@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CONFIG_FILE="${CONFIG_FILE:-${APP_DIR}/deploy/install.env}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
+HEALTH_CHECK="${HEALTH_CHECK:-true}"
 
 log() {
   printf '\n\033[1;32m==> %s\033[0m\n' "$*" >&2
@@ -11,6 +12,11 @@ log() {
 
 warn() {
   printf '\n\033[1;33mWARN: %s\033[0m\n' "$*" >&2
+}
+
+fail() {
+  printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2
+  exit 1
 }
 
 read_kv() {
@@ -58,6 +64,34 @@ load_config() {
   FRONTEND_URL="${FRONTEND_URL:-https://${DOMAIN}}"
   API_PORT="${API_PORT:-3001}"
   SITE_ROOT="$(infer_site_root)"
+}
+
+validate_fastpanel_target() {
+  log "Checking FastPanel deploy target"
+
+  [[ -d "${APP_DIR}/sellway-backend" ]] || fail "Backend directory not found: ${APP_DIR}/sellway-backend"
+  [[ -d "${APP_DIR}/sellway-frontend" ]] || fail "Frontend directory not found: ${APP_DIR}/sellway-frontend"
+
+  if [[ -z "$SITE_ROOT" ]]; then
+    fail "SITE_ROOT is empty. Set it in ${CONFIG_FILE} or pass SITE_ROOT=/path/to/site."
+  fi
+
+  mkdir -p "$SITE_ROOT"
+
+  if [[ ! -w "$SITE_ROOT" ]]; then
+    warn "SITE_ROOT is not writable by current user: ${SITE_ROOT}"
+    warn "Run update as root/sudo or fix permissions in FastPanel."
+  fi
+
+  cat <<EOF
+FastPanel-safe update mode:
+  APP_DIR: ${APP_DIR}
+  DOMAIN: ${DOMAIN}
+  FRONTEND_URL: ${FRONTEND_URL}
+  API_PORT: ${API_PORT}
+  SITE_ROOT: ${SITE_ROOT}
+  Nginx/SSL: not touched
+EOF
 }
 
 save_config() {
@@ -121,7 +155,7 @@ EOF
   npm run build
 
   if [[ "$SITE_ROOT" != "${APP_DIR}/sellway-frontend/dist" ]]; then
-    log "Copying frontend build to ${SITE_ROOT}"
+    log "Copying frontend build to FastPanel SITE_ROOT=${SITE_ROOT}"
     mkdir -p "$SITE_ROOT"
     cp -a "${APP_DIR}/sellway-frontend/dist"/. "$SITE_ROOT"/
   fi
@@ -144,6 +178,28 @@ restart_services() {
   pm2 save
 }
 
+post_update_healthcheck() {
+  [[ "$HEALTH_CHECK" == "true" ]] || return
+
+  log "Checking SellWay API health"
+  sleep 2
+
+  if curl -fsS "http://127.0.0.1:${API_PORT}/health" >/tmp/sellway-health.json 2>/tmp/sellway-health.err; then
+    printf 'Health: OK — '
+    cat /tmp/sellway-health.json
+    printf '\n'
+    return
+  fi
+
+  warn "SellWay API health-check failed. Last curl error:"
+  cat /tmp/sellway-health.err || true
+  warn "PM2 status:"
+  pm2 status || true
+  warn "Recent API logs:"
+  pm2 logs sellway-api --lines 80 --nostream || true
+  fail "Update finished but API is not healthy. Check .env, database and PM2 logs."
+}
+
 finish() {
   cat <<EOF
 
@@ -153,14 +209,17 @@ Project: ${APP_DIR}
 Site root: ${SITE_ROOT}
 Config: ${CONFIG_FILE}
 Health: curl http://127.0.0.1:${API_PORT}/health
+FastPanel: Nginx and SSL were not changed.
 EOF
 }
 
 load_config
+validate_fastpanel_target
 save_config
 update_code
 update_backend
 run_migrations
 update_frontend
 restart_services
+post_update_healthcheck
 finish
