@@ -406,10 +406,14 @@ install_backend() {
   npm install
 
   if [[ "$INIT_DB" == "true" && "$DATABASE_URL" != *"password@localhost"* ]]; then
-    log "Applying database schema"
-    if ! psql "$DATABASE_URL" -f db/schema.sql; then
-      warn "Database schema was not applied because PostgreSQL is unavailable or DATABASE_URL is wrong."
-      warn "Fix DATABASE_URL in ${APP_DIR}/sellway-backend/.env and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"
+    if psql "$DATABASE_URL" -tAc "SELECT to_regclass('public.users') IS NOT NULL" 2>/dev/null | grep -q t; then
+      warn "Database schema already exists; skipping db/schema.sql. Existing data was not touched."
+    else
+      log "Applying database schema"
+      if ! psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.sql; then
+        warn "Database schema was not applied because PostgreSQL is unavailable or DATABASE_URL is wrong."
+        warn "Fix DATABASE_URL in ${APP_DIR}/sellway-backend/.env and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"
+      fi
     fi
   else
     warn "Database schema was not applied. Set DATABASE_URL and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"

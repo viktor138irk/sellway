@@ -8,3 +8,6 @@ export const uploadImages  = (id, formData) => client.post(`/products/${id}/imag
 export const addKeys       = (id, keys) => client.post(`/products/${id}/keys`, { keys });
 export const getKeys       = (id) => client.get(`/products/${id}/keys`);
 export const getCategories = () => client.get('/categories');
+export const createCategory = (data) => client.post('/categories', data);
+export const updateCategory = (id, data) => client.put(`/categories/${id}`, data);
+export const deleteCategory = (id) => client.delete(`/categories/${id}`);
