@@ -1,0 +1,16 @@
+import client from './client';
+export const getStats         = ()          => client.get('/admin/stats');
+export const getUsers         = (p)         => client.get('/admin/users', { params: p });
+export const updateUser       = (id, data)  => client.put(`/admin/users/${id}`, data);
+export const getPendingProducts = (p)       => client.get('/admin/products', { params: { status:'pending', ...p } });
+export const approveProduct   = (id)        => client.post(`/admin/products/${id}/approve`);
+export const rejectProduct    = (id, reason)=> client.post(`/admin/products/${id}/reject`, { reason });
+export const getAdminOrders   = (p)         => client.get('/admin/orders', { params: p });
+export const getDisputes      = (p)         => client.get('/admin/disputes', { params: p });
+export const resolveDispute   = (id, data)  => client.post(`/admin/disputes/${id}/resolve`, data);
+export const getWithdrawals   = (p)         => client.get('/admin/withdrawals', { params: p });
+export const approveWithdraw  = (id)        => client.post(`/admin/withdrawals/${id}/approve`);
+export const rejectWithdraw   = (id, reason)=> client.post(`/admin/withdrawals/${id}/reject`, { reason });
+export const getAdminSettings = ()          => client.get('/admin/settings');
+export const saveSettings     = (data)      => client.put('/admin/settings', data);
+export const getLogs          = (p)         => client.get('/admin/logs', { params: p });

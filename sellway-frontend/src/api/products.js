@@ -1,0 +1,10 @@
+import client from './client';
+export const getProducts  = (params) => client.get('/products', { params });
+export const getProduct   = (id) => client.get(`/products/${id}`);
+export const createProduct = (data) => client.post('/products', data);
+export const updateProduct = (id, data) => client.put(`/products/${id}`, data);
+export const deleteProduct = (id) => client.delete(`/products/${id}`);
+export const uploadImages  = (id, formData) => client.post(`/products/${id}/images`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const addKeys       = (id, keys) => client.post(`/products/${id}/keys`, { keys });
+export const getKeys       = (id) => client.get(`/products/${id}/keys`);
+export const getCategories = () => client.get('/categories');
