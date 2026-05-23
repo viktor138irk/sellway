@@ -6,14 +6,14 @@ import { C, Btn, Input } from '../../components/UI';
 
 function AuthWrap({ children, title, sub }) {
   return (
-    <div style={{ minHeight: 'calc(100vh - 90px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ width: '100%', maxWidth: 420 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+    <div style={{ minHeight: 'calc(100vh - 90px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ width: '100%', maxWidth: 460 }}>
+        <div style={{ textAlign: 'center', marginBottom: 26 }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>⚡</div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: C.t1, marginBottom: 8 }}>{title}</h1>
           <p style={{ fontSize: 14, color: C.t2 }}>{sub}</p>
         </div>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 28 }}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 'clamp(18px, 5vw, 28px)' }}>
           {children}
         </div>
       </div>
@@ -21,22 +21,25 @@ function AuthWrap({ children, title, sub }) {
   );
 }
 
-// ── Login ─────────────────────────────────────────────
+function dashboardPath(role, fallback = '/') {
+  return ['seller', 'freelancer', 'admin'].includes(role) ? '/seller' : fallback;
+}
+
 export function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
-  const [loading, setLoading]   = useState(false);
-  const { login }   = useAuth();
-  const { error }   = useToast();
-  const navigate    = useNavigate();
-  const location    = useLocation();
-  const from        = location.state?.from?.pathname || '/';
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const { error } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/';
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     try {
       const user = await login(form.email, form.password);
-      navigate(user.role === 'seller' || user.role === 'admin' ? '/seller' : from, { replace: true });
+      navigate(dashboardPath(user.role, from), { replace: true });
     } catch (err) {
       error(err.response?.data?.error || 'Неверный email или пароль');
     } finally {
@@ -47,10 +50,8 @@ export function LoginPage() {
   return (
     <AuthWrap title="Добро пожаловать" sub="Войдите в свой аккаунт SellWay">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Input label="Email" type="email" value={form.email} placeholder="you@example.com"
-          onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
-        <Input label="Пароль" type="password" value={form.password} placeholder="Минимум 8 символов"
-          onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
+        <Input label="Email" type="email" value={form.email} placeholder="you@example.com" onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+        <Input label="Пароль" type="password" value={form.password} placeholder="Минимум 8 символов" onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Link to="/forgot-password" style={{ fontSize: 12, color: C.accent, textDecoration: 'none' }}>Забыли пароль?</Link>
         </div>
@@ -64,16 +65,16 @@ export function LoginPage() {
   );
 }
 
-// ── Register ──────────────────────────────────────────
 export function RegisterPage() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const initialRef = params.get('ref') || '';
-  const initialRole = params.get('role') === 'seller' || initialRef ? 'seller' : 'buyer';
+  const requestedRole = params.get('role');
+  const initialRole = ['seller', 'freelancer'].includes(requestedRole) ? requestedRole : (initialRef ? 'seller' : 'buyer');
   const [form, setForm] = useState({ email: '', username: '', password: '', role: initialRole, ref: initialRef });
   const [errors, setErrors] = useState({});
-  const [loading, setLoading]  = useState(false);
-  const [done, setDone]        = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
   const { register } = useAuth();
   const { error: showError, success } = useToast();
 
@@ -112,32 +113,33 @@ export function RegisterPage() {
     </AuthWrap>
   );
 
+  const roleOptions = [
+    ['buyer', '🛒', 'Покупатель', 'Покупать товары и услуги'],
+    ['seller', '📦', 'Продавец', 'Готовые цифровые товары'],
+    ['freelancer', '🧑‍💻', 'Фрилансер', 'Услуги и поэтапные сделки'],
+  ];
+
   return (
-    <AuthWrap title="Создать аккаунт" sub="Присоединяйтесь к SellWay">
+    <AuthWrap title="Создать аккаунт" sub="Выберите роль под свой сценарий">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Я хочу</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {[['buyer','🛒','Покупать'], ['seller','📦','Продавать']].map(([val, icon, label]) => (
-              <div key={val} onClick={() => setForm(f => ({ ...f, role: val }))}
-                style={{ background: form.role === val ? C.accent + '18' : '#0A0A12',
-                  border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 10,
-                  padding: '12px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: 8 }}>
+            {roleOptions.map(([val, icon, label, hint]) => (
+              <button key={val} type="button" onClick={() => setForm(f => ({ ...f, role: val }))}
+                style={{ background: form.role === val ? C.accent + '18' : '#0A0A12', border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 10, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: form.role === val ? C.accent : C.t1 }}>{label}</div>
-              </div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: form.role === val ? C.accent : C.t1 }}>{label}</div>
+                <div style={{ fontSize: 10, color: C.t3, marginTop: 3, lineHeight: 1.3 }}>{hint}</div>
+              </button>
             ))}
           </div>
         </div>
-        <Input label="Email" type="email" value={form.email} placeholder="you@example.com"
-          onChange={e => setForm(f => ({ ...f, email: e.target.value }))} error={errors.email} required />
-        <Input label="Никнейм" value={form.username} placeholder="только буквы, цифры, _"
-          onChange={e => setForm(f => ({ ...f, username: e.target.value }))} error={errors.username} required />
-        <Input label="Пароль" type="password" value={form.password} placeholder="Минимум 8 символов"
-          onChange={e => setForm(f => ({ ...f, password: e.target.value }))} error={errors.password} required />
-        {form.role === 'seller' && (
-          <Input label="Реферальный код" value={form.ref} placeholder="если есть"
-            onChange={e => setForm(f => ({ ...f, ref: e.target.value.trim() }))} error={errors.ref} />
+        <Input label="Email" type="email" value={form.email} placeholder="you@example.com" onChange={e => setForm(f => ({ ...f, email: e.target.value }))} error={errors.email} required />
+        <Input label="Никнейм" value={form.username} placeholder="только буквы, цифры, _" onChange={e => setForm(f => ({ ...f, username: e.target.value }))} error={errors.username} required />
+        <Input label="Пароль" type="password" value={form.password} placeholder="Минимум 8 символов" onChange={e => setForm(f => ({ ...f, password: e.target.value }))} error={errors.password} required />
+        {['seller', 'freelancer'].includes(form.role) && (
+          <Input label="Реферальный код" value={form.ref} placeholder="если есть" onChange={e => setForm(f => ({ ...f, ref: e.target.value.trim() }))} error={errors.ref} />
         )}
         <Btn type="submit" full loading={loading} size="lg">Создать аккаунт</Btn>
       </form>
