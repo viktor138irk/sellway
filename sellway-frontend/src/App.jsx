@@ -26,6 +26,7 @@ const AdminProducts     = lazy(() => import('./pages/admin/ProductsModerationPag
 const AdminOrders       = lazy(() => import('./pages/admin/OrdersPage'));
 const AdminDisputes     = lazy(() => import('./pages/admin/DisputesPage'));
 const AdminWithdrawals  = lazy(() => import('./pages/admin/WithdrawalsPage'));
+const AdminReferrals    = lazy(() => import('./pages/admin/ReferralsPage'));
 const AdminCategories   = lazy(() => import('./pages/admin/CategoriesPage'));
 const AdminSettings     = lazy(() => import('./pages/admin/SettingsPage'));
 const AdminLogs         = lazy(() => import('./pages/admin/LogsPage'));
@@ -77,6 +78,7 @@ function AppRoutes() {
     <Route path="/admin/orders" element={<Protected roles={['admin','moderator']}><AdminOrders/></Protected>}/>
     <Route path="/admin/disputes" element={<Protected roles={['admin','moderator']}><AdminDisputes/></Protected>}/>
     <Route path="/admin/withdrawals" element={<Protected roles={['admin']}><AdminWithdrawals/></Protected>}/>
+    <Route path="/admin/referrals" element={<Protected roles={['admin']}><AdminReferrals/></Protected>}/>
     <Route path="/admin/categories" element={<Protected roles={['admin']}><AdminCategories/></Protected>}/>
     <Route path="/admin/settings" element={<Protected roles={['admin']}><AdminSettings/></Protected>}/>
     <Route path="/admin/logs" element={<Protected roles={['admin']}><AdminLogs/></Protected>}/>
