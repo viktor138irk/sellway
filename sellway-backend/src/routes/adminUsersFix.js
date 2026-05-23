@@ -66,38 +66,96 @@ router.get('/stats', async (req, res) => {
     const referralToday = Number(p.referral_today || 0);
     const avgDelivery = await query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (delivered_at-created_at))/60),0) AS avg_min FROM orders WHERE delivered_at IS NOT NULL AND created_at > NOW()-INTERVAL '7 days'`);
 
+    res.json({ revenue: { gross_total: r.gross_total || 0, gross_week: r.gross_week || 0, gross_today: r.gross_today || 0, commission_total: commissionTotal, commission_week: commissionWeek, commission_today: commissionToday, referral_total: referralTotal, referral_week: referralWeek, referral_today: referralToday, profit_total: Math.max(0, commissionTotal - referralTotal), profit_week: Math.max(0, commissionWeek - referralWeek), profit_today: Math.max(0, commissionToday - referralToday) }, orders: orders.rows[0], users: users.rows[0], disputes: disputes.rows[0], products: products.rows[0], avgDeliveryMin: Math.round(avgDelivery.rows[0].avg_min), online: Number(online.rows[0]?.online || 0), trend: trends.rows.map(x => ({ day: x.day, commission: Number(x.commission || 0), referral: Number(x.referral || 0), profit: Math.max(0, Number(x.commission || 0) - Number(x.referral || 0)) })) });
+  } catch (err) { logger.error('Admin stats fix error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+router.get('/referrals', requireRole('admin'), async (req, res) => {
+  try {
+    const [settings, summary, topReferrers, recentPayments, invited] = await Promise.all([
+      query(`SELECT key, value FROM settings WHERE key IN ('referral_enabled','default_referral_commission_rate','max_referral_commission_rate','referral_payout_basis')`),
+      query(`SELECT COALESCE(SUM(t.amount),0) AS paid_total,
+                    COALESCE(SUM(CASE WHEN t.created_at::date=CURRENT_DATE THEN t.amount END),0) AS paid_today,
+                    COALESCE(SUM(CASE WHEN t.created_at > NOW()-INTERVAL '7 days' THEN t.amount END),0) AS paid_week,
+                    COUNT(t.id)::int AS payments_count,
+                    COUNT(DISTINCT s.user_id)::int AS referrers_count,
+                    COUNT(DISTINCT child.user_id)::int AS invited_count
+             FROM sellers s
+             LEFT JOIN sellers child ON child.referred_by_seller_id=s.user_id
+             LEFT JOIN transactions t ON t.user_id=s.user_id AND t.meta->>'source'='seller_referral'`),
+      query(`SELECT u.id, u.username, u.email, u.role,
+                    s.referral_code, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count,
+                    COALESCE(SUM(t.amount),0) AS paid_total,
+                    COUNT(t.id)::int AS payments_count
+             FROM sellers s
+             JOIN users u ON u.id=s.user_id
+             LEFT JOIN transactions t ON t.user_id=s.user_id AND t.meta->>'source'='seller_referral'
+             WHERE s.referred_sellers_count > 0 OR s.referral_earnings > 0
+             GROUP BY u.id, u.username, u.email, u.role, s.referral_code, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count
+             ORDER BY paid_total DESC, s.referred_sellers_count DESC LIMIT 50`),
+      query(`SELECT t.id, t.amount, t.description, t.created_at, t.order_id,
+                    ref_u.username AS referrer_name, ref_u.email AS referrer_email,
+                    seller_u.username AS seller_name, seller_u.email AS seller_email,
+                    o.order_number, p.title AS product_title
+             FROM transactions t
+             JOIN users ref_u ON ref_u.id=t.user_id
+             LEFT JOIN orders o ON o.id=t.order_id
+             LEFT JOIN users seller_u ON seller_u.id=o.seller_id
+             LEFT JOIN products p ON p.id=o.product_id
+             WHERE t.meta->>'source'='seller_referral'
+             ORDER BY t.created_at DESC LIMIT 100`),
+      query(`SELECT child.user_id, child.created_at, child.referral_commission_rate,
+                    u.username, u.email, u.role,
+                    ref.username AS referrer_name, ref.email AS referrer_email,
+                    COALESCE(SUM(o.amount),0) AS turnover,
+                    COUNT(o.id)::int AS confirmed_orders,
+                    COALESCE(SUM(t.amount),0) AS referral_paid
+             FROM sellers child
+             JOIN users u ON u.id=child.user_id
+             LEFT JOIN users ref ON ref.id=child.referred_by_seller_id
+             LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed'
+             LEFT JOIN transactions t ON t.order_id=o.id AND t.meta->>'source'='seller_referral'
+             WHERE child.referred_by_seller_id IS NOT NULL
+             GROUP BY child.user_id, child.created_at, child.referral_commission_rate, u.username, u.email, u.role, ref.username, ref.email
+             ORDER BY child.created_at DESC LIMIT 100`),
+    ]);
+
+    const cfg = Object.fromEntries(settings.rows.map(r => [r.key, r.value]));
     res.json({
-      revenue: {
-        gross_total: r.gross_total || 0,
-        gross_week: r.gross_week || 0,
-        gross_today: r.gross_today || 0,
-        commission_total: commissionTotal,
-        commission_week: commissionWeek,
-        commission_today: commissionToday,
-        referral_total: referralTotal,
-        referral_week: referralWeek,
-        referral_today: referralToday,
-        profit_total: Math.max(0, commissionTotal - referralTotal),
-        profit_week: Math.max(0, commissionWeek - referralWeek),
-        profit_today: Math.max(0, commissionToday - referralToday),
+      settings: {
+        referral_enabled: cfg.referral_enabled ?? 'true',
+        default_referral_commission_rate: cfg.default_referral_commission_rate ?? '0.0100',
+        max_referral_commission_rate: cfg.max_referral_commission_rate ?? '0.0500',
+        referral_payout_basis: cfg.referral_payout_basis ?? 'turnover',
       },
-      orders: orders.rows[0],
-      users: users.rows[0],
-      disputes: disputes.rows[0],
-      products: products.rows[0],
-      avgDeliveryMin: Math.round(avgDelivery.rows[0].avg_min),
-      online: Number(online.rows[0]?.online || 0),
-      trend: trends.rows.map(x => ({
-        day: x.day,
-        commission: Number(x.commission || 0),
-        referral: Number(x.referral || 0),
-        profit: Math.max(0, Number(x.commission || 0) - Number(x.referral || 0)),
-      })),
+      summary: summary.rows[0] || {},
+      topReferrers: topReferrers.rows,
+      recentPayments: recentPayments.rows,
+      invited: invited.rows,
     });
-  } catch (err) {
-    logger.error('Admin stats fix error', { err: err.message });
-    res.status(500).json({ error: 'Ошибка сервера' });
+  } catch (err) { logger.error('Admin referrals error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+router.put('/referrals/settings', requireRole('admin'), async (req, res) => {
+  const allowed = ['referral_enabled', 'default_referral_commission_rate', 'max_referral_commission_rate', 'referral_payout_basis'];
+  const data = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+  if ('default_referral_commission_rate' in data) {
+    const n = Number(data.default_referral_commission_rate);
+    if (Number.isNaN(n) || n < 0 || n > 0.5) return res.status(400).json({ error: 'Ставка по умолчанию должна быть от 0 до 0.5' });
   }
+  if ('max_referral_commission_rate' in data) {
+    const n = Number(data.max_referral_commission_rate);
+    if (Number.isNaN(n) || n < 0 || n > 0.5) return res.status(400).json({ error: 'Максимальная ставка должна быть от 0 до 0.5' });
+  }
+  if (data.referral_payout_basis && !['turnover', 'platform_commission'].includes(data.referral_payout_basis)) return res.status(400).json({ error: 'Некорректная база расчёта' });
+  try {
+    await transaction(async (client) => {
+      for (const [key, value] of Object.entries(data)) {
+        await client.query(`INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`, [key, String(value)]);
+      }
+    });
+    res.json({ message: 'Настройки рефералов сохранены' });
+  } catch (err) { logger.error('Save referral settings error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 router.get('/users', async (req, res) => {
@@ -105,115 +163,54 @@ router.get('/users', async (req, res) => {
   const offset = (Number(page) - 1) * Number(limit);
   const params = [];
   const where = [];
-
   if (search) { params.push(`%${search}%`); where.push(`(u.username ILIKE $${params.length} OR u.email ILIKE $${params.length})`); }
   if (role) { params.push(role); where.push(`u.role=$${params.length}`); }
   if (status) { params.push(status); where.push(`u.status=$${params.length}`); }
-
   const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
   params.push(Number(limit), offset);
-
   try {
-    const { rows } = await query(
-      `SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified,
-              u.created_at, u.last_login_at,
-              w.balance, w.held,
-              s.rating, s.total_sales, s.verified AS seller_verified,
-              s.custom_commission_rate, s.referral_code,
-              s.referred_by_seller_id, ref_user.email AS referred_by_email,
-              ref_user.username AS referred_by_username,
-              s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count,
-              COALESCE(ref_orders.orders_count, 0) AS referral_orders_count,
-              COALESCE(ref_orders.turnover, 0) AS referral_turnover
-       FROM users u
-       LEFT JOIN wallets w ON w.user_id=u.id
-       LEFT JOIN sellers s ON s.user_id=u.id
-       LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id
-       LEFT JOIN (
-         SELECT child.referred_by_seller_id AS user_id,
-                COUNT(o.id)::int AS orders_count,
-                COALESCE(SUM(o.amount),0) AS turnover
-         FROM sellers child
-         LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed'
-         WHERE child.referred_by_seller_id IS NOT NULL
-         GROUP BY child.referred_by_seller_id
-       ) ref_orders ON ref_orders.user_id=u.id
-       ${whereStr}
-       ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`,
-      params
-    );
+    const { rows } = await query(`SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
     res.json({ users: rows });
-  } catch (err) {
-    logger.error('Admin users list error', { err: err.message });
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { logger.error('Admin users list error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 router.put('/users/:id', requireRole('admin'), async (req, res) => {
   const { role, status, custom_commission_rate, referral_commission_rate, referred_by } = req.body;
   const allowedRoles = ['buyer', 'seller', 'freelancer', 'moderator', 'admin'];
   if (role && !allowedRoles.includes(role)) return res.status(400).json({ error: 'Некорректная роль' });
-
   try {
     const result = await transaction(async (client) => {
-      const { rows: [user] } = await client.query(
-        'UPDATE users SET role=COALESCE($1,role), status=COALESCE($2,status) WHERE id=$3 RETURNING id, email, username, role, status',
-        [role || null, status || null, req.params.id]
-      );
+      const { rows: [user] } = await client.query('UPDATE users SET role=COALESCE($1,role), status=COALESCE($2,status) WHERE id=$3 RETURNING id, email, username, role, status', [role || null, status || null, req.params.id]);
       if (!user) throw { status: 404, message: 'Пользователь не найден' };
-
       if (COMMERCIAL_ROLES.includes(user.role)) await ensureSellerProfile(client, user);
-
       if (COMMERCIAL_ROLES.includes(user.role)) {
         let referrerId = undefined;
         if (referred_by !== undefined) {
           const ref = String(referred_by || '').trim();
           if (ref) {
-            const { rows: [referrer] } = await client.query(
-              `SELECT s.user_id
-               FROM sellers s
-               JOIN users u ON u.id=s.user_id
-               WHERE LOWER(s.referral_code)=LOWER($1)
-                  OR LOWER(u.email)=LOWER($1)
-                  OR LOWER(u.username)=LOWER($1)
-               LIMIT 1`,
-              [ref]
-            );
+            const { rows: [referrer] } = await client.query(`SELECT s.user_id FROM sellers s JOIN users u ON u.id=s.user_id WHERE LOWER(s.referral_code)=LOWER($1) OR LOWER(u.email)=LOWER($1) OR LOWER(u.username)=LOWER($1) LIMIT 1`, [ref]);
             if (!referrer) throw { status: 400, message: 'Реферер не найден' };
             if (referrer.user_id === user.id) throw { status: 400, message: 'Нельзя назначить пользователя реферером самому себе' };
             referrerId = referrer.user_id;
-          } else {
-            referrerId = null;
-          }
+          } else referrerId = null;
         }
-
         const commissionRate = custom_commission_rate === '' || custom_commission_rate === undefined ? null : Number(custom_commission_rate);
         const referralRate = referral_commission_rate === '' || referral_commission_rate === undefined ? undefined : Number(referral_commission_rate);
         if (commissionRate !== null && (Number.isNaN(commissionRate) || commissionRate < 0 || commissionRate > 0.5)) throw { status: 400, message: 'Комиссия должна быть от 0 до 0.5' };
         if (referralRate !== undefined && (Number.isNaN(referralRate) || referralRate < 0 || referralRate > 0.5)) throw { status: 400, message: 'Реферальный процент должен быть от 0 до 0.5' };
-
         const updates = [];
         const values = [];
         if (custom_commission_rate !== undefined) { values.push(commissionRate); updates.push(`custom_commission_rate=$${values.length}`); }
         if (referralRate !== undefined) { values.push(referralRate); updates.push(`referral_commission_rate=$${values.length}`); }
         if (referrerId !== undefined) { values.push(referrerId); updates.push(`referred_by_seller_id=$${values.length}`); }
-        if (updates.length) {
-          values.push(user.id);
-          await client.query(`UPDATE sellers SET ${updates.join(', ')} WHERE user_id=$${values.length}`, values);
-        }
-
+        if (updates.length) { values.push(user.id); await client.query(`UPDATE sellers SET ${updates.join(', ')} WHERE user_id=$${values.length}`, values); }
         await client.query(`UPDATE sellers s SET referred_sellers_count=(SELECT COUNT(*) FROM sellers child WHERE child.referred_by_seller_id=s.user_id)`);
       }
-
       return user;
     });
     logger.info('User updated by admin users fix', { targetId: req.params.id, adminId: req.user.id, role, status });
     res.json(result);
-  } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    logger.error('Admin users update error', { err: err.message });
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Admin users update error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 module.exports = router;
