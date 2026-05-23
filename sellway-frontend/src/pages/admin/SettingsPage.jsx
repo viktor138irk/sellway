@@ -19,7 +19,30 @@ const SECTIONS = [
     ['maintenance_mode','Режим обслуживания','toggle','false','Закрыть сайт для пользователей'],
     ['new_seller_requires_verify','Верификация продавцов','toggle','true','Требовать проверку новых продавцов'],
   ]},
+  { title: '✈️ Telegram', keys: [
+    ['TELEGRAM_BOT_TOKEN','Токен бота','password','','Токен от @BotFather'],
+    ['TELEGRAM_BOT_USERNAME','Username бота','text','SellWayBot','Без символа @'],
+    ['TELEGRAM_ADMIN_CHAT_ID','Chat ID админа','text','','Для системных уведомлений'],
+  ]},
+  { title: '🧦 SOCKS5 для Telegram', keys: [
+    ['PROXY_ENABLED','Использовать SOCKS5','toggle','false','Нужно, если Telegram недоступен напрямую'],
+    ['PROXY_HOST','Хост прокси','text','127.0.0.1','IP или домен прокси'],
+    ['PROXY_PORT','Порт прокси','number','1080',''],
+    ['PROXY_USERNAME','Логин прокси','text','','Оставь пустым, если авторизация не нужна'],
+    ['PROXY_PASSWORD','Пароль прокси','password','','Оставь пустым, если авторизация не нужна'],
+  ]},
 ];
+
+const RESTART_KEYS = new Set([
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_BOT_USERNAME',
+  'TELEGRAM_ADMIN_CHAT_ID',
+  'PROXY_ENABLED',
+  'PROXY_HOST',
+  'PROXY_PORT',
+  'PROXY_USERNAME',
+  'PROXY_PASSWORD',
+]);
 
 export default function SettingsPage() {
   const toast = useToast();
@@ -48,8 +71,12 @@ export default function SettingsPage() {
     if (!Object.keys(changed).length) return toast.info('Нет изменений');
     setSaving(true);
     try {
-      await saveSettings(changed);
-      toast.success('Настройки сохранены ✅');
+      const { data } = await saveSettings(changed);
+      if (data.restartRequired || Object.keys(changed).some(key => RESTART_KEYS.has(key))) {
+        toast.warn('Сохранено. Перезапусти sellway-api и sellway-bot в PM2');
+      } else {
+        toast.success('Настройки сохранены ✅');
+      }
       setChanged({});
     } catch { toast.error('Ошибка сохранения'); }
     finally { setSaving(false); }
@@ -98,7 +125,8 @@ export default function SettingsPage() {
                         {type === 'toggle'
                           ? <Toggle value={val === 'true'} onChange={v => update(key, v)} />
                           : <input type={type} value={val} onChange={e => update(key, e.target.value)}
-                              style={{ background:'#0A0A12', border:`1px solid ${isChanged ? C.accent : C.border}`, borderRadius:8, padding:'8px 12px', color:C.t1, fontSize:14, fontWeight:700, outline:'none', fontFamily:'inherit', width:120, textAlign:'right', transition:'border-color .2s' }} />}
+                              autoComplete="new-password"
+                              style={{ background:'#0A0A12', border:`1px solid ${isChanged ? C.accent : C.border}`, borderRadius:8, padding:'8px 12px', color:C.t1, fontSize:14, fontWeight:700, outline:'none', fontFamily:'inherit', width:type === 'number' ? 120 : 300, textAlign:type === 'number' ? 'right' : 'left', transition:'border-color .2s' }} />}
                       </div>
                     </div>
                   );
@@ -106,6 +134,12 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
+
+          {Object.keys(changed).some(key => RESTART_KEYS.has(key)) && (
+            <div style={{ background:C.amber+'12', border:`1px solid ${C.amber}44`, borderRadius:12, padding:'14px 18px', color:C.amber, fontSize:12, fontWeight:700 }}>
+              После сохранения Telegram/SOCKS5 настроек выполни на сервере: pm2 restart sellway-api sellway-bot --update-env
+            </div>
+          )}
 
           {/* Danger zone */}
           <div style={{ background:'#1A0808', border:`1px solid ${C.red}44`, borderRadius:16, overflow:'hidden' }}>

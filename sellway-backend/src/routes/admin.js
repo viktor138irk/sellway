@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const fs = require('fs');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -6,6 +7,33 @@ const { query, transaction } = require('../config/db');
 const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
+
+const ENV_FILE = path.resolve(__dirname, '..', '..', '.env');
+const ENV_SETTINGS = {
+  TELEGRAM_BOT_TOKEN: 'Токен Telegram-бота от @BotFather',
+  TELEGRAM_BOT_USERNAME: 'Username Telegram-бота без @',
+  TELEGRAM_ADMIN_CHAT_ID: 'Chat ID администратора для уведомлений',
+  PROXY_ENABLED: 'Включить SOCKS5-прокси для Telegram',
+  PROXY_HOST: 'Хост SOCKS5-прокси',
+  PROXY_PORT: 'Порт SOCKS5-прокси',
+  PROXY_USERNAME: 'Логин SOCKS5-прокси',
+  PROXY_PASSWORD: 'Пароль SOCKS5-прокси',
+};
+
+function setEnvValue(content, key, value) {
+  const line = `${key}=${String(value ?? '').replace(/\r?\n/g, '')}`;
+  const re = new RegExp(`^${key}=.*$`, 'm');
+  return re.test(content) ? content.replace(re, line) : `${content.replace(/\s*$/, '')}\n${line}\n`;
+}
+
+function writeEnvSettings(updates) {
+  let content = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8') : '';
+  for (const [key, value] of Object.entries(updates)) {
+    content = setEnvValue(content, key, value);
+    process.env[key] = String(value ?? '');
+  }
+  fs.writeFileSync(ENV_FILE, content, { mode: 0o600 });
+}
 
 // Multer для загрузки картинок (категории, баннеры и т.д.)
 const upload = multer({
@@ -345,25 +373,44 @@ router.post('/withdrawals/:id/reject', requireRole('admin'), async (req, res) =>
 
 // ── GET /admin/settings ───────────────────────────────
 
-router.get('/settings', async (req, res) => {
+router.get('/settings', requireRole('admin'), async (req, res) => {
   const { rows } = await query('SELECT key, value, description FROM settings ORDER BY key');
-  res.json(Object.fromEntries(rows.map(r => [r.key, { value: r.value, description: r.description }])));
+  const settings = Object.fromEntries(rows.map(r => [r.key, { value: r.value, description: r.description }]));
+  for (const [key, description] of Object.entries(ENV_SETTINGS)) {
+    settings[key] = { value: process.env[key] || '', description, source: 'env' };
+  }
+  res.json(settings);
 });
 
 // ── PUT /admin/settings ───────────────────────────────
 
 router.put('/settings', requireRole('admin'), async (req, res) => {
   const updates = req.body; // { key: value, ... }
+  const envUpdates = {};
+  const dbUpdates = {};
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (key in ENV_SETTINGS) envUpdates[key] = String(value);
+    else dbUpdates[key] = String(value);
+  }
+
   try {
-    for (const [key, value] of Object.entries(updates)) {
+    for (const [key, value] of Object.entries(dbUpdates)) {
       await query(
-        'UPDATE settings SET value=$1, updated_at=NOW() WHERE key=$2',
-        [String(value), key]
+        `INSERT INTO settings (key, value, description, updated_at)
+         VALUES ($1,$2,NULL,NOW())
+         ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+        [key, value]
       );
     }
+    if (Object.keys(envUpdates).length) writeEnvSettings(envUpdates);
     logger.info('Settings updated', { adminId: req.user.id, keys: Object.keys(updates) });
-    res.json({ message: 'Настройки сохранены' });
+    res.json({
+      message: 'Настройки сохранены',
+      restartRequired: Object.keys(envUpdates).some(key => key.startsWith('TELEGRAM_') || key.startsWith('PROXY_')),
+    });
   } catch (err) {
+    logger.error('Settings update error', { err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
