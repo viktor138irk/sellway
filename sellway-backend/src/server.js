@@ -34,6 +34,7 @@ app.use('/api/orders',         require('./routes/orders'));
 app.use('/api/service-orders', require('./routes/serviceOrders'));
 app.use('/api/categories',     require('./routes/categories'));
 app.use('/api/seller',         require('./routes/seller'));
+app.use('/api/admin',          require('./routes/adminReferralModeration'));
 app.use('/api/admin',          require('./routes/adminUsersFix'));
 app.use('/api/admin',          require('./routes/admin'));
 app.use('/api/notifications',  require('./routes/notifications'));
@@ -51,6 +52,6 @@ server.listen(PORT, '0.0.0.0', () => {
   logger.info(`   ЮKassa webhook: /api/payments/webhook`);
 });
 
-process.on('SIGTERM', async () => { server.close(() => pool.end().then(() => process.exit(0))); });
+process.on('SIGTERM', async () => { server.close(() => pool.end().then(() => pool.end()).finally(() => process.exit(0))); });
 process.on('unhandledRejection', (r) => logger.error('Unhandled rejection', { reason: String(r) }));
 module.exports = { app, server };
