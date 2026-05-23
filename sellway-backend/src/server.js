@@ -27,14 +27,15 @@ app.use((req, res, next) => { const s = Date.now(); res.on('finish', () => { if 
 
 app.get('/health', async (req, res) => { try { await pool.query('SELECT 1'); res.json({ status:'ok', service:'SellWay API' }); } catch { res.status(503).json({ status:'error' }); } });
 
-app.use('/api/auth',          require('./routes/auth'));
-app.use('/api/products',      require('./routes/products'));
-app.use('/api/orders',        require('./routes/orders'));
-app.use('/api/categories',    require('./routes/categories'));
-app.use('/api/seller',        require('./routes/seller'));
-app.use('/api/admin',         require('./routes/admin'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/payments',      require('./routes/payments'));
+app.use('/api/auth',           require('./routes/auth'));
+app.use('/api/products',       require('./routes/products'));
+app.use('/api/orders',         require('./routes/orders'));
+app.use('/api/service-orders', require('./routes/serviceOrders'));
+app.use('/api/categories',     require('./routes/categories'));
+app.use('/api/seller',         require('./routes/seller'));
+app.use('/api/admin',          require('./routes/admin'));
+app.use('/api/notifications',  require('./routes/notifications'));
+app.use('/api/payments',       require('./routes/payments'));
 
 app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.path} not found` }));
 app.use((err, req, res, next) => { logger.error('Error', { err: err.message }); res.status(err.status||500).json({ error: process.env.NODE_ENV==='production' ? 'Внутренняя ошибка' : err.message }); });
