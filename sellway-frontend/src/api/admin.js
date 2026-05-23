@@ -13,4 +13,6 @@ export const approveWithdraw  = (id)        => client.post(`/admin/withdrawals/$
 export const rejectWithdraw   = (id, reason)=> client.post(`/admin/withdrawals/${id}/reject`, { reason });
 export const getAdminSettings = ()          => client.get('/admin/settings');
 export const saveSettings     = (data)      => client.put('/admin/settings', data);
+export const getAdminReferrals = ()         => client.get('/admin/referrals');
+export const saveReferralSettings = (data)  => client.put('/admin/referrals/settings', data);
 export const getLogs          = (p)         => client.get('/admin/logs', { params: p });
