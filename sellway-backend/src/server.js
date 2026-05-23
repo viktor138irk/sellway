@@ -27,6 +27,7 @@ app.use((req, res, next) => { const s = Date.now(); res.on('finish', () => { if 
 
 app.get('/health', async (req, res) => { try { await pool.query('SELECT 1'); res.json({ status:'ok', service:'SellWay API' }); } catch { res.status(503).json({ status:'error' }); } });
 
+app.use('/api/auth',           require('./routes/authRegisterFix'));
 app.use('/api/auth',           require('./routes/auth'));
 app.use('/api/products',       require('./routes/products'));
 app.use('/api/orders',         require('./routes/orders'));
