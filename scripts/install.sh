@@ -69,6 +69,15 @@ ask() {
   fi
 }
 
+read_env_value() {
+  local file="$1"
+  local key="$2"
+
+  if [[ -f "$file" ]]; then
+    grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2-
+  fi
+}
+
 secret() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 48
@@ -150,11 +159,15 @@ write_backend_env() {
   local env_file="${APP_DIR}/sellway-backend/.env"
   local example_file="${APP_DIR}/sellway-backend/.env.example"
 
-  ask DATABASE_URL "PostgreSQL DATABASE_URL" "postgresql://sellway_user:password@localhost:5432/sellway_db"
-
   if [[ ! -f "$env_file" ]]; then
     cp "$example_file" "$env_file"
   fi
+
+  if [[ -z "${DATABASE_URL:-}" ]]; then
+    DATABASE_URL="$(read_env_value "$env_file" DATABASE_URL)"
+  fi
+
+  ask DATABASE_URL "PostgreSQL DATABASE_URL" "postgresql://sellway_user:password@localhost:5432/sellway_db"
 
   set_env_value "$env_file" PORT "$API_PORT"
   set_env_value "$env_file" NODE_ENV "production"
@@ -180,9 +193,12 @@ install_backend() {
 
   if [[ "$INIT_DB" == "true" && "$DATABASE_URL" != *"password@localhost"* ]]; then
     log "Applying database schema"
-    psql "$DATABASE_URL" -f db/schema.sql
+    if ! psql "$DATABASE_URL" -f db/schema.sql; then
+      warn "Database schema was not applied because PostgreSQL is unavailable or DATABASE_URL is wrong."
+      warn "Fix DATABASE_URL in ${APP_DIR}/sellway-backend/.env and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"
+    fi
   else
-    warn "Database schema was not applied. Set DATABASE_URL and run: psql \"\$DATABASE_URL\" -f sellway-backend/db/schema.sql"
+    warn "Database schema was not applied. Set DATABASE_URL and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"
   fi
 }
 
