@@ -21,6 +21,8 @@ const ProductsPage     = lazy(() => import('./pages/seller/ProductsPage'));
 const SellerOrders     = lazy(() => import('./pages/seller/OrdersPage'));
 const SellerFinances   = lazy(() => import('./pages/seller/FinancesPage'));
 const SellerWithdrawal = lazy(() => import('./pages/seller/WithdrawalPage'));
+const SellerSettings   = lazy(() => import('./pages/seller/SettingsPage'));
+const SellerPlaceholder = lazy(() => import('./pages/seller/PlaceholderPage'));
 
 // Profile
 const SettingsPage = lazy(() => import('./pages/profile/SettingsPage'));
@@ -95,6 +97,9 @@ function AppRoutes() {
           <Route path="/seller/orders"       element={<Protected roles={['seller','admin']}><SellerOrders/></Protected>}/>
           <Route path="/seller/finances"     element={<Protected roles={['seller','admin']}><SellerFinances/></Protected>}/>
           <Route path="/seller/withdrawal"   element={<Protected roles={['seller','admin']}><SellerWithdrawal/></Protected>}/>
+          <Route path="/seller/reviews"      element={<Protected roles={['seller','admin']}><SellerPlaceholder type="reviews"/></Protected>}/>
+          <Route path="/seller/promo"        element={<Protected roles={['seller','admin']}><SellerPlaceholder type="promo"/></Protected>}/>
+          <Route path="/seller/settings"     element={<Protected roles={['seller','admin']}><SellerSettings/></Protected>}/>
 
           {/* ── Profile ───────────────────────────────── */}
           <Route path="/profile/settings"    element={<Protected><SettingsPage/></Protected>}/>
