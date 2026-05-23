@@ -18,6 +18,88 @@ async function ensureSellerProfile(client, user) {
   );
 }
 
+router.get('/stats', async (req, res) => {
+  try {
+    const [revenue, orders, users, disputes, products, payouts, trends, online] = await Promise.all([
+      query(`SELECT COALESCE(SUM(amount),0) AS gross_total,
+                    COALESCE(SUM(CASE WHEN created_at > NOW()-INTERVAL '7 days' THEN amount END),0) AS gross_week,
+                    COALESCE(SUM(CASE WHEN created_at::date=CURRENT_DATE THEN amount END),0) AS gross_today,
+                    COALESCE(SUM(commission),0) AS commission_total,
+                    COALESCE(SUM(CASE WHEN created_at > NOW()-INTERVAL '7 days' THEN commission END),0) AS commission_week,
+                    COALESCE(SUM(CASE WHEN created_at::date=CURRENT_DATE THEN commission END),0) AS commission_today
+             FROM orders WHERE status='confirmed'`),
+      query(`SELECT COUNT(*) AS total,
+                    COUNT(CASE WHEN status IN ('pending','paid','delivered','delivering') THEN 1 END) AS active,
+                    COUNT(CASE WHEN created_at::date=CURRENT_DATE THEN 1 END) AS today
+             FROM orders`),
+      query(`SELECT COUNT(*) AS total,
+                    COUNT(CASE WHEN role='seller' THEN 1 END) AS sellers,
+                    COUNT(CASE WHEN role='freelancer' THEN 1 END) AS freelancers,
+                    COUNT(CASE WHEN created_at::date=CURRENT_DATE THEN 1 END) AS today
+             FROM users`),
+      query(`SELECT COUNT(*) AS total, COUNT(CASE WHEN status='open' THEN 1 END) AS open FROM disputes`),
+      query(`SELECT COUNT(*) AS total,
+                    COUNT(CASE WHEN status='pending' THEN 1 END) AS pending,
+                    COUNT(CASE WHEN delivery_type='service' THEN 1 END) AS services
+             FROM products`),
+      query(`SELECT COALESCE(SUM(amount),0) AS referral_total,
+                    COALESCE(SUM(CASE WHEN created_at > NOW()-INTERVAL '7 days' THEN amount END),0) AS referral_week,
+                    COALESCE(SUM(CASE WHEN created_at::date=CURRENT_DATE THEN amount END),0) AS referral_today
+             FROM transactions WHERE meta->>'source'='seller_referral'`),
+      query(`SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
+                    COALESCE(SUM(o.commission),0) AS commission,
+                    COALESCE(SUM(rt.amount),0) AS referral
+             FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') d
+             LEFT JOIN orders o ON o.status='confirmed' AND o.confirmed_at::date=d::date
+             LEFT JOIN transactions rt ON rt.order_id=o.id AND rt.meta->>'source'='seller_referral'
+             GROUP BY d::date ORDER BY d::date`),
+      query(`SELECT COUNT(*) AS online FROM users WHERE last_login_at > NOW()-INTERVAL '15 minutes'`),
+    ]);
+
+    const r = revenue.rows[0] || {};
+    const p = payouts.rows[0] || {};
+    const commissionTotal = Number(r.commission_total || 0);
+    const commissionWeek = Number(r.commission_week || 0);
+    const commissionToday = Number(r.commission_today || 0);
+    const referralTotal = Number(p.referral_total || 0);
+    const referralWeek = Number(p.referral_week || 0);
+    const referralToday = Number(p.referral_today || 0);
+    const avgDelivery = await query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (delivered_at-created_at))/60),0) AS avg_min FROM orders WHERE delivered_at IS NOT NULL AND created_at > NOW()-INTERVAL '7 days'`);
+
+    res.json({
+      revenue: {
+        gross_total: r.gross_total || 0,
+        gross_week: r.gross_week || 0,
+        gross_today: r.gross_today || 0,
+        commission_total: commissionTotal,
+        commission_week: commissionWeek,
+        commission_today: commissionToday,
+        referral_total: referralTotal,
+        referral_week: referralWeek,
+        referral_today: referralToday,
+        profit_total: Math.max(0, commissionTotal - referralTotal),
+        profit_week: Math.max(0, commissionWeek - referralWeek),
+        profit_today: Math.max(0, commissionToday - referralToday),
+      },
+      orders: orders.rows[0],
+      users: users.rows[0],
+      disputes: disputes.rows[0],
+      products: products.rows[0],
+      avgDeliveryMin: Math.round(avgDelivery.rows[0].avg_min),
+      online: Number(online.rows[0]?.online || 0),
+      trend: trends.rows.map(x => ({
+        day: x.day,
+        commission: Number(x.commission || 0),
+        referral: Number(x.referral || 0),
+        profit: Math.max(0, Number(x.commission || 0) - Number(x.referral || 0)),
+      })),
+    });
+  } catch (err) {
+    logger.error('Admin stats fix error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 router.get('/users', async (req, res) => {
   const { page = 1, limit = 50, search, role, status } = req.query;
   const offset = (Number(page) - 1) * Number(limit);
@@ -120,10 +202,7 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
           await client.query(`UPDATE sellers SET ${updates.join(', ')} WHERE user_id=$${values.length}`, values);
         }
 
-        await client.query(
-          `UPDATE sellers s
-           SET referred_sellers_count=(SELECT COUNT(*) FROM sellers child WHERE child.referred_by_seller_id=s.user_id)`
-        );
+        await client.query(`UPDATE sellers s SET referred_sellers_count=(SELECT COUNT(*) FROM sellers child WHERE child.referred_by_seller_id=s.user_id)`);
       }
 
       return user;
