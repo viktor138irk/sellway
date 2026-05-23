@@ -17,6 +17,7 @@ const SECTIONS = [
     title: 'ФИНАНСЫ',
     items: [
       ['/admin/withdrawals','💸', 'Выплаты'],
+      ['/admin/referrals',  '🤝', 'Рефералы'],
       ['/admin/logs',       '📋', 'Аудит-логи'],
     ],
   },
@@ -34,72 +35,21 @@ export default function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  async function handleLogout() {
-    await logout();
-    navigate('/');
-  }
-
-  function isActive(path) {
-    if (path === '/admin') return location.pathname === '/admin';
-    return location.pathname.startsWith(path);
-  }
+  async function handleLogout() { await logout(); navigate('/'); }
+  function isActive(path) { if (path === '/admin') return location.pathname === '/admin'; return location.pathname.startsWith(path); }
 
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 58px)', background: C.bg }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: 220, background: '#0C0C14', borderRight: `1px solid ${C.border}`,
-        display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto',
-      }}>
-        {/* User */}
+      <aside style={{ width: 220, background: '#0C0C14', borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto' }}>
         <div style={{ padding: '16px', borderBottom: `1px solid ${C.border}`, display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg,${C.accent},#A78BFA)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
-            {user?.username?.[0]?.toUpperCase()}
-          </div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}</div>
-            <div style={{ fontSize: 10, color: C.accent, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Администратор</div>
-          </div>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg,${C.accent},#A78BFA)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{user?.username?.[0]?.toUpperCase()}</div>
+          <div style={{ overflow: 'hidden' }}><div style={{ fontSize: 13, fontWeight: 700, color: C.t1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}</div><div style={{ fontSize: 10, color: C.accent, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Администратор</div></div>
         </div>
-
-        {/* Nav */}
         <nav style={{ flex: 1, padding: '10px 8px' }}>
-          {SECTIONS.map(section => (
-            <div key={section.title} style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: 1.5, color: C.t3, textTransform: 'uppercase', padding: '0 8px', marginBottom: 6 }}>
-                {section.title}
-              </div>
-              {section.items.map(([path, icon, label, badge]) => {
-                const active = isActive(path);
-                return (
-                  <Link key={path} to={path}
-                    style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8,
-                      marginBottom: 2, textDecoration: 'none',
-                      background: active ? C.accent + '18' : 'transparent',
-                      borderLeft: `3px solid ${active ? C.accent : 'transparent'}`,
-                      color: active ? C.accentL : C.t2, fontSize: 13, fontWeight: active ? 700 : 400,
-                      transition: 'all .15s' }}>
-                    <span style={{ fontSize: 15, flexShrink: 0 }}>{icon}</span>
-                    <span style={{ flex: 1 }}>{label}</span>
-                    {badge && <span style={{ fontSize: 9, background: C.red + '33', color: C.red, padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>{badge}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+          {SECTIONS.map(section => <div key={section.title} style={{ marginBottom: 20 }}><div style={{ fontSize: 9, fontWeight: 900, letterSpacing: 1.5, color: C.t3, textTransform: 'uppercase', padding: '0 8px', marginBottom: 6 }}>{section.title}</div>{section.items.map(([path, icon, label, badge]) => { const active = isActive(path); return <Link key={path} to={path} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, marginBottom: 2, textDecoration: 'none', background: active ? C.accent + '18' : 'transparent', borderLeft: `3px solid ${active ? C.accent : 'transparent'}`, color: active ? C.accentL : C.t2, fontSize: 13, fontWeight: active ? 700 : 400, transition: 'all .15s' }}><span style={{ fontSize: 15, flexShrink: 0 }}>{icon}</span><span style={{ flex: 1 }}>{label}</span>{badge && <span style={{ fontSize: 9, background: C.red + '33', color: C.red, padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>{badge}</span>}</Link>; })}</div>)}
         </nav>
-
-        {/* Bottom */}
-        <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Link to="/" style={{ fontSize: 12, color: C.t3, textDecoration: 'none' }}>← Магазин</Link>
-          <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: C.red, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: 0 }}>
-            🚪 Выйти
-          </button>
-        </div>
+        <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 }}><Link to="/" style={{ fontSize: 12, color: C.t3, textDecoration: 'none' }}>← Магазин</Link><button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: C.red, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: 0 }}>🚪 Выйти</button></div>
       </aside>
-
-      {/* Content */}
       <main style={{ flex: 1, minWidth: 0, overflowX: 'hidden' }}>{children}</main>
     </div>
   );
