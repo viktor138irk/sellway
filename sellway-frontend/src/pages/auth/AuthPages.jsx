@@ -66,7 +66,11 @@ export function LoginPage() {
 
 // ── Register ──────────────────────────────────────────
 export function RegisterPage() {
-  const [form, setForm] = useState({ email: '', username: '', password: '', role: 'buyer' });
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const initialRef = params.get('ref') || '';
+  const initialRole = params.get('role') === 'seller' || initialRef ? 'seller' : 'buyer';
+  const [form, setForm] = useState({ email: '', username: '', password: '', role: initialRole, ref: initialRef });
   const [errors, setErrors] = useState({});
   const [loading, setLoading]  = useState(false);
   const [done, setDone]        = useState(false);
@@ -131,6 +135,10 @@ export function RegisterPage() {
           onChange={e => setForm(f => ({ ...f, username: e.target.value }))} error={errors.username} required />
         <Input label="Пароль" type="password" value={form.password} placeholder="Минимум 8 символов"
           onChange={e => setForm(f => ({ ...f, password: e.target.value }))} error={errors.password} required />
+        {form.role === 'seller' && (
+          <Input label="Реферальный код" value={form.ref} placeholder="если есть"
+            onChange={e => setForm(f => ({ ...f, ref: e.target.value.trim() }))} error={errors.ref} />
+        )}
         <Btn type="submit" full loading={loading} size="lg">Создать аккаунт</Btn>
       </form>
       <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: C.t2 }}>

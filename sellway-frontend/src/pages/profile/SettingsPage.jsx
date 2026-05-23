@@ -12,7 +12,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   // Profile form
-  const [profile, setProfile] = useState({ username: user?.username || '' });
+  const [profile, setProfile] = useState({ username: user?.username || '', phone: user?.phone || '' });
+  const [smsCode, setSmsCode] = useState('');
+  const [smsLoading, setSmsLoading] = useState(false);
 
   // Password form
   const [pwd, setPwd] = useState({ current: '', new: '', confirm: '' });
@@ -39,6 +41,34 @@ export default function SettingsPage() {
       toast.error(err.response?.data?.error || 'Ошибка');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function sendSmsCode() {
+    if (!profile.phone.trim()) return toast.warn('Введите номер телефона');
+    setSmsLoading(true);
+    try {
+      await client.post('/auth/phone/send-code', { phone: profile.phone });
+      toast.success('Код отправлен по SMS');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось отправить SMS');
+    } finally {
+      setSmsLoading(false);
+    }
+  }
+
+  async function verifySmsCode() {
+    if (!smsCode.trim()) return toast.warn('Введите код из SMS');
+    setSmsLoading(true);
+    try {
+      await client.post('/auth/phone/verify', { code: smsCode });
+      await refreshUser();
+      setSmsCode('');
+      toast.success('Телефон подтверждён');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Неверный код');
+    } finally {
+      setSmsLoading(false);
     }
   }
 
@@ -117,6 +147,17 @@ export default function SettingsPage() {
             </div>
             <Input label="Никнейм" value={profile.username}
               onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} />
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <Input label="Телефон" value={profile.phone} placeholder="+7 999 123-45-67"
+                helper={user?.phone_verified ? 'Телефон подтверждён' : 'Нужен SMS-код подтверждения'}
+                onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:10, alignItems:'end' }}>
+                <Input label="Код из SMS" value={smsCode} placeholder="123456"
+                  onChange={e => setSmsCode(e.target.value)} />
+                <Btn type="button" variant="ghost" loading={smsLoading} onClick={sendSmsCode}>Отправить код</Btn>
+                <Btn type="button" loading={smsLoading} onClick={verifySmsCode}>Подтвердить</Btn>
+              </div>
+            </div>
             <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 9, padding: '11px 13px' }}>
               <div style={{ fontSize: 12, color: C.t3, marginBottom: 2 }}>Email (нельзя изменить)</div>
               <div style={{ fontSize: 14, color: C.t2 }}>{user?.email}</div>

@@ -35,6 +35,9 @@ CREATE TABLE users (
   status            user_status  NOT NULL DEFAULT 'pending_verify',
   avatar_url        VARCHAR(500),
   phone             VARCHAR(20),
+  phone_verified    BOOLEAN DEFAULT FALSE,
+  phone_verify_code_hash VARCHAR(255),
+  phone_verify_expires TIMESTAMPTZ,
   email_verified    BOOLEAN DEFAULT FALSE,
   email_verify_token VARCHAR(255),
   reset_token       VARCHAR(255),
@@ -63,6 +66,12 @@ CREATE TABLE sellers (
   total_reviews     INT DEFAULT 0,
   total_sales       INT DEFAULT 0,
   auto_rate         DECIMAL(5,2) DEFAULT 98.00,
+  custom_commission_rate DECIMAL(6,4),
+  referral_code     VARCHAR(32) UNIQUE DEFAULT UPPER(SUBSTRING(REPLACE(uuid_generate_v4()::TEXT, '-', '') FROM 1 FOR 10)),
+  referred_by_seller_id UUID REFERENCES users(id),
+  referral_commission_rate DECIMAL(6,4) DEFAULT 0.0100,
+  referral_earnings DECIMAL(12,2) DEFAULT 0.00,
+  referred_sellers_count INT DEFAULT 0,
   response_time_min INT DEFAULT 0,
   is_online         BOOLEAN DEFAULT FALSE,
   last_seen_at      TIMESTAMPTZ DEFAULT NOW(),
@@ -351,6 +360,8 @@ CREATE INDEX idx_transactions_user   ON transactions(user_id);
 CREATE INDEX idx_notifications_user  ON notifications(user_id, is_read);
 CREATE INDEX idx_reviews_seller      ON reviews(seller_id);
 CREATE INDEX idx_reviews_product     ON reviews(product_id);
+CREATE INDEX idx_sellers_referral_code ON sellers(referral_code);
+CREATE INDEX idx_sellers_referred_by ON sellers(referred_by_seller_id);
 CREATE INDEX idx_keys_product        ON product_keys(product_id, is_sold);
 CREATE INDEX idx_refresh_token       ON refresh_tokens(token);
 CREATE INDEX idx_order_messages      ON order_messages(order_id);
@@ -432,10 +443,13 @@ INSERT INTO categories (name, slug, emoji, sort_order) VALUES
 
 INSERT INTO settings (key, value, description) VALUES
   ('platform_commission',       '0.07',  'Комиссия платформы (доля)'),
+  ('default_seller_commission_rate', '0.07', 'Комиссия платформы для продавцов без персональной ставки'),
+  ('default_referral_commission_rate', '0.01', 'Вознаграждение рефереру с оборота приглашенного продавца'),
   ('min_withdrawal',            '500',   'Минимальная сумма вывода'),
   ('max_withdrawal_daily',      '100000','Максимальная сумма вывода в день'),
   ('withdrawal_commission',     '0.02',  'Комиссия при выводе'),
   ('escrow_auto_confirm_hours', '48',    'Часов до автоподтверждения'),
   ('auto_review_rating',        '5',     'Оценка при автоотзыве'),
   ('maintenance_mode',          'false', 'Режим обслуживания'),
-  ('new_seller_requires_verify','true',  'Верификация для продавцов');
+  ('new_seller_requires_verify','true',  'Верификация для продавцов'),
+  ('sms_code_template', 'Ваш код подтверждения {{code}}', 'Шаблон SMS-кода подтверждения');

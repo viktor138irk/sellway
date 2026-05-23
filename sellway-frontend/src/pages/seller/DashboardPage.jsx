@@ -36,7 +36,7 @@ export default function SellerDashboard() {
     </SellerLayout>
   );
 
-  const { wallet, seller, recentOrders = [], products = [] } = data || {};
+  const { wallet, seller, referral, recentOrders = [], products = [] } = data || {};
   const nextPayout = wallet?.balance * 0.7; // упрощённо
 
   return (
@@ -85,6 +85,24 @@ export default function SellerDashboard() {
           <StatCard icon="⭐" label="Рейтинг" value={seller?.rating ? parseFloat(seller.rating).toFixed(1) : '—'} color={C.amber} />
           <StatCard icon="💰" label="Заморожено" value={`${parseFloat(wallet?.held || 0).toLocaleString('ru')} ₽`} color={C.t2} />
         </div>
+
+        {referral?.code && (
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: C.t1, marginBottom: 6 }}>Реферальная программа</div>
+              <div style={{ fontSize: 12, color: C.t2, marginBottom: 8 }}>Приглашайте продавцов и получайте вознаграждение с их оборота</div>
+              <div style={{ fontSize: 12, color: C.t3, fontFamily: 'monospace', wordBreak: 'break-all' }}>{referral.link}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.accent }}>{referral.code}</div>
+              <div style={{ fontSize: 11, color: C.t3 }}>код</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.green }}>{parseFloat(referral.earnings || 0).toLocaleString('ru')} ₽</div>
+              <div style={{ fontSize: 11, color: C.t3 }}>{referral.referredCount || 0} продавцов</div>
+            </div>
+          </div>
+        )}
 
         {/* Recent orders */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>

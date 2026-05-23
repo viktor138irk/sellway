@@ -7,6 +7,8 @@ import { useToast } from '../../contexts/ToastContext';
 const SECTIONS = [
   { title: '💰 Финансы', keys: [
     ['platform_commission','Комиссия платформы (доля)','number','0.07','Например: 0.07 = 7%'],
+    ['default_seller_commission_rate','Комиссия продавца по умолчанию','number','0.07','Используется, если у продавца нет персональной ставки'],
+    ['default_referral_commission_rate','Реферальный процент по умолчанию','number','0.01','Например: 0.01 = 1% с оборота приглашённого продавца'],
     ['withdrawal_commission','Комиссия при выводе (доля)','number','0.02',''],
     ['min_withdrawal','Мин. сумма вывода (₽)','number','500',''],
     ['max_withdrawal_daily','Макс. вывод в день (₽)','number','100000',''],
@@ -38,6 +40,12 @@ const SECTIONS = [
     ['SMTP_USER','SMTP пользователь','text','noreply@sellway.pro','Email отправителя'],
     ['SMTP_PASS','SMTP пароль','password','','Пароль приложения или почтового ящика'],
   ]},
+  { title: '📲 SMSPilot', keys: [
+    ['SMSPILOT_ENABLED','Включить SMSPilot','toggle','false','Отправка SMS-кодов подтверждения'],
+    ['SMSPILOT_API_KEY','API ключ','password','','Ключ из личного кабинета SMSPilot'],
+    ['SMSPILOT_SENDER','Отправитель','text','','Имя отправителя, если оно настроено в SMSPilot'],
+    ['SMS_CODE_TEMPLATE','Шаблон SMS','text','Ваш код подтверждения {{code}}','Используй {{code}} на месте кода'],
+  ]},
 ];
 
 const RESTART_KEYS = new Set([
@@ -54,6 +62,10 @@ const RESTART_KEYS = new Set([
   'SMTP_SECURE',
   'SMTP_USER',
   'SMTP_PASS',
+  'SMSPILOT_ENABLED',
+  'SMSPILOT_API_KEY',
+  'SMSPILOT_SENDER',
+  'SMS_CODE_TEMPLATE',
 ]);
 
 export default function SettingsPage() {

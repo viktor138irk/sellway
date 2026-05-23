@@ -10,7 +10,7 @@ router.use(auth, requireRole('seller', 'admin'));
 // ── Dashboard ────────────────────────────────────────
 router.get('/dashboard', async (req, res) => {
   try {
-    const [wallet, seller, recentOrders, products] = await Promise.all([
+    const [wallet, seller, recentOrders, products, referralStats] = await Promise.all([
       query('SELECT * FROM wallets WHERE user_id=$1', [req.user.id]),
       query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]),
       query(
@@ -23,12 +23,28 @@ router.get('/dashboard', async (req, res) => {
         "SELECT id, title, price, status, keys_count, sales_count FROM products WHERE seller_id=$1 AND status!='archived' ORDER BY created_at DESC",
         [req.user.id]
       ),
+      query(
+        `SELECT COUNT(*) AS referred_count,
+                COALESCE(SUM(CASE WHEN child.created_at >= NOW()-INTERVAL '30 days' THEN 1 ELSE 0 END),0) AS referred_30d
+         FROM sellers child
+         WHERE child.referred_by_seller_id=$1`,
+        [req.user.id]
+      ),
     ]);
     res.json({
       wallet: wallet.rows[0],
       seller: seller.rows[0],
       recentOrders: recentOrders.rows,
       products: products.rows,
+      referral: {
+        code: seller.rows[0]?.referral_code || null,
+        link: seller.rows[0]?.referral_code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=seller&ref=${seller.rows[0].referral_code}` : null,
+        referredCount: parseInt(referralStats.rows[0]?.referred_count || 0),
+        referred30d: parseInt(referralStats.rows[0]?.referred_30d || 0),
+        earnings: seller.rows[0]?.referral_earnings || '0.00',
+        referralRate: seller.rows[0]?.referral_commission_rate || '0.0100',
+        commissionRate: seller.rows[0]?.custom_commission_rate || null,
+      },
     });
   } catch (err) {
     logger.error('Seller dashboard error', { err: err.message });

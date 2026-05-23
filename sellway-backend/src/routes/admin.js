@@ -23,7 +23,24 @@ const ENV_SETTINGS = {
   SMTP_SECURE: 'Использовать защищенное SMTP-соединение',
   SMTP_USER: 'SMTP-пользователь',
   SMTP_PASS: 'SMTP-пароль',
+  SMSPILOT_ENABLED: 'Включить SMSPilot',
+  SMSPILOT_API_KEY: 'API-ключ SMSPilot',
+  SMSPILOT_SENDER: 'Имя отправителя SMSPilot',
+  SMS_CODE_TEMPLATE: 'Шаблон SMS-кода подтверждения',
 };
+
+function makeReferralCode() {
+  return uuidv4().replace(/-/g, '').slice(0, 10).toUpperCase();
+}
+
+async function ensureSellerProfile(userId, username, client = { query }) {
+  await client.query(
+    `INSERT INTO sellers (user_id, display_name, referral_code)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId, username, makeReferralCode()]
+  );
+}
 
 function setEnvValue(content, key, value) {
   const raw = String(value ?? '').replace(/\r?\n/g, '');
@@ -123,10 +140,15 @@ router.get('/users', async (req, res) => {
     const { rows } = await query(
       `SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified,
               u.created_at, u.last_login_at,
-              w.balance, s.rating, s.total_sales, s.verified AS seller_verified
+              w.balance, s.rating, s.total_sales, s.verified AS seller_verified,
+              s.custom_commission_rate, s.referral_code,
+              s.referred_by_seller_id, ref_user.email AS referred_by_email,
+              ref_user.username AS referred_by_username,
+              s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count
        FROM users u
        LEFT JOIN wallets w ON w.user_id=u.id
        LEFT JOIN sellers s ON s.user_id=u.id
+       LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id
        ${whereStr}
        ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`,
       params
@@ -140,16 +162,95 @@ router.get('/users', async (req, res) => {
 // ── PUT /admin/users/:id ─────────────────────────────
 
 router.put('/users/:id', requireRole('admin'), async (req, res) => {
-  const { role, status } = req.body;
+  const {
+    role,
+    status,
+    custom_commission_rate,
+    referral_commission_rate,
+    referred_by,
+  } = req.body;
   try {
-    const { rows: [user] } = await query(
-      'UPDATE users SET role=COALESCE($1,role), status=COALESCE($2,status) WHERE id=$3 RETURNING id, username, role, status',
-      [role, status, req.params.id]
-    );
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    logger.info('User updated by admin', { targetId: req.params.id, adminId: req.user.id, role, status });
-    res.json(user);
+    await transaction(async (client) => {
+      const { rows: [user] } = await client.query(
+        'UPDATE users SET role=COALESCE($1,role), status=COALESCE($2,status) WHERE id=$3 RETURNING id, email, username, role, status',
+        [role, status, req.params.id]
+      );
+      if (!user) throw { status: 404, message: 'Пользователь не найден' };
+
+      if (user.role === 'seller' || user.role === 'admin') {
+        await ensureSellerProfile(user.id, user.username, client);
+      }
+
+      if (user.role === 'seller' || user.role === 'admin') {
+        let referrerId = undefined;
+        if (referred_by !== undefined) {
+          const ref = String(referred_by || '').trim();
+          if (ref) {
+            const { rows: [referrer] } = await client.query(
+              `SELECT s.user_id
+               FROM sellers s
+               JOIN users u ON u.id=s.user_id
+               WHERE LOWER(s.referral_code)=LOWER($1)
+                  OR LOWER(u.email)=LOWER($1)
+                  OR LOWER(u.username)=LOWER($1)
+               LIMIT 1`,
+              [ref]
+            );
+            if (!referrer) throw { status: 400, message: 'Реферер не найден' };
+            if (referrer.user_id === user.id) throw { status: 400, message: 'Нельзя назначить продавца реферером самому себе' };
+            referrerId = referrer.user_id;
+          } else {
+            referrerId = null;
+          }
+        }
+
+        const commissionRate = custom_commission_rate === '' || custom_commission_rate === undefined
+          ? null
+          : Number(custom_commission_rate);
+        const referralRate = referral_commission_rate === '' || referral_commission_rate === undefined
+          ? undefined
+          : Number(referral_commission_rate);
+
+        if (commissionRate !== null && (Number.isNaN(commissionRate) || commissionRate < 0 || commissionRate > 0.5)) {
+          throw { status: 400, message: 'Комиссия продавца должна быть от 0 до 0.5' };
+        }
+        if (referralRate !== undefined && (Number.isNaN(referralRate) || referralRate < 0 || referralRate > 0.5)) {
+          throw { status: 400, message: 'Реферальный процент должен быть от 0 до 0.5' };
+        }
+
+        const updates = [];
+        const values = [];
+        if (custom_commission_rate !== undefined) {
+          values.push(commissionRate);
+          updates.push(`custom_commission_rate=$${values.length}`);
+        }
+        if (referralRate !== undefined) {
+          values.push(referralRate);
+          updates.push(`referral_commission_rate=$${values.length}`);
+        }
+        if (referrerId !== undefined) {
+          values.push(referrerId);
+          updates.push(`referred_by_seller_id=$${values.length}`);
+        }
+        if (updates.length) {
+          values.push(user.id);
+          await client.query(`UPDATE sellers SET ${updates.join(', ')} WHERE user_id=$${values.length}`, values);
+        }
+
+        await client.query(
+          `UPDATE sellers s
+           SET referred_sellers_count=(
+             SELECT COUNT(*) FROM sellers child WHERE child.referred_by_seller_id=s.user_id
+           )`
+        );
+      }
+
+      logger.info('User updated by admin', { targetId: req.params.id, adminId: req.user.id, role, status });
+      return res.json(user);
+    });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    logger.error('User update error', { err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });

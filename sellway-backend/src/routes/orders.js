@@ -15,8 +15,13 @@ router.post('/', auth, async (req, res) => {
     await transaction(async (client) => {
       // Получаем товар
       const { rows: [product] } = await client.query(
-        `SELECT p.*, u.id AS seller_user_id
-         FROM products p JOIN users u ON u.id = p.seller_id
+        `SELECT p.*, u.id AS seller_user_id,
+                s.custom_commission_rate,
+                s.referred_by_seller_id,
+                s.referral_commission_rate
+         FROM products p
+         JOIN users u ON u.id = p.seller_id
+         LEFT JOIN sellers s ON s.user_id = p.seller_id
          WHERE p.id=$1 AND p.status='active'`,
         [product_id]
       );
@@ -33,8 +38,15 @@ router.post('/', auth, async (req, res) => {
         throw { status: 402, message: 'Недостаточно средств на балансе' };
       }
 
-      // Рассчитываем комиссию
-      const commission = parseFloat((product.price * parseFloat(process.env.PLATFORM_COMMISSION || 0.07)).toFixed(2));
+      // Рассчитываем комиссию: персональная ставка продавца важнее общей.
+      const { rows: [commissionSetting] } = await client.query(
+        "SELECT value FROM settings WHERE key IN ('default_seller_commission_rate','platform_commission') ORDER BY CASE WHEN key='default_seller_commission_rate' THEN 0 ELSE 1 END LIMIT 1"
+      );
+      const defaultCommissionRate = parseFloat(commissionSetting?.value || process.env.PLATFORM_COMMISSION || 0.07);
+      const sellerCommissionRate = product.custom_commission_rate != null
+        ? parseFloat(product.custom_commission_rate)
+        : defaultCommissionRate;
+      const commission = parseFloat((product.price * sellerCommissionRate).toFixed(2));
       const sellerAmount = parseFloat((product.price - commission).toFixed(2));
 
       // Создаём заказ
@@ -264,6 +276,44 @@ router.post('/:id/confirm', auth, async (req, res) => {
         'UPDATE sellers SET total_sales=total_sales+1 WHERE user_id=$1',
         [order.seller_id]
       );
+
+      const { rows: [seller] } = await client.query(
+        'SELECT referred_by_seller_id, referral_commission_rate FROM sellers WHERE user_id=$1',
+        [order.seller_id]
+      );
+      if (seller?.referred_by_seller_id && seller.referred_by_seller_id !== order.seller_id) {
+        const referralRate = parseFloat(seller.referral_commission_rate || 0);
+        const referralAmount = Math.min(
+          parseFloat(order.commission),
+          parseFloat((parseFloat(order.amount) * referralRate).toFixed(2))
+        );
+
+        if (referralAmount > 0) {
+          await client.query(
+            `UPDATE wallets
+             SET balance=balance+$1, total_in=total_in+$1
+             WHERE user_id=$2`,
+            [referralAmount, seller.referred_by_seller_id]
+          );
+          await client.query(
+            `UPDATE sellers
+             SET referral_earnings=referral_earnings+$1
+             WHERE user_id=$2`,
+            [referralAmount, seller.referred_by_seller_id]
+          );
+          await client.query(
+            `INSERT INTO transactions (user_id, order_id, type, amount, description, meta)
+             VALUES ($1,$2,'credit',$3,$4,$5)`,
+            [
+              seller.referred_by_seller_id,
+              order.id,
+              referralAmount,
+              `Реферальное вознаграждение за заказ ${order.order_number}`,
+              JSON.stringify({ source: 'seller_referral', seller_id: order.seller_id }),
+            ]
+          );
+        }
+      }
       await client.query(
         'UPDATE products SET sales_count=sales_count+1 WHERE id=$1',
         [order.product_id]

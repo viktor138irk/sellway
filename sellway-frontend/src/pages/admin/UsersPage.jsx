@@ -11,13 +11,24 @@ const STATUS_LABEL = { active: 'Активен', banned: 'Заблокирова
 function UserModal({ user, onClose, onSave }) {
   const [role, setRole]     = useState(user.role);
   const [status, setStatus] = useState(user.status);
+  const [sellerSettings, setSellerSettings] = useState({
+    custom_commission_rate: user.custom_commission_rate ?? '',
+    referral_commission_rate: user.referral_commission_rate ?? '0.0100',
+    referred_by: user.referred_by_email || user.referred_by_username || '',
+  });
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
   async function handleSave() {
     setSaving(true);
     try {
-      await onSave(user.id, { role, status });
+      const payload = { role, status };
+      if (role === 'seller' || role === 'admin') {
+        payload.custom_commission_rate = sellerSettings.custom_commission_rate;
+        payload.referral_commission_rate = sellerSettings.referral_commission_rate;
+        payload.referred_by = sellerSettings.referred_by;
+      }
+      await onSave(user.id, payload);
       toast.success('Пользователь обновлён');
       onClose();
     } catch (err) {
@@ -65,6 +76,31 @@ function UserModal({ user, onClose, onSave }) {
         {status === 'banned' && (
           <div style={{ background: '#2A1010', border: `1px solid ${C.red}44`, borderRadius: 10, padding: '12px 16px', fontSize: 12, color: C.red }}>
             ⚠️ Пользователь не сможет войти в систему
+          </div>
+        )}
+
+        {(role === 'seller' || role === 'admin') && (
+          <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: C.t1 }}>Продавец: комиссии и рефералка</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input label="Персональная комиссия" type="number" step="0.0001" min="0" max="0.5"
+                value={sellerSettings.custom_commission_rate}
+                helper="Пусто = ставка по умолчанию. 0.07 = 7%"
+                onChange={e => setSellerSettings(s => ({ ...s, custom_commission_rate: e.target.value }))} />
+              <Input label="Реферальный процент" type="number" step="0.0001" min="0" max="0.5"
+                value={sellerSettings.referral_commission_rate}
+                helper="0.01 = 1% с оборота"
+                onChange={e => setSellerSettings(s => ({ ...s, referral_commission_rate: e.target.value }))} />
+            </div>
+            <Input label="Реферер" value={sellerSettings.referred_by}
+              placeholder="email, username или referral code"
+              helper="Оставь пустым, чтобы убрать реферера"
+              onChange={e => setSellerSettings(s => ({ ...s, referred_by: e.target.value }))} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, fontSize: 12 }}>
+              <div><div style={{ color: C.t3 }}>Код</div><div style={{ color: C.accent, fontWeight: 800 }}>{user.referral_code || 'создастся'}</div></div>
+              <div><div style={{ color: C.t3 }}>Реф. доход</div><div style={{ color: C.green, fontWeight: 800 }}>{parseFloat(user.referral_earnings || 0).toLocaleString('ru')} ₽</div></div>
+              <div><div style={{ color: C.t3 }}>Приглашено</div><div style={{ color: C.t1, fontWeight: 800 }}>{user.referred_sellers_count || 0}</div></div>
+            </div>
           </div>
         )}
 
@@ -132,8 +168,8 @@ export default function UsersPage() {
 
         {/* Table */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 100px 100px 120px 80px 80px', gap: 12, padding: '10px 18px', background: '#0A0A12', borderBottom: `1px solid ${C.border}` }}>
-            {['Пользователь', 'Email', 'Роль', 'Статус', 'Баланс', 'Продаж', ''].map((h, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 100px 100px 120px 90px 80px 80px', gap: 12, padding: '10px 18px', background: '#0A0A12', borderBottom: `1px solid ${C.border}` }}>
+            {['Пользователь', 'Email', 'Роль', 'Статус', 'Баланс', 'Комиссия', 'Продаж', ''].map((h, i) => (
               <div key={i} style={{ fontSize: 10, fontWeight: 800, color: C.t3, textTransform: 'uppercase', letterSpacing: 1 }}>{h}</div>
             ))}
           </div>
@@ -143,7 +179,7 @@ export default function UsersPage() {
             : users.length === 0
               ? <div style={{ padding: 48, textAlign: 'center', color: C.t3, fontSize: 13 }}>Ничего не найдено</div>
               : users.map(u => (
-                <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 100px 100px 120px 80px 80px', gap: 12, padding: '13px 18px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', transition: 'background .15s' }}
+                <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 100px 100px 120px 90px 80px 80px', gap: 12, padding: '13px 18px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = C.cardHov}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
 
@@ -167,6 +203,9 @@ export default function UsersPage() {
                   </span>
 
                   <div style={{ fontSize: 13, color: C.t1, fontWeight: 600 }}>{parseFloat(u.balance || 0).toLocaleString('ru')} ₽</div>
+                  <div style={{ fontSize: 12, color: u.custom_commission_rate ? C.accent : C.t3, fontWeight: 700 }}>
+                    {u.role === 'seller' || u.role === 'admin' ? (u.custom_commission_rate ? `${(parseFloat(u.custom_commission_rate) * 100).toFixed(2)}%` : 'общая') : '—'}
+                  </div>
                   <div style={{ fontSize: 13, color: C.t2 }}>{u.total_sales || 0}</div>
 
                   <button onClick={() => setEditUser(u)}

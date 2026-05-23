@@ -5,7 +5,12 @@ const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const { query, transaction } = require('../config/db');
 const { sendVerifyEmail, sendResetEmail } = require('../services/mailer');
+const { sendVerificationCode, normalizePhone } = require('../services/sms');
 const logger = require('../config/logger');
+
+function makeReferralCode() {
+  return uuidv4().replace(/-/g, '').slice(0, 10).toUpperCase();
+}
 
 // ── Tokens ──────────────────────────────────────────
 
@@ -38,11 +43,12 @@ router.post('/register', [
   body('username').trim().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_]+$/).withMessage('Никнейм: 3-30 символов, только буквы/цифры/_'),
   body('password').isLength({ min: 8 }).withMessage('Пароль минимум 8 символов'),
   body('role').optional().isIn(['buyer', 'seller']).withMessage('Некорректная роль'),
+  body('ref').optional().trim().isLength({ max: 64 }),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
 
-  const { email, username, password, role = 'buyer' } = req.body;
+  const { email, username, password, role = 'buyer', ref } = req.body;
 
   try {
     await transaction(async (client) => {
@@ -70,10 +76,31 @@ router.post('/register', [
 
       // Если продавец — создаём профиль
       if (role === 'seller') {
+        let referrerId = null;
+        if (ref) {
+          const { rows: [referrer] } = await client.query(
+            `SELECT user_id FROM sellers WHERE LOWER(referral_code)=LOWER($1) LIMIT 1`,
+            [ref]
+          );
+          referrerId = referrer?.user_id || null;
+        }
+
         await client.query(
-          'INSERT INTO sellers (user_id, display_name) VALUES ($1,$2)',
-          [user.id, username]
+          `INSERT INTO sellers (user_id, display_name, referral_code, referred_by_seller_id)
+           VALUES ($1,$2,$3,$4)`,
+          [user.id, username, makeReferralCode(), referrerId]
         );
+
+        if (referrerId) {
+          await client.query(
+            `UPDATE sellers
+             SET referred_sellers_count=(
+               SELECT COUNT(*) FROM sellers child WHERE child.referred_by_seller_id=sellers.user_id
+             )
+             WHERE user_id=$1`,
+            [referrerId]
+          );
+        }
       }
 
       // Отправляем письмо
@@ -263,7 +290,7 @@ router.post('/reset-password', [
 async function buildUserResponse(userId) {
   const { rows: [user] } = await query(
     `SELECT u.id, u.email, u.username, u.role, u.status, u.avatar_url,
-            u.email_verified, u.created_at,
+            u.phone, u.phone_verified, u.email_verified, u.created_at,
             COALESCE(w.balance, 0) AS balance, COALESCE(w.held, 0) AS held,
             s.rating, s.total_sales, s.verified AS seller_verified
      FROM users u
@@ -289,11 +316,12 @@ router.get('/me', require('../middleware/auth').auth, async (req, res) => {
 router.put('/profile', require('../middleware/auth').auth, [
   body('username').optional().trim().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_]+$/),
   body('avatar_url').optional().isURL(),
+  body('phone').optional().trim().isLength({ max: 20 }),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
 
-  const { username, avatar_url } = req.body;
+  const { username, avatar_url, phone } = req.body;
 
   try {
     if (username) {
@@ -307,9 +335,11 @@ router.put('/profile', require('../middleware/auth').auth, [
     await query(
       `UPDATE users SET
          username = COALESCE($1, username),
-         avatar_url = COALESCE($2, avatar_url)
-       WHERE id = $3`,
-      [username || null, avatar_url || null, req.user.id]
+         avatar_url = COALESCE($2, avatar_url),
+         phone = COALESCE($3, phone),
+         phone_verified = CASE WHEN $3::VARCHAR IS NOT NULL AND $3::VARCHAR != COALESCE(phone,'') THEN FALSE ELSE phone_verified END
+       WHERE id = $4`,
+      [username || null, avatar_url || null, phone ? normalizePhone(phone) : null, req.user.id]
     );
 
     const user = await buildUserResponse(req.user.id);
@@ -317,6 +347,71 @@ router.put('/profile', require('../middleware/auth').auth, [
     res.json(user);
   } catch (err) {
     logger.error('Profile update error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ── POST /auth/phone/send-code ───────────────────────
+
+router.post('/phone/send-code', require('../middleware/auth').auth, [
+  body('phone').trim().isLength({ min: 10, max: 20 }).withMessage('Некорректный номер телефона'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
+
+  const phone = normalizePhone(req.body.phone);
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+
+  try {
+    const codeHash = await bcrypt.hash(code, 10);
+    await query(
+      `UPDATE users
+       SET phone=$1, phone_verified=FALSE, phone_verify_code_hash=$2, phone_verify_expires=NOW()+INTERVAL '10 minutes'
+       WHERE id=$3`,
+      [phone, codeHash, req.user.id]
+    );
+
+    await sendVerificationCode(phone, code);
+    res.json({
+      message: 'Код подтверждения отправлен',
+      ...(process.env.NODE_ENV !== 'production' && { devCode: code }),
+    });
+  } catch (err) {
+    logger.error('Phone code send error', { userId: req.user.id, err: err.message });
+    res.status(500).json({ error: err.message || 'Не удалось отправить SMS' });
+  }
+});
+
+// ── POST /auth/phone/verify ──────────────────────────
+
+router.post('/phone/verify', require('../middleware/auth').auth, [
+  body('code').trim().isLength({ min: 4, max: 10 }).withMessage('Введите код из SMS'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
+
+  try {
+    const { rows: [user] } = await query(
+      `SELECT phone_verify_code_hash, phone_verify_expires
+       FROM users WHERE id=$1`,
+      [req.user.id]
+    );
+    if (!user?.phone_verify_code_hash || !user?.phone_verify_expires || new Date(user.phone_verify_expires) < new Date()) {
+      return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+    }
+
+    const ok = await bcrypt.compare(req.body.code.trim(), user.phone_verify_code_hash);
+    if (!ok) return res.status(400).json({ error: 'Неверный код подтверждения' });
+
+    await query(
+      `UPDATE users
+       SET phone_verified=TRUE, phone_verify_code_hash=NULL, phone_verify_expires=NULL
+       WHERE id=$1`,
+      [req.user.id]
+    );
+    res.json({ message: 'Телефон подтверждён' });
+  } catch (err) {
+    logger.error('Phone verify error', { userId: req.user.id, err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
