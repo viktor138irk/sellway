@@ -34,6 +34,7 @@ app.use('/api/orders',         require('./routes/orders'));
 app.use('/api/service-orders', require('./routes/serviceOrders'));
 app.use('/api/categories',     require('./routes/categories'));
 app.use('/api/seller',         require('./routes/seller'));
+app.use('/api/admin',          require('./routes/adminUsersFix'));
 app.use('/api/admin',          require('./routes/admin'));
 app.use('/api/notifications',  require('./routes/notifications'));
 app.use('/api/payments',       require('./routes/payments'));
