@@ -29,6 +29,18 @@ const ENV_SETTINGS = {
   SMS_CODE_TEMPLATE: 'Шаблон SMS-кода подтверждения',
 };
 
+function normalizeSettingValue(raw) {
+  let value = raw;
+  let depth = 0;
+  while (value && typeof value === 'object' && 'value' in value && depth < 5) {
+    value = value.value;
+    depth += 1;
+  }
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') return '';
+  return String(value);
+}
+
 function makeReferralCode() {
   return uuidv4().replace(/-/g, '').slice(0, 10).toUpperCase();
 }
@@ -498,8 +510,9 @@ router.put('/settings', requireRole('admin'), async (req, res) => {
   const dbUpdates = {};
 
   for (const [key, value] of Object.entries(updates)) {
-    if (key in ENV_SETTINGS) envUpdates[key] = String(value);
-    else dbUpdates[key] = String(value);
+    const normalized = normalizeSettingValue(value);
+    if (key in ENV_SETTINGS) envUpdates[key] = normalized;
+    else dbUpdates[key] = normalized;
   }
 
   try {

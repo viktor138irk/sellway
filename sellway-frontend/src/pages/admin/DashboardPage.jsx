@@ -100,6 +100,18 @@ function QuickAction({ emoji, title, sub, to }) {
   );
 }
 
+function valueToString(raw, fallback = '') {
+  let value = raw;
+  let depth = 0;
+  while (value && typeof value === 'object' && 'value' in value && depth < 5) {
+    value = value.value;
+    depth += 1;
+  }
+  if (value === undefined || value === null) return String(fallback ?? '');
+  if (typeof value === 'object') return String(fallback ?? '');
+  return String(value);
+}
+
 export default function AdminDashboard() {
   const toast = useToast();
   const [stats, setStats]         = useState(null);
@@ -121,7 +133,7 @@ export default function AdminDashboard() {
         // Конвертируем объект настроек
         const raw = set.data;
         const flat = {};
-        Object.entries(raw).forEach(([k, v]) => { flat[k] = typeof v === 'object' ? v.value : v; });
+        Object.entries(raw).forEach(([k, v]) => { flat[k] = valueToString(v); });
         setSettings(flat);
       })
       .catch(console.error)

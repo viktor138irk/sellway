@@ -68,6 +68,18 @@ const RESTART_KEYS = new Set([
   'SMS_CODE_TEMPLATE',
 ]);
 
+function valueToString(raw, fallback = '') {
+  let value = raw;
+  let depth = 0;
+  while (value && typeof value === 'object' && 'value' in value && depth < 5) {
+    value = value.value;
+    depth += 1;
+  }
+  if (value === undefined || value === null) return String(fallback ?? '');
+  if (typeof value === 'object') return String(fallback ?? '');
+  return String(value);
+}
+
 export default function SettingsPage() {
   const toast = useToast();
   const [settings, setSettings] = useState({});
@@ -79,7 +91,7 @@ export default function SettingsPage() {
     getAdminSettings()
       .then(r => {
         const flat = {};
-        Object.entries(r.data).forEach(([k,v]) => { flat[k] = typeof v === 'object' ? v.value : v; });
+        Object.entries(r.data).forEach(([k, v]) => { flat[k] = valueToString(v); });
         setSettings(flat);
       })
       .catch(() => toast.error('Ошибка загрузки'))
@@ -134,7 +146,7 @@ export default function SettingsPage() {
               </div>
               <div style={{ padding:'6px 0' }}>
                 {section.keys.map(([key, label, type, def, helper]) => {
-                  const val = settings[key] ?? def;
+                  const val = valueToString(settings[key], def);
                   const isChanged = key in changed;
                   return (
                     <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 22px', borderBottom:`1px solid ${C.border}`, background: isChanged ? C.accent+'08' : 'transparent', transition:'background .2s' }}>
