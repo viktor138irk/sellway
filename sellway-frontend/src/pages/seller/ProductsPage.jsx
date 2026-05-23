@@ -46,6 +46,38 @@ function ImageUpload({ images, onChange, max=8 }) {
   );
 }
 
+function CategoryIcon({ category, size = 28 }) {
+  return (
+    <span style={{ width:size, height:size, borderRadius:8, overflow:'hidden', background:'#0A0A14', border:`1px solid ${C.border}`, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+      {category?.image_url
+        ? <img src={category.image_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+        : <span style={{ fontSize:Math.max(16, Math.round(size * 0.55)) }}>{category?.emoji || '📂'}</span>}
+    </span>
+  );
+}
+
+function CategoryPicker({ categories, value, onChange }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      <label style={{ fontSize:12, fontWeight:700, color:C.t2 }}>Категория *</label>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))', gap:8 }}>
+        {categories.map(cat => {
+          const selected = value === cat.id;
+          return (
+            <button key={cat.id} type="button" onClick={() => onChange(cat.id)}
+              style={{ display:'flex', alignItems:'center', gap:9, minHeight:44, background:selected ? C.accent+'18' : '#0A0A12',
+                border:`1px solid ${selected ? C.accent : C.border}`, borderRadius:9, color:selected ? C.t1 : C.t2,
+                padding:'8px 10px', cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'border-color .15s, background .15s' }}>
+              <CategoryIcon category={cat} />
+              <span style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cat.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ProductForm({ productId, onSave, onCancel }) {
   const toast = useToast();
   const [cats, setCats] = useState([]);
@@ -56,6 +88,7 @@ function ProductForm({ productId, onSave, onCancel }) {
   const [existingKeys, setExistingKeys] = useState([]);
   const [form, setForm] = useState({ title:'', short_desc:'', description:'', price:'', old_price:'', category_id:'', delivery_type:'auto', guarantee_days:0, tags:'' });
   const set = k => v => setForm(f=>({...f,[k]:v}));
+  const setFromInput = k => e => set(k)(e.target.value);
 
   useEffect(() => {
     getCategories().then(r=>setCats(r.data)).catch(()=>{});
@@ -110,22 +143,21 @@ function ProductForm({ productId, onSave, onCancel }) {
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
         <div style={{ gridColumn:'1/-1' }}>
-          <Input label="Название товара *" value={form.title} onChange={set('title')} placeholder="CS2 Аккаунт | Prime Status | Gold Nova Master" />
+          <Input label="Название товара *" value={form.title} onChange={setFromInput('title')} placeholder="CS2 Аккаунт | Prime Status | Gold Nova Master" />
         </div>
-        <Select label="Категория *" value={form.category_id} onChange={e=>set('category_id')(e.target.value)}>
-          <option value="">Выберите категорию</option>
-          {cats.map(c=><option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-        </Select>
+        <div style={{ gridColumn:'1/-1' }}>
+          <CategoryPicker categories={cats} value={form.category_id} onChange={set('category_id')} />
+        </div>
         <Select label="Тип выдачи" value={form.delivery_type} onChange={e=>set('delivery_type')(e.target.value)}>
           <option value="auto">⚡ Автоматическая (ключи)</option>
           <option value="manual">⏱ Ручная (вручную)</option>
         </Select>
-        <Input label="Цена (₽) *" type="number" value={form.price} onChange={set('price')} placeholder="1200" />
-        <Input label="Старая цена (₽)" type="number" value={form.old_price} onChange={set('old_price')} placeholder="1500 (необязательно)" />
-        <Input label="Краткое описание" value={form.short_desc} onChange={set('short_desc')} placeholder="В 1-2 предложения" />
-        <Input label="Гарантия (дней)" type="number" value={form.guarantee_days} onChange={set('guarantee_days')} placeholder="30" />
+        <Input label="Цена (₽) *" type="number" value={form.price} onChange={setFromInput('price')} placeholder="1200" />
+        <Input label="Старая цена (₽)" type="number" value={form.old_price} onChange={setFromInput('old_price')} placeholder="1500 (необязательно)" />
+        <Input label="Краткое описание" value={form.short_desc} onChange={setFromInput('short_desc')} placeholder="В 1-2 предложения" />
+        <Input label="Гарантия (дней)" type="number" value={form.guarantee_days} onChange={setFromInput('guarantee_days')} placeholder="30" />
         <div style={{ gridColumn:'1/-1' }}>
-          <Input label="Теги (через запятую)" value={form.tags} onChange={set('tags')} placeholder="Prime Status, С почтой, EU сервер" />
+          <Input label="Теги (через запятую)" value={form.tags} onChange={setFromInput('tags')} placeholder="Prime Status, С почтой, EU сервер" />
         </div>
         <div style={{ gridColumn:'1/-1' }}>
           <Textarea label="Подробное описание" value={form.description} onChange={e=>set('description')(e.target.value)} rows={5} placeholder="Опишите товар подробно: что входит, как передаётся, особенности..." style={{ width:'100%' }} />

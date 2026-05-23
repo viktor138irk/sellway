@@ -22,7 +22,11 @@ function CategoryForm({ initial, onSave, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [imgFile, setImgFile] = useState(null);
 
-  function handleName(v) { setName(v); if (auto) setSlug(toSlug(v)); }
+  function handleName(e) {
+    const v = e.target.value;
+    setName(v);
+    if (auto) setSlug(toSlug(v));
+  }
 
   async function handleImg(e) {
     const file = e.target.files[0];
@@ -37,13 +41,13 @@ function CategoryForm({ initial, onSave, onCancel }) {
     if (!name.trim() || !slug.trim()) return toast.warn('Заполните название и slug');
     setSaving(true);
     try {
-      let imageUrl = image && !image.startsWith('data:') ? image : undefined;
+      let imageUrl = image && !image.startsWith('data:') ? image : '';
       if (imgFile) {
         const fd = new FormData(); fd.append('image', imgFile);
         const r = await client.post('/admin/upload-image', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => null);
         if (r?.data?.url) imageUrl = r.data.url;
       }
-      const data = { name: name.trim(), slug: slug.trim(), emoji, is_active: active, ...(imageUrl && { image_url: imageUrl }) };
+      const data = { name: name.trim(), slug: slug.trim(), emoji, image_url: imageUrl, is_active: active };
       if (initial) await updateCategory(initial.id, data); else await createCategory(data);
       toast.success(initial ? 'Категория обновлена' : 'Категория создана');
       onSave();
@@ -73,7 +77,7 @@ function CategoryForm({ initial, onSave, onCancel }) {
       </div>
       <Input label="Название *" value={name} onChange={handleName} placeholder="Minecraft" />
       <div>
-        <Input label="Slug (URL) *" value={slug} onChange={v=>{setAuto(false);setSlug(v);}} placeholder="minecraft" helper={`/catalog?category=${slug||'...'}`} style={{ fontFamily:'monospace' }} />
+        <Input label="Slug (URL) *" value={slug} onChange={e=>{setAuto(false);setSlug(e.target.value);}} placeholder="minecraft" helper={`/catalog?category=${slug||'...'}`} style={{ fontFamily:'monospace' }} />
       </div>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px' }}>
         <div><div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>Активна</div><div style={{ fontSize:12, color:C.t2 }}>Показывать в каталоге</div></div>
