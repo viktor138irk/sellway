@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminLayout from './AdminLayout';
-import { C, Spinner, Btn, Input, Modal, Toggle } from '../../components/UI';
+import { C, Spinner, Btn, Input, Modal, Toggle, Select } from '../../components/UI';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../../api/products';
 import { uploadImages } from '../../api/products';
 import { useToast } from '../../contexts/ToastContext';
@@ -10,7 +10,7 @@ const EMOJIS = ['🎮','🧱','⛏️','🔫','⚔️','💣','🎯','💳','�
 
 function toSlug(s) { return s.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,''); }
 
-function CategoryForm({ initial, onSave, onCancel }) {
+function CategoryForm({ initial, categories = [], onSave, onCancel }) {
   const ref = useRef();
   const toast = useToast();
   const [name, setName]     = useState(initial?.name || '');
@@ -18,7 +18,8 @@ function CategoryForm({ initial, onSave, onCancel }) {
   const [emoji, setEmoji]   = useState(initial?.emoji || '🎮');
   const [image, setImage]   = useState(initial?.image_url || null);
   const [active, setActive] = useState(initial?.is_active !== false);
-  const [auto, setAuto]     = useState(!initial);
+  const [parentId, setParentId] = useState(initial?.parent_id || '');
+  const [auto, setAuto]     = useState(!initial?.id);
   const [saving, setSaving] = useState(false);
   const [imgFile, setImgFile] = useState(null);
 
@@ -47,9 +48,9 @@ function CategoryForm({ initial, onSave, onCancel }) {
         const r = await client.post('/admin/upload-image', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => null);
         if (r?.data?.url) imageUrl = r.data.url;
       }
-      const data = { name: name.trim(), slug: slug.trim(), emoji, image_url: imageUrl, is_active: active };
-      if (initial) await updateCategory(initial.id, data); else await createCategory(data);
-      toast.success(initial ? 'Категория обновлена' : 'Категория создана');
+      const data = { name: name.trim(), slug: slug.trim(), emoji, image_url: imageUrl, is_active: active, parent_id: parentId || null };
+      if (initial?.id) await updateCategory(initial.id, data); else await createCategory(data);
+      toast.success(initial?.id ? 'Категория обновлена' : 'Категория создана');
       onSave();
     } catch (err) { toast.error(err.response?.data?.error || 'Ошибка'); }
     finally { setSaving(false); }
@@ -79,13 +80,19 @@ function CategoryForm({ initial, onSave, onCancel }) {
       <div>
         <Input label="Slug (URL) *" value={slug} onChange={e=>{setAuto(false);setSlug(e.target.value);}} placeholder="minecraft" helper={`/catalog?category=${slug||'...'}`} style={{ fontFamily:'monospace' }} />
       </div>
+      <Select label="Родительская категория" value={parentId} onChange={e=>setParentId(e.target.value)}>
+        <option value="">Нет, это основная категория</option>
+        {categories.filter(c => !c.parent_id && c.id !== initial?.id).map(c => (
+          <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+        ))}
+      </Select>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px' }}>
         <div><div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>Активна</div><div style={{ fontSize:12, color:C.t2 }}>Показывать в каталоге</div></div>
         <Toggle value={active} onChange={setActive} />
       </div>
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
         <Btn variant="ghost" onClick={onCancel}>Отмена</Btn>
-        <Btn loading={saving} onClick={handleSave}>{initial?'Сохранить':'Создать'}</Btn>
+        <Btn loading={saving} onClick={handleSave}>{initial?.id?'Сохранить':'Создать'}</Btn>
       </div>
     </div>
   );
@@ -137,7 +144,7 @@ export default function CategoriesPage() {
             <div style={{ display:'grid', gridTemplateColumns:'30px 56px 1fr 120px 80px 100px 90px', gap:12, padding:'10px 18px', background:'#0A0A12', borderBottom:`1px solid ${C.border}` }}>
               {['','','Название / Slug','Товаров','Порядок','Статус',''].map((h,i)=><div key={i} style={{ fontSize:10, fontWeight:800, color:C.t3, textTransform:'uppercase', letterSpacing:1 }}>{h}</div>)}
             </div>
-            {[...cats].sort((a,b)=>a.sort_order-b.sort_order).map((cat,i,arr)=>(
+            {[...cats].sort((a,b)=>(a.parent_id ? 1 : 0) - (b.parent_id ? 1 : 0) || a.sort_order-b.sort_order).map((cat,i,arr)=>(
               <div key={cat.id} style={{ display:'grid', gridTemplateColumns:'30px 56px 1fr 120px 80px 100px 90px', gap:12, padding:'13px 18px', alignItems:'center', borderBottom:`1px solid ${C.border}`, transition:'background .15s' }}
                 onMouseEnter={e=>e.currentTarget.style.background=C.cardHov} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                 <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
@@ -147,7 +154,10 @@ export default function CategoriesPage() {
                 <div style={{ width:44, height:44, borderRadius:10, overflow:'hidden', background:'#0A0A14', border:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   {cat.image_url ? <img src={cat.image_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:22 }}>{cat.emoji||'📂'}</span>}
                 </div>
-                <div><div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>{cat.name}</div><div style={{ fontSize:11, color:C.t3, fontFamily:'monospace', marginTop:2 }}>/{cat.slug}</div></div>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>{cat.parent_id ? '↳ ' : ''}{cat.name}</div>
+                  <div style={{ fontSize:11, color:C.t3, fontFamily:'monospace', marginTop:2 }}>/{cat.slug}</div>
+                </div>
                 <div style={{ fontSize:13, color:C.t2 }}>{(cat.product_count||0).toLocaleString('ru')}</div>
                 <div style={{ fontSize:12, color:C.t3 }}>#{cat.sort_order}</div>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -155,6 +165,7 @@ export default function CategoriesPage() {
                   <span style={{ fontSize:10, color:cat.is_active?C.green:C.t3, fontWeight:700 }}>{cat.is_active?'Активна':'Скрыта'}</span>
                 </div>
                 <div style={{ display:'flex', gap:5 }}>
+                  {!cat.parent_id && <button onClick={()=>{setEditCat({ parent_id: cat.id, emoji: cat.emoji });setModal('create');}} style={{ background:'transparent', border:`1px solid ${C.border}`, color:C.accent, borderRadius:7, padding:'5px 8px', fontSize:11, cursor:'pointer' }}>+</button>}
                   <button onClick={()=>{setEditCat(cat);setModal('edit');}} style={{ background:'transparent', border:`1px solid ${C.border}`, color:C.t2, borderRadius:7, padding:'5px 8px', fontSize:11, cursor:'pointer' }}>✏️</button>
                   <button onClick={()=>setDeleteCat(cat)} style={{ background:'transparent', border:`1px solid #3A1A1A`, color:C.red, borderRadius:7, padding:'5px 8px', fontSize:11, cursor:'pointer' }}>🗑</button>
                 </div>
@@ -165,7 +176,7 @@ export default function CategoriesPage() {
 
       {(modal==='create'||modal==='edit') && (
         <Modal title={modal==='edit'?`Редактировать: ${editCat?.name}`:'Новая категория'} onClose={()=>setModal(null)}>
-          <CategoryForm initial={editCat} onSave={()=>{setModal(null);load();}} onCancel={()=>setModal(null)} />
+          <CategoryForm initial={editCat} categories={cats} onSave={()=>{setModal(null);load();}} onCancel={()=>setModal(null)} />
         </Modal>
       )}
       {deleteCat && (

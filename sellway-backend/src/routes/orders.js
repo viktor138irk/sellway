@@ -27,7 +27,17 @@ router.post('/', auth, async (req, res) => {
       );
       if (!product) throw { status: 404, message: 'Товар не найден или недоступен' };
       if (product.seller_user_id === req.user.id) throw { status: 400, message: 'Нельзя купить свой товар' };
-      if (product.keys_count < 1) throw { status: 400, message: 'Нет в наличии' };
+      if (product.delivery_type === 'auto' && product.keys_count < 1) throw { status: 400, message: 'Нет ключей в наличии' };
+
+      let productFile = null;
+      if (product.delivery_type === 'file') {
+        const { rows: [file] } = await client.query(
+          'SELECT id, url, filename, mime_type, size_bytes FROM product_files WHERE product_id=$1 ORDER BY created_at DESC LIMIT 1',
+          [product_id]
+        );
+        if (!file) throw { status: 400, message: 'Файл для выдачи не загружен' };
+        productFile = file;
+      }
 
       // Проверяем баланс покупателя
       const { rows: [wallet] } = await client.query(
@@ -70,7 +80,7 @@ router.post('/', auth, async (req, res) => {
         [req.user.id, order.id, product.price, `Оплата заказа ${order.order_number}`]
       );
 
-      // Если авто-выдача — сразу выдаём ключ
+      // Если авто-выдача — сразу выдаём ключ или файл.
       let key = null;
       if (product.delivery_type === 'auto') {
         const { rows: [k] } = await client.query(
@@ -94,6 +104,20 @@ router.post('/', auth, async (req, res) => {
             [order.id, product.seller_user_id, `🔑 Ключ передан автоматически: <hidden — откройте страницу заказа>`]
           );
         }
+      } else if (product.delivery_type === 'file') {
+        await client.query(
+          `UPDATE orders
+           SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours',
+               meta=$1::jsonb
+           WHERE id=$2`,
+          [JSON.stringify({ file: productFile }), order.id]
+        );
+
+        await client.query(
+          `INSERT INTO order_messages (order_id, sender_id, message, is_system)
+           VALUES ($1,$2,$3,TRUE)`,
+          [order.id, product.seller_user_id, `📎 Файл передан автоматически: ${productFile.filename}`]
+        );
       } else {
         // Уведомляем продавца о ручной выдаче
         await client.query(
@@ -115,7 +139,7 @@ router.post('/', auth, async (req, res) => {
       logger.info('Order created', { orderId: order.id, buyerId: req.user.id, amount: product.price });
 
       return res.status(201).json({
-        order: { ...order, status: product.delivery_type === 'auto' ? 'delivered' : 'paid' },
+        order: { ...order, status: ['auto', 'file'].includes(product.delivery_type) ? 'delivered' : 'paid' },
         key: key ? { value: key.key_value } : null,
       });
     });
@@ -168,6 +192,7 @@ router.get('/:id', auth, async (req, res) => {
     const { rows: [order] } = await query(
       `SELECT o.*,
               p.title AS product_title, p.description AS product_desc, p.delivery_type,
+              o.meta->'file' AS file,
               pk.key_value,
               buyer.username AS buyer_name, buyer.avatar_url AS buyer_avatar,
               seller.username AS seller_name, seller.avatar_url AS seller_avatar

@@ -33,7 +33,8 @@ export default function ProductPage() {
   async function handleBuy() {
     if (!user) return navigate('/login', { state: { from: { pathname: `/product/${id}` } } });
     if (user.id === product.seller_id) return toast.warn('Нельзя купить свой товар');
-    if (product.keys_count < 1) return toast.warn('Товар не в наличии');
+    if (product.delivery_type === 'auto' && product.keys_count < 1) return toast.warn('Товар не в наличии');
+    if (product.delivery_type === 'file' && product.files_count < 1) return toast.warn('Файл для выдачи пока не загружен');
 
     // Проверяем баланс
     if (parseFloat(user.balance || 0) < parseFloat(product.price)) {
@@ -72,6 +73,7 @@ export default function ProductPage() {
 
   const images = product.images || [];
   const disc = product.old_price ? Math.round((1-product.price/product.old_price)*100) : 0;
+  const canBuy = product.delivery_type === 'auto' ? product.keys_count > 0 : product.delivery_type === 'file' ? product.files_count > 0 : true;
 
   return (
     <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 20px' }} className="fade-in">
@@ -110,7 +112,8 @@ export default function ProductPage() {
         <div>
           {/* Badges */}
           <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:16 }}>
-            {product.delivery_type === 'auto' && <Badge color={C.green}>⚡ Авто-выдача</Badge>}
+            {product.delivery_type === 'auto' && <Badge color={C.green}>🔑 Авто-ключи</Badge>}
+            {product.delivery_type === 'file' && <Badge color={C.green}>📎 Авто-файл</Badge>}
             {product.seller_verified && <Badge color='#60A5FA'>✓ Продавец проверен</Badge>}
             {product.guarantee_days > 0 && <Badge color={C.t2}>🛡️ Гарантия {product.guarantee_days} дн.</Badge>}
             <Badge color={C.t3}>🛒 Куплено: {product.sales_count}</Badge>
@@ -130,14 +133,18 @@ export default function ProductPage() {
               <span style={{ fontSize:32, fontWeight:900, color:C.t1 }}>{parseFloat(product.price).toLocaleString('ru')} ₽</span>
               {product.old_price && <span style={{ fontSize:16, color:C.t3, textDecoration:'line-through' }}>{parseFloat(product.old_price).toLocaleString('ru')} ₽</span>}
             </div>
-            {product.keys_count > 0
+            {product.delivery_type === 'auto' && (product.keys_count > 0
               ? <div style={{ fontSize:12, color:C.green, marginTop:4 }}>● В наличии: {product.keys_count} шт.</div>
-              : <div style={{ fontSize:12, color:C.red, marginTop:4 }}>● Нет в наличии</div>}
+              : <div style={{ fontSize:12, color:C.red, marginTop:4 }}>● Нет в наличии</div>)}
+            {product.delivery_type === 'file' && (product.files_count > 0
+              ? <div style={{ fontSize:12, color:C.green, marginTop:4 }}>● Файл готов к выдаче</div>
+              : <div style={{ fontSize:12, color:C.red, marginTop:4 }}>● Файл не загружен</div>)}
+            {product.delivery_type === 'manual' && <div style={{ fontSize:12, color:C.green, marginTop:4 }}>● Ручная выдача продавцом</div>}
           </div>
 
           {/* Buy buttons */}
           <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-            <Btn full size="lg" loading={buyLoading} onClick={handleBuy} disabled={product.keys_count < 1} icon="⚡">
+            <Btn full size="lg" loading={buyLoading} onClick={handleBuy} disabled={!canBuy} icon="⚡">
               Купить сейчас
             </Btn>
             <button style={{ width:46, height:46, borderRadius:9, background:C.card, border:`1px solid ${C.border}`, color:C.t2, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>🤍</button>
@@ -145,7 +152,7 @@ export default function ProductPage() {
 
           {/* Guarantees */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:22 }}>
-            {[['🔒','Безопасная сделка','Средства заморожены до подтверждения'],['⚡',product.delivery_type==='auto'?'Авто-выдача':'Ручная выдача',product.delivery_type==='auto'?'Мгновенно, 24/7':'Продавец передаёт вручную'],['🛡️','Гарантия',product.guarantee_days>0?`${product.guarantee_days} дней`:'Уточните у продавца'],['↩️','Возврат','При открытии спора']].map(([icon,t,d])=>(
+            {[['🔒','Безопасная сделка','Средства заморожены до подтверждения'],['⚡',product.delivery_type==='auto'?'Авто-ключи':product.delivery_type==='file'?'Авто-файл':'Ручная выдача',product.delivery_type==='manual'?'Продавец передаёт вручную':'Мгновенно, 24/7'],['🛡️','Гарантия',product.guarantee_days>0?`${product.guarantee_days} дней`:'Уточните у продавца'],['↩️','Возврат','При открытии спора']].map(([icon,t,d])=>(
               <div key={t} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:9, padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
                 <span style={{ fontSize:16, flexShrink:0, marginTop:1 }}>{icon}</span>
                 <div><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{t}</div><div style={{ fontSize:11, color:C.t2, marginTop:2 }}>{d}</div></div>

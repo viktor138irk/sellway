@@ -21,7 +21,8 @@ function ProductCard({ p }) {
           : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:52 }}>📦</div>}
         <div style={{ position:'absolute', top:8, left:8, display:'flex', flexDirection:'column', gap:4 }}>
           {disc > 0 && <span style={{ background:C.red, color:'#fff', fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>−{disc}%</span>}
-          {p.delivery_type === 'auto' && <span style={{ background:C.green, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>⚡ Авто</span>}
+          {p.delivery_type === 'auto' && <span style={{ background:C.green, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>🔑 Авто</span>}
+          {p.delivery_type === 'file' && <span style={{ background:C.green, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>📎 Файл</span>}
         </div>
         <button onClick={e => { e.stopPropagation(); setFav(f=>!f); }}
           style={{ position:'absolute', top:8, right:8, width:30, height:30, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>

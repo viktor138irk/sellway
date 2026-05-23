@@ -3,35 +3,37 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import SellerLayout from '../../components/Layout/SellerLayout';
 import { C, Card, Btn, Input } from '../../components/UI';
-import { requestWithdraw, getDashboard } from '../../api/seller';
-
-const METHODS = [
-  { id:'card',   icon:'💳', label:'Банковская карта', fee:'2%' },
-  { id:'sbp',    icon:'⚡', label:'СБП (Быстрые платежи)', fee:'1%' },
-  { id:'paypal', icon:'🅿️', label:'PayPal', fee:'2%' },
-  { id:'crypto', icon:'₿',  label:'Криптовалюта', fee:'1%' },
-];
+import { requestWithdraw, getDashboard, getWithdrawConfig } from '../../api/seller';
 
 export default function WithdrawalPage() {
   const { user } = useAuth();
   const toast    = useToast();
   const [balance, setBalance] = useState(0);
   const [method, setMethod]   = useState('card');
+  const [methods, setMethods] = useState([]);
+  const [limits, setLimits] = useState({ minAmount: 500, maxDaily: 100000 });
   const [amount, setAmount]   = useState('');
   const [account, setAccount] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getDashboard().then(r => setBalance(parseFloat(r.data.wallet?.balance || 0)));
+    getWithdrawConfig().then(r => {
+      const available = (r.data.methods || []).filter(m => m.enabled);
+      setMethods(available);
+      setLimits({ minAmount: r.data.minAmount || 500, maxDaily: r.data.maxDaily || 100000 });
+      if (available.length) setMethod(available[0].id);
+    }).catch(()=>{});
   }, []);
 
-  const feeRate = method === 'sbp' || method === 'crypto' ? 0.01 : 0.02;
+  const selectedMethod = methods.find(m => m.id === method);
+  const feeRate = selectedMethod?.commission || 0;
   const fee     = amount ? Math.round(+amount * feeRate) : 0;
   const receive = amount ? +amount - fee : 0;
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!amount || +amount < 500) return toast.warn('Минимальная сумма: 500 ₽');
+    if (!amount || +amount < limits.minAmount) return toast.warn(`Минимальная сумма: ${limits.minAmount.toLocaleString('ru')} ₽`);
     if (+amount > balance) return toast.warn('Недостаточно средств');
     if (!account.trim()) return toast.warn('Укажите реквизиты');
     setLoading(true);
@@ -58,13 +60,13 @@ export default function WithdrawalPage() {
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 10 }}>Способ вывода</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {METHODS.map(m => (
+                  {methods.map(m => (
                     <div key={m.id} onClick={() => setMethod(m.id)}
                       style={{ background: method===m.id ? C.accent+'18' : '#0A0A12', border: `1.5px solid ${method===m.id ? C.accent : C.border}`,
                         borderRadius: 10, padding: '12px', cursor: 'pointer', transition: 'all .15s' }}>
                       <div style={{ fontSize: 20, marginBottom: 5 }}>{m.icon}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: method===m.id ? C.accent : C.t1 }}>{m.label}</div>
-                      <div style={{ fontSize: 10, color: C.t3 }}>Комиссия {m.fee}</div>
+                      <div style={{ fontSize: 10, color: C.t3 }}>Комиссия {(m.commission*100).toFixed(2).replace(/\.?0+$/,'')}%</div>
                     </div>
                   ))}
                 </div>
@@ -90,7 +92,7 @@ export default function WithdrawalPage() {
                 </div>
               </div>
               <Input label="Реквизиты" value={account} onChange={e => setAccount(e.target.value)}
-                placeholder={method==='card' ? 'Номер карты' : method==='sbp' ? 'Номер телефона' : method==='crypto' ? 'Адрес кошелька' : 'Email PayPal'} />
+                placeholder={selectedMethod?.placeholder || 'Реквизиты'} />
               <div style={{ background: '#0A0A12', borderRadius: 9, padding: '14px 16px' }}>
                 {[['Сумма', amount ? `${parseFloat(amount).toLocaleString('ru')} ₽` : '—'],
                   [`Комиссия (${(feeRate*100).toFixed(0)}%)`, `${fee.toLocaleString('ru')} ₽`],
@@ -107,7 +109,7 @@ export default function WithdrawalPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Card style={{ padding: 18 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>📏 Лимиты</div>
-              {[['Минимум', '500 ₽'],['Максимум в день','100 000 ₽'],['Время обработки','до 24 часов']].map(([l,v]) => (
+              {[['Минимум', `${limits.minAmount.toLocaleString('ru')} ₽`],['Максимум в день',`${limits.maxDaily.toLocaleString('ru')} ₽`],['Время обработки','до 24 часов']].map(([l,v]) => (
                 <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12 }}>
                   <span style={{ color: C.t2 }}>{l}</span><span style={{ color: C.t1, fontWeight: 600 }}>{v}</span>
                 </div>

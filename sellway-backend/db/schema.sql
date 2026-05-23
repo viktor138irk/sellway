@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TYPE user_role      AS ENUM ('buyer', 'seller', 'admin', 'moderator');
 CREATE TYPE user_status    AS ENUM ('active', 'banned', 'pending_verify');
 CREATE TYPE order_status   AS ENUM ('pending', 'paid', 'delivering', 'delivered', 'confirmed', 'disputed', 'cancelled', 'refunded');
-CREATE TYPE delivery_type  AS ENUM ('auto', 'manual');
+CREATE TYPE delivery_type  AS ENUM ('auto', 'manual', 'file');
 CREATE TYPE product_status AS ENUM ('draft', 'pending', 'active', 'rejected', 'archived');
 CREATE TYPE withdraw_status AS ENUM ('pending', 'processing', 'completed', 'rejected');
 CREATE TYPE withdraw_method AS ENUM ('card', 'paypal', 'crypto', 'sbp');
@@ -173,6 +173,16 @@ CREATE TABLE product_keys (
   is_sold     BOOLEAN DEFAULT FALSE,
   sold_at     TIMESTAMPTZ,
   order_id    UUID,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE product_files (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id  UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  url         VARCHAR(500) NOT NULL,
+  filename    VARCHAR(255) NOT NULL,
+  mime_type   VARCHAR(120),
+  size_bytes  BIGINT DEFAULT 0,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -363,6 +373,7 @@ CREATE INDEX idx_reviews_product     ON reviews(product_id);
 CREATE INDEX idx_sellers_referral_code ON sellers(referral_code);
 CREATE INDEX idx_sellers_referred_by ON sellers(referred_by_seller_id);
 CREATE INDEX idx_keys_product        ON product_keys(product_id, is_sold);
+CREATE INDEX idx_product_files_product ON product_files(product_id);
 CREATE INDEX idx_refresh_token       ON refresh_tokens(token);
 CREATE INDEX idx_order_messages      ON order_messages(order_id);
 CREATE INDEX idx_audit_logs_user     ON audit_logs(user_id, created_at DESC);
@@ -448,6 +459,14 @@ INSERT INTO settings (key, value, description) VALUES
   ('min_withdrawal',            '500',   'Минимальная сумма вывода'),
   ('max_withdrawal_daily',      '100000','Максимальная сумма вывода в день'),
   ('withdrawal_commission',     '0.02',  'Комиссия при выводе'),
+  ('withdraw_method_card_enabled', 'true', 'Включить вывод на банковскую карту'),
+  ('withdraw_method_card_commission', '0.02', 'Комиссия вывода на карту'),
+  ('withdraw_method_sbp_enabled', 'true', 'Включить вывод через СБП'),
+  ('withdraw_method_sbp_commission', '0.01', 'Комиссия вывода через СБП'),
+  ('withdraw_method_paypal_enabled', 'true', 'Включить вывод PayPal'),
+  ('withdraw_method_paypal_commission', '0.02', 'Комиссия вывода PayPal'),
+  ('withdraw_method_crypto_enabled', 'true', 'Включить вывод криптовалюты'),
+  ('withdraw_method_crypto_commission', '0.01', 'Комиссия вывода криптовалюты'),
   ('escrow_auto_confirm_hours', '48',    'Часов до автоподтверждения'),
   ('auto_review_rating',        '5',     'Оценка при автоотзыве'),
   ('maintenance_mode',          'false', 'Режим обслуживания'),

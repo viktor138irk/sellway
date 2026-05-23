@@ -53,7 +53,7 @@ function ProductDetail({ product, onClose, onAction }) {
               ['Продавец', `${product.seller_name} (${product.seller_email})`],
               ['Категория', product.category_name || '—'],
               ['Цена', `${parseFloat(product.price).toLocaleString('ru')} ₽`],
-              ['Тип выдачи', product.delivery_type === 'auto' ? '⚡ Авто' : '⏱ Ручная'],
+              ['Тип выдачи', product.delivery_type === 'auto' ? '🔑 Авто-ключи' : product.delivery_type === 'file' ? '📎 Авто-файл' : '⏱ Ручная'],
               ['Гарантия', product.guarantee_days ? `${product.guarantee_days} дн.` : 'Нет'],
               ['Создан', new Date(product.created_at).toLocaleString('ru')],
             ].map(([l, v]) => (

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SellerLayout from '../../components/Layout/SellerLayout';
 import { C, Spinner, Btn, Input, Select, Textarea, Modal } from '../../components/UI';
-import { getProducts, getProduct, createProduct, updateProduct, deleteProduct, uploadImages, addKeys, getKeys, getCategories } from '../../api/products';
+import { getProducts, getProduct, createProduct, updateProduct, deleteProduct, uploadImages, uploadProductFile, addKeys, getKeys, getCategories } from '../../api/products';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -84,11 +84,16 @@ function ProductForm({ productId, onSave, onCancel }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [images, setImages] = useState([]);
+  const [productFile, setProductFile] = useState(null);
+  const [existingFile, setExistingFile] = useState(null);
   const [keysText, setKeysText] = useState('');
   const [existingKeys, setExistingKeys] = useState([]);
+  const [parentCategoryId, setParentCategoryId] = useState('');
   const [form, setForm] = useState({ title:'', short_desc:'', description:'', price:'', old_price:'', category_id:'', delivery_type:'auto', guarantee_days:0, tags:'' });
   const set = k => v => setForm(f=>({...f,[k]:v}));
   const setFromInput = k => e => set(k)(e.target.value);
+  const rootCats = cats.filter(c => !c.parent_id);
+  const subCats = cats.filter(c => c.parent_id === parentCategoryId);
 
   useEffect(() => {
     getCategories().then(r=>setCats(r.data)).catch(()=>{});
@@ -98,7 +103,9 @@ function ProductForm({ productId, onSave, onCancel }) {
         .then(([pr, kr]) => {
           const p = pr.data;
           setForm({ title:p.title||'', short_desc:p.short_desc||'', description:p.description||'', price:p.price||'', old_price:p.old_price||'', category_id:p.category_id||'', delivery_type:p.delivery_type||'auto', guarantee_days:p.guarantee_days||0, tags:(p.tags||[]).join(', ') });
+          setParentCategoryId(p.parent_category_id || p.category_id || '');
           setImages((p.images||[]).map(url=>({ preview:url })));
+          setExistingFile((p.files || [])[0] || null);
           setExistingKeys(kr.data);
         }).catch(()=>toast.error('Ошибка загрузки товара'))
         .finally(()=>setLoading(false));
@@ -107,6 +114,8 @@ function ProductForm({ productId, onSave, onCancel }) {
 
   async function handleSave() {
     if (!form.title || !form.price || !form.category_id) return toast.warn('Заполните обязательные поля');
+    if (form.delivery_type === 'auto' && !keysText.trim() && existingKeys.filter(k=>!k.is_sold).length === 0) return toast.warn('Добавьте ключи для автовыдачи');
+    if (form.delivery_type === 'file' && !productFile && !existingFile) return toast.warn('Прикрепите файл для выдачи');
     setSaving(true);
     try {
       const body = { ...form, price:parseFloat(form.price), old_price:form.old_price?parseFloat(form.old_price):null, tags:form.tags.split(',').map(s=>s.trim()).filter(Boolean) };
@@ -122,8 +131,13 @@ function ProductForm({ productId, onSave, onCancel }) {
         await uploadImages(saved.id, fd).catch(()=>toast.warn('Некоторые фото не загрузились'));
       }
 
-      // Add new keys
-      const keys = keysText.split('\n').map(s=>s.trim()).filter(Boolean);
+      if (form.delivery_type === 'file' && productFile) {
+        const fd = new FormData();
+        fd.append('file', productFile);
+        await uploadProductFile(saved.id, fd).catch(()=>toast.warn('Файл не загрузился'));
+      }
+
+      const keys = form.delivery_type === 'auto' ? keysText.split('\n').map(s=>s.trim()).filter(Boolean) : [];
       if (keys.length > 0) {
         await addKeys(saved.id, keys).catch(()=>toast.warn('Некоторые ключи не добавились'));
       }
@@ -131,7 +145,7 @@ function ProductForm({ productId, onSave, onCancel }) {
       toast.success(productId ? 'Товар обновлён и отправлен на проверку' : 'Товар создан и отправлен на модерацию');
       onSave();
     } catch(err) {
-      toast.error(err.response?.data?.error || 'Ошибка сохранения');
+      toast.error(err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || 'Ошибка сохранения');
     } finally { setSaving(false); }
   }
 
@@ -145,11 +159,17 @@ function ProductForm({ productId, onSave, onCancel }) {
         <div style={{ gridColumn:'1/-1' }}>
           <Input label="Название товара *" value={form.title} onChange={setFromInput('title')} placeholder="CS2 Аккаунт | Prime Status | Gold Nova Master" />
         </div>
-        <div style={{ gridColumn:'1/-1' }}>
-          <CategoryPicker categories={cats} value={form.category_id} onChange={set('category_id')} />
-        </div>
+        <Select label="Категория *" value={parentCategoryId} onChange={e=>{ const id=e.target.value; setParentCategoryId(id); set('category_id')(cats.some(c=>c.parent_id===id) ? '' : id); }}>
+          <option value="">Выберите категорию</option>
+          {rootCats.map(c=><option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+        </Select>
+        <Select label="Подкатегория" value={form.category_id} onChange={e=>set('category_id')(e.target.value)} disabled={!parentCategoryId || subCats.length === 0}>
+          <option value={subCats.length ? '' : parentCategoryId}>{subCats.length ? 'Выберите подкатегорию' : 'Без подкатегории'}</option>
+          {subCats.map(c=><option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+        </Select>
         <Select label="Тип выдачи" value={form.delivery_type} onChange={e=>set('delivery_type')(e.target.value)}>
-          <option value="auto">⚡ Автоматическая (ключи)</option>
+          <option value="auto">🔑 Автовыдача ключей</option>
+          <option value="file">📎 Автовыдача файла</option>
           <option value="manual">⏱ Ручная (вручную)</option>
         </Select>
         <Input label="Цена (₽) *" type="number" value={form.price} onChange={setFromInput('price')} placeholder="1200" />
@@ -164,8 +184,7 @@ function ProductForm({ productId, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Keys */}
-      <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:12, padding:16 }}>
+      {form.delivery_type === 'auto' && <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:12, padding:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
           <div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>🔑 Ключи / коды</div>
           {existingKeys.length > 0 && <span style={{ fontSize:11, color:C.t2 }}>Уже добавлено: {existingKeys.filter(k=>!k.is_sold).length} доступных</span>}
@@ -185,7 +204,23 @@ function ProductForm({ productId, onSave, onCancel }) {
             </div>
           </div>
         )}
-      </div>
+      </div>}
+
+      {form.delivery_type === 'file' && (
+        <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:12, padding:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:C.t1, marginBottom:10 }}>📎 Файл для выдачи</div>
+          {existingFile && !productFile && <div style={{ fontSize:12, color:C.t2, marginBottom:10 }}>Текущий файл: {existingFile.filename}</div>}
+          <input type="file" onChange={e=>setProductFile(e.target.files?.[0] || null)}
+            style={{ width:'100%', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:'11px 13px', color:C.t1, fontSize:13, fontFamily:'inherit' }} />
+          {productFile && <div style={{ fontSize:12, color:C.green, marginTop:8 }}>Выбран файл: {productFile.name}</div>}
+        </div>
+      )}
+
+      {form.delivery_type === 'manual' && (
+        <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:12, padding:16, fontSize:12, color:C.t2 }}>
+          При ручной выдаче покупатель получит товар через чат сделки. Ключи и файл не требуются.
+        </div>
+      )}
 
       <div style={{ background:'#0A1A0A', border:`1px solid ${C.green}33`, borderRadius:10, padding:'12px 16px', fontSize:12, color:C.green }}>
         💡 После сохранения товар уйдёт на модерацию. Комиссия платформы: <strong>7%</strong>. Ваш доход с этого товара: <strong>{form.price ? Math.floor(+form.price*0.93).toLocaleString('ru') : '—'} ₽</strong>

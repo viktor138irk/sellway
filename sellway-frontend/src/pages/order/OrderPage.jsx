@@ -195,6 +195,15 @@ export default function OrderPage() {
           </div>
         )}
 
+        {isBuyer && order.file && ['delivered', 'confirmed'].includes(order.status) && (
+          <div style={{ padding: '14px 22px', borderBottom: `1px solid ${C.border}`, background: '#0A1A0A' }}>
+            <div style={{ fontSize: 12, color: C.green, fontWeight: 700, marginBottom: 8 }}>📎 Ваш файл</div>
+            <a href={order.file.url} target="_blank" rel="noopener noreferrer" style={{ color:C.accent, fontSize:14, fontWeight:700, textDecoration:'none' }}>
+              Скачать {order.file.filename || 'файл'}
+            </a>
+          </div>
+        )}
+
         {/* Chat */}
         <div style={{ height: 340, overflowY: 'auto', padding: '16px 18px', background: '#0D0D15', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {messages.map((m, i) => {

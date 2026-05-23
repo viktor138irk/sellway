@@ -13,6 +13,16 @@ const SECTIONS = [
     ['min_withdrawal','Мин. сумма вывода (₽)','number','500',''],
     ['max_withdrawal_daily','Макс. вывод в день (₽)','number','100000',''],
   ]},
+  { title: '💸 Системы вывода средств', keys: [
+    ['withdraw_method_card_enabled','Карты включены','toggle','true','Показывать вывод на банковские карты'],
+    ['withdraw_method_card_commission','Комиссия карты (доля)','number','0.02','0.02 = 2%'],
+    ['withdraw_method_sbp_enabled','СБП включен','toggle','true','Показывать вывод через СБП'],
+    ['withdraw_method_sbp_commission','Комиссия СБП (доля)','number','0.01','0.01 = 1%'],
+    ['withdraw_method_paypal_enabled','PayPal включен','toggle','true','Показывать вывод PayPal'],
+    ['withdraw_method_paypal_commission','Комиссия PayPal (доля)','number','0.02','0.02 = 2%'],
+    ['withdraw_method_crypto_enabled','Криптовалюта включена','toggle','true','Показывать вывод криптовалютой'],
+    ['withdraw_method_crypto_commission','Комиссия crypto (доля)','number','0.01','0.01 = 1%'],
+  ]},
   { title: '⏱ Сделки', keys: [
     ['escrow_auto_confirm_hours','Авто-подтверждение (часов)','number','48','Часов до авто-подтверждения'],
     ['auto_review_rating','Оценка авто-отзыва','number','5','От 1 до 5'],

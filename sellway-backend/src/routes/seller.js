@@ -52,19 +52,60 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-// ── Withdrawal: правильная комиссия по методу ────────
-const WITHDRAW_COMMISSION = { card: 0.02, paypal: 0.02, sbp: 0.01, crypto: 0.01 };
+const WITHDRAW_METHODS = {
+  card: { label: 'Банковская карта', icon: '💳', placeholder: 'Номер карты' },
+  sbp: { label: 'СБП (Быстрые платежи)', icon: '⚡', placeholder: 'Номер телефона' },
+  paypal: { label: 'PayPal', icon: '🅿️', placeholder: 'Email PayPal' },
+  crypto: { label: 'Криптовалюта', icon: '₿', placeholder: 'Адрес кошелька' },
+};
+
+async function getWithdrawConfig(client = { query }) {
+  const { rows } = await client.query(
+    `SELECT key, value FROM settings
+     WHERE key IN (
+       'min_withdrawal','max_withdrawal_daily',
+       'withdraw_method_card_enabled','withdraw_method_card_commission',
+       'withdraw_method_sbp_enabled','withdraw_method_sbp_commission',
+       'withdraw_method_paypal_enabled','withdraw_method_paypal_commission',
+       'withdraw_method_crypto_enabled','withdraw_method_crypto_commission'
+     )`
+  );
+  const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  const methods = Object.entries(WITHDRAW_METHODS).map(([id, meta]) => ({
+    id,
+    ...meta,
+    enabled: settings[`withdraw_method_${id}_enabled`] !== 'false',
+    commission: parseFloat(settings[`withdraw_method_${id}_commission`] || (id === 'sbp' || id === 'crypto' ? 0.01 : 0.02)),
+  }));
+  return {
+    minAmount: parseFloat(settings.min_withdrawal || 500),
+    maxDaily: parseFloat(settings.max_withdrawal_daily || 100000),
+    methods,
+  };
+}
+
+router.get('/withdrawal/config', async (req, res) => {
+  try {
+    res.json(await getWithdrawConfig());
+  } catch (err) {
+    logger.error('Withdrawal config error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
 
 router.post('/withdrawal', async (req, res) => {
   const { amount, method, requisites } = req.body;
   const amt = parseFloat(amount);
 
-  if (!amt || amt < 500) return res.status(400).json({ error: 'Минимальная сумма 500 ₽' });
-  if (!WITHDRAW_COMMISSION[method]) return res.status(400).json({ error: 'Неверный метод вывода' });
   if (!requisites?.account?.trim()) return res.status(400).json({ error: 'Укажите реквизиты' });
 
   try {
     const w = await transaction(async (client) => {
+      const config = await getWithdrawConfig(client);
+      const methodConfig = config.methods.find(m => m.id === method && m.enabled);
+      if (!methodConfig) throw { status: 400, message: 'Неверный или отключенный метод вывода' };
+      if (!amt || amt < config.minAmount) throw { status: 400, message: `Минимальная сумма ${config.minAmount.toLocaleString('ru')} ₽` };
+
       const { rows: [wallet] } = await client.query(
         'SELECT balance FROM wallets WHERE user_id=$1 FOR UPDATE',
         [req.user.id]
@@ -73,7 +114,7 @@ router.post('/withdrawal', async (req, res) => {
         throw { status: 402, message: 'Недостаточно средств' };
       }
 
-      const commission = parseFloat((amt * WITHDRAW_COMMISSION[method]).toFixed(2));
+      const commission = parseFloat((amt * methodConfig.commission).toFixed(2));
       const netAmount  = parseFloat((amt - commission).toFixed(2));
 
       const { rows: [w] } = await client.query(

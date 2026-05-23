@@ -21,6 +21,10 @@ const upload = multer({
     cb(allowed.includes(file.mimetype) ? null : new Error('Только JPEG, PNG, WebP'), allowed.includes(file.mimetype));
   },
 });
+const fileUpload = multer({
+  storage,
+  limits: { fileSize: parseInt(process.env.PRODUCT_FILE_MAX_SIZE) || 104857600 },
+});
 
 // ── GET /products ────────────────────────────────────
 router.get('/', optionalAuth, async (req, res) => {
@@ -50,7 +54,10 @@ router.get('/', optionalAuth, async (req, res) => {
       where.push("p.status = 'active'");
     }
 
-    if (category) { params.push(category); where.push(`c.slug = $${params.length}`); }
+    if (category) {
+      params.push(category);
+      where.push(`(c.slug = $${params.length} OR parent.slug = $${params.length})`);
+    }
     if (search)   {
       params.push(`%${search}%`);
       where.push(`(p.title ILIKE $${params.length} OR p.short_desc ILIKE $${params.length})`);
@@ -74,14 +81,17 @@ router.get('/', optionalAuth, async (req, res) => {
               p.delivery_type, p.keys_count, p.rating, p.reviews_count,
               p.sales_count, p.tags, p.guarantee_days, p.seller_id,
               c.name AS category_name, c.slug AS category_slug,
+              parent.id AS parent_category_id, parent.name AS parent_category_name, parent.slug AS parent_category_slug,
               u.username AS seller_name,
               s.verified AS seller_verified, s.rating AS seller_rating,
               s.total_sales AS seller_sales,
               (SELECT url FROM product_images WHERE product_id=p.id AND is_main=TRUE LIMIT 1) AS main_image,
               (SELECT COALESCE(json_agg(url ORDER BY sort_order), '[]'::json)
-               FROM product_images WHERE product_id=p.id) AS images
+               FROM product_images WHERE product_id=p.id) AS images,
+              (SELECT COUNT(*)::int FROM product_files WHERE product_id=p.id) AS files_count
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN categories parent ON parent.id = c.parent_id
        LEFT JOIN users u ON u.id = p.seller_id
        LEFT JOIN sellers s ON s.user_id = p.seller_id
        ${whereStr}
@@ -93,6 +103,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const { rows: [{ count }] } = await query(
       `SELECT COUNT(*)::int FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN categories parent ON parent.id = c.parent_id
        ${whereStr}`,
       params.slice(0, -2)
     );
@@ -115,12 +126,16 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const { rows } = await query(
       `SELECT p.*,
               c.name AS category_name, c.slug AS category_slug,
+              c.parent_id AS parent_category_id,
               u.username AS seller_name, u.avatar_url AS seller_avatar,
               s.verified AS seller_verified, s.rating AS seller_rating,
               s.total_sales AS seller_sales, s.response_time_min,
               s.description AS seller_description, s.is_online AS seller_online,
               (SELECT COALESCE(json_agg(url ORDER BY sort_order), '[]'::json)
-               FROM product_images WHERE product_id=p.id) AS images
+               FROM product_images WHERE product_id=p.id) AS images,
+              (SELECT COALESCE(json_agg(json_build_object('id', id, 'url', url, 'filename', filename, 'size_bytes', size_bytes) ORDER BY created_at DESC), '[]'::json)
+               FROM product_files WHERE product_id=p.id) AS files,
+              (SELECT COUNT(*)::int FROM product_files WHERE product_id=p.id) AS files_count
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        LEFT JOIN users u ON u.id = p.seller_id
@@ -157,7 +172,7 @@ router.post('/', auth, requireRole('seller', 'admin'), [
   body('title').trim().isLength({ min: 5, max: 255 }),
   body('price').isFloat({ min: 1 }),
   body('category_id').isUUID(),
-  body('delivery_type').isIn(['auto', 'manual']),
+  body('delivery_type').isIn(['auto', 'manual', 'file']),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
@@ -188,15 +203,15 @@ router.put('/:id', auth, requireRole('seller', 'admin'), async (req, res) => {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    const { title, description, short_desc, price, old_price, delivery_type, guarantee_days, tags } = req.body;
+    const { title, description, short_desc, price, old_price, category_id, delivery_type, guarantee_days, tags } = req.body;
     const { rows: [product] } = await query(
       `UPDATE products SET
          title=COALESCE($1,title), description=$2, short_desc=$3,
-         price=COALESCE($4,price), old_price=$5,
-         delivery_type=COALESCE($6,delivery_type), guarantee_days=$7, tags=$8,
+         price=COALESCE($4,price), old_price=$5, category_id=COALESCE($6,category_id),
+         delivery_type=COALESCE($7,delivery_type), guarantee_days=$8, tags=$9,
          status = CASE WHEN status='active' THEN 'pending' ELSE status END
-       WHERE id=$9 RETURNING *`,
-      [title, description, short_desc, price, old_price || null, delivery_type, guarantee_days || 0, tags || [], req.params.id]
+       WHERE id=$10 RETURNING *`,
+      [title, description, short_desc, price, old_price || null, category_id, delivery_type, guarantee_days || 0, tags || [], req.params.id]
     );
     res.json(product);
   } catch (err) {
@@ -259,6 +274,30 @@ router.post('/:id/images', auth, requireRole('seller', 'admin'), upload.array('i
   } catch (err) {
     logger.error('Image upload error', { err: err.message });
     res.status(500).json({ error: 'Ошибка загрузки' });
+  }
+});
+
+// ── POST /products/:id/file ── Файл для автоматической выдачи ──
+router.post('/:id/file', auth, requireRole('seller', 'admin'), fileUpload.single('file'), async (req, res) => {
+  try {
+    const { rows: [p] } = await query('SELECT seller_id FROM products WHERE id=$1', [req.params.id]);
+    if (!p) return res.status(404).json({ error: 'Товар не найден' });
+    if (p.seller_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+
+    const baseUrl = process.env.UPLOAD_URL || '/uploads';
+    await query('DELETE FROM product_files WHERE product_id=$1', [req.params.id]);
+    const { rows: [file] } = await query(
+      `INSERT INTO product_files (product_id, url, filename, mime_type, size_bytes)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [req.params.id, `${baseUrl}/${req.file.filename}`, req.file.originalname, req.file.mimetype, req.file.size]
+    );
+    res.json({ file });
+  } catch (err) {
+    logger.error('Product file upload error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка загрузки файла' });
   }
 });
 
