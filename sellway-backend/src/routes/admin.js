@@ -18,10 +18,17 @@ const ENV_SETTINGS = {
   PROXY_PORT: 'Порт SOCKS5-прокси',
   PROXY_USERNAME: 'Логин SOCKS5-прокси',
   PROXY_PASSWORD: 'Пароль SOCKS5-прокси',
+  SMTP_HOST: 'SMTP-хост для email-уведомлений',
+  SMTP_PORT: 'SMTP-порт',
+  SMTP_SECURE: 'Использовать защищенное SMTP-соединение',
+  SMTP_USER: 'SMTP-пользователь',
+  SMTP_PASS: 'SMTP-пароль',
 };
 
 function setEnvValue(content, key, value) {
-  const line = `${key}=${String(value ?? '').replace(/\r?\n/g, '')}`;
+  const raw = String(value ?? '').replace(/\r?\n/g, '');
+  const escaped = raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+  const line = `${key}="${escaped}"`;
   const re = new RegExp(`^${key}=.*$`, 'm');
   return re.test(content) ? content.replace(re, line) : `${content.replace(/\s*$/, '')}\n${line}\n`;
 }
@@ -407,7 +414,7 @@ router.put('/settings', requireRole('admin'), async (req, res) => {
     logger.info('Settings updated', { adminId: req.user.id, keys: Object.keys(updates) });
     res.json({
       message: 'Настройки сохранены',
-      restartRequired: Object.keys(envUpdates).some(key => key.startsWith('TELEGRAM_') || key.startsWith('PROXY_')),
+      restartRequired: Object.keys(envUpdates).length > 0,
     });
   } catch (err) {
     logger.error('Settings update error', { err: err.message });

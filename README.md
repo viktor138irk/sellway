@@ -36,6 +36,17 @@ bash scripts/install.sh
 
 Подробности: [INSTALL.md](INSTALL.md).
 
+## Обновление
+
+После первой установки можно обновляться одной командой:
+
+```bash
+cd /var/www/sellway.pro
+sudo bash scripts/update.sh
+```
+
+Скрипт подтянет код из GitHub, сохранит старый `.env`, соберёт frontend, скопирует его в сохранённый `SITE_ROOT` FastPanel и перезапустит PM2.
+
 ## Локальный запуск
 
 Backend:

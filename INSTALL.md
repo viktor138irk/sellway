@@ -134,14 +134,21 @@ http://sellway.pro
 
 ```bash
 cd /var/www/sellway.pro
-sudo git pull
-sudo bash scripts/install.sh
+sudo bash scripts/update.sh
 ```
 
-Установщик не затирает существующий `.env`, а только использует его для запуска.
+Скрипт обновления:
 
-Если нужно только обновить код и сборку, а базу не трогать:
+- делает `git pull`;
+- не задаёт вопросы;
+- не затирает `sellway-backend/.env`;
+- использует сохранённый `SITE_ROOT` из `deploy/install.env`;
+- если `deploy/install.env` ещё нет, пробует найти FastPanel document root автоматически;
+- ставит зависимости, собирает frontend и копирует `dist` в корень сайта;
+- перезапускает `sellway-api` и `sellway-bot` через PM2.
+
+Если нужно отключить миграции:
 
 ```bash
-sudo INIT_DB=false bash scripts/install.sh
+sudo RUN_MIGRATIONS=false bash scripts/update.sh
 ```

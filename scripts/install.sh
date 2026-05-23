@@ -581,6 +581,19 @@ apply_nginx_config() {
   systemctl reload nginx || service nginx reload || true
 }
 
+save_install_config() {
+  mkdir -p "$GENERATED_NGINX_DIR"
+  cat > "${GENERATED_NGINX_DIR}/install.env" <<EOF
+APP_DIR=${APP_DIR}
+DOMAIN=${DOMAIN}
+FRONTEND_URL=${FRONTEND_URL}
+API_PORT=${API_PORT}
+SITE_ROOT=${SITE_ROOT}
+FASTPANEL_SAFE=${FASTPANEL_SAFE}
+INSTALL_NGINX=${INSTALL_NGINX}
+EOF
+}
+
 finish_message() {
   cat <<EOF
 
@@ -609,4 +622,5 @@ install_frontend
 install_pm2
 generated_nginx_config="$(generate_nginx_config | tail -n 1)"
 apply_nginx_config "$generated_nginx_config"
+save_install_config
 finish_message

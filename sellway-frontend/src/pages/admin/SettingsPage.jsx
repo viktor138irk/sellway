@@ -31,6 +31,13 @@ const SECTIONS = [
     ['PROXY_USERNAME','Логин прокси','text','','Оставь пустым, если авторизация не нужна'],
     ['PROXY_PASSWORD','Пароль прокси','password','','Оставь пустым, если авторизация не нужна'],
   ]},
+  { title: '✉️ SMTP', keys: [
+    ['SMTP_HOST','SMTP хост','text','smtp.yandex.ru','Например: smtp.yandex.ru'],
+    ['SMTP_PORT','SMTP порт','number','465','Обычно 465 или 587'],
+    ['SMTP_SECURE','Защищённое соединение','toggle','true','true для 465, false для 587'],
+    ['SMTP_USER','SMTP пользователь','text','noreply@sellway.pro','Email отправителя'],
+    ['SMTP_PASS','SMTP пароль','password','','Пароль приложения или почтового ящика'],
+  ]},
 ];
 
 const RESTART_KEYS = new Set([
@@ -42,6 +49,11 @@ const RESTART_KEYS = new Set([
   'PROXY_PORT',
   'PROXY_USERNAME',
   'PROXY_PASSWORD',
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_SECURE',
+  'SMTP_USER',
+  'SMTP_PASS',
 ]);
 
 export default function SettingsPage() {
@@ -73,7 +85,7 @@ export default function SettingsPage() {
     try {
       const { data } = await saveSettings(changed);
       if (data.restartRequired || Object.keys(changed).some(key => RESTART_KEYS.has(key))) {
-        toast.warn('Сохранено. Перезапусти sellway-api и sellway-bot в PM2');
+        toast.warn('Сохранено. Перезапусти сервисы в PM2');
       } else {
         toast.success('Настройки сохранены ✅');
       }
@@ -137,7 +149,7 @@ export default function SettingsPage() {
 
           {Object.keys(changed).some(key => RESTART_KEYS.has(key)) && (
             <div style={{ background:C.amber+'12', border:`1px solid ${C.amber}44`, borderRadius:12, padding:'14px 18px', color:C.amber, fontSize:12, fontWeight:700 }}>
-              После сохранения Telegram/SOCKS5 настроек выполни на сервере: pm2 restart sellway-api sellway-bot --update-env
+              После сохранения настроек Telegram, SOCKS5 или SMTP выполни на сервере: pm2 restart sellway-api sellway-bot --update-env
             </div>
           )}
 
