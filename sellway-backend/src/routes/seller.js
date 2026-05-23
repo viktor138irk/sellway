@@ -7,6 +7,9 @@ const logger = require('../config/logger');
 
 router.use(auth, requireRole('seller', 'freelancer', 'admin'));
 
+function roleForLink(role) { return role === 'freelancer' ? 'freelancer' : 'seller'; }
+function referralLink(code, role) { return code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=${roleForLink(role)}&ref=${code}` : null; }
+
 router.get('/dashboard', async (req, res) => {
   try {
     const [wallet, seller, recentOrders, products, referralStats] = await Promise.all([
@@ -17,7 +20,6 @@ router.get('/dashboard', async (req, res) => {
       query(`SELECT COUNT(*) AS referred_count, COALESCE(SUM(CASE WHEN child.created_at >= NOW()-INTERVAL '30 days' THEN 1 ELSE 0 END),0) AS referred_30d FROM sellers child WHERE child.referred_by_seller_id=$1`, [req.user.id]),
     ]);
     const s = seller.rows[0] || {};
-    const roleForLink = req.user.role === 'freelancer' ? 'freelancer' : 'seller';
     res.json({
       wallet: wallet.rows[0],
       seller: s,
@@ -25,17 +27,76 @@ router.get('/dashboard', async (req, res) => {
       products: products.rows,
       referral: {
         code: s.referral_code || null,
-        link: s.referral_code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=${roleForLink}&ref=${s.referral_code}` : null,
+        link: referralLink(s.referral_code, req.user.role),
         referredCount: parseInt(referralStats.rows[0]?.referred_count || 0),
         referred30d: parseInt(referralStats.rows[0]?.referred_30d || 0),
         earnings: s.referral_earnings || '0.00',
         referralRate: s.referral_commission_rate || '0.0100',
         commissionRate: s.custom_commission_rate || null,
-        role: roleForLink,
+        role: roleForLink(req.user.role),
       },
     });
   } catch (err) {
     logger.error('Seller dashboard error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.get('/referrals', async (req, res) => {
+  try {
+    const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
+    if (!seller) return res.status(404).json({ error: 'Профиль продавца/фрилансера не найден' });
+
+    const { rows: referred } = await query(
+      `SELECT child.user_id, u.username, u.email, u.role, child.created_at,
+              child.referral_commission_rate, child.total_sales,
+              COALESCE(SUM(o.amount),0) AS turnover,
+              COUNT(o.id)::int AS orders_count,
+              COALESCE(SUM(rt.amount),0) AS paid_to_you
+       FROM sellers child
+       JOIN users u ON u.id=child.user_id
+       LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed'
+       LEFT JOIN transactions rt ON rt.order_id=o.id AND rt.user_id=$1 AND rt.meta->>'source'='seller_referral'
+       WHERE child.referred_by_seller_id=$1
+       GROUP BY child.user_id, u.username, u.email, u.role, child.created_at, child.referral_commission_rate, child.total_sales
+       ORDER BY child.created_at DESC`,
+      [req.user.id]
+    );
+
+    const { rows: payments } = await query(
+      `SELECT t.id, t.amount, t.description, t.created_at, t.order_id,
+              o.order_number, p.title AS product_title, seller_u.username AS seller_name
+       FROM transactions t
+       LEFT JOIN orders o ON o.id=t.order_id
+       LEFT JOIN products p ON p.id=o.product_id
+       LEFT JOIN users seller_u ON seller_u.id=o.seller_id
+       WHERE t.user_id=$1 AND t.meta->>'source'='seller_referral'
+       ORDER BY t.created_at DESC LIMIT 50`,
+      [req.user.id]
+    );
+
+    const summary = referred.reduce((acc, r) => {
+      acc.referredCount += 1;
+      acc.turnover += Number(r.turnover || 0);
+      acc.ordersCount += Number(r.orders_count || 0);
+      acc.paidToYou += Number(r.paid_to_you || 0);
+      return acc;
+    }, { referredCount: 0, turnover: 0, ordersCount: 0, paidToYou: 0 });
+
+    res.json({
+      referral: {
+        code: seller.referral_code,
+        link: referralLink(seller.referral_code, req.user.role),
+        rate: seller.referral_commission_rate || '0.0100',
+        earnings: seller.referral_earnings || '0.00',
+        role: roleForLink(req.user.role),
+      },
+      summary,
+      referred,
+      payments,
+    });
+  } catch (err) {
+    logger.error('Referrals page error', { err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
