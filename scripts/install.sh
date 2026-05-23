@@ -2,15 +2,16 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/viktor138irk/sellway.git}"
-APP_DIR="${APP_DIR:-/var/www/sellway.pro}"
-DOMAIN="${DOMAIN:-sellway.pro}"
-FRONTEND_URL="${FRONTEND_URL:-https://${DOMAIN}}"
-API_PORT="${API_PORT:-3001}"
-INIT_DB="${INIT_DB:-true}"
+APP_DIR="${APP_DIR:-}"
+DOMAIN="${DOMAIN:-}"
+FRONTEND_URL="${FRONTEND_URL:-}"
+API_PORT="${API_PORT:-}"
+INIT_DB="${INIT_DB:-}"
 FASTPANEL_SAFE="${FASTPANEL_SAFE:-true}"
 INSTALL_NGINX="${INSTALL_NGINX:-false}"
-SITE_ROOT="${SITE_ROOT:-${APP_DIR}/sellway-frontend/dist}"
-GENERATED_NGINX_DIR="${GENERATED_NGINX_DIR:-${APP_DIR}/deploy}"
+SITE_ROOT="${SITE_ROOT:-}"
+GENERATED_NGINX_DIR="${GENERATED_NGINX_DIR:-}"
+WIZARD="${WIZARD:-true}"
 
 if [[ "${1:-}" == "--help" ]]; then
   cat <<'HELP'
@@ -22,13 +23,15 @@ Environment variables:
   DATABASE_URL=postgresql://user:password@localhost:5432/db
   FRONTEND_URL=https://sellway.pro
   API_PORT=3001
-  INIT_DB=true
+  INIT_DB=false
   FASTPANEL_SAFE=true
   INSTALL_NGINX=false
   SITE_ROOT=/var/www/sellway.pro/sellway-frontend/dist
+  WIZARD=true
 
 Example:
-  sudo DOMAIN=sellway.pro DATABASE_URL='postgresql://sellway_user:pass@localhost:5432/sellway_db' bash scripts/install.sh
+  sudo bash scripts/install.sh
+  sudo WIZARD=false DOMAIN=sellway.pro DATABASE_URL='postgresql://sellway_user:pass@localhost:5432/sellway_db' bash scripts/install.sh
 HELP
   exit 0
 fi
@@ -69,12 +72,190 @@ ask() {
   fi
 }
 
+is_interactive() {
+  [[ -t 0 && "$WIZARD" == "true" ]]
+}
+
+prompt_value() {
+  local var_name="$1"
+  local label="$2"
+  local default_value="$3"
+  local current_value="${!var_name:-}"
+  local answer
+
+  current_value="${current_value:-$default_value}"
+
+  if is_interactive; then
+    read -r -p "${label} [${current_value}]: " answer
+    current_value="${answer:-$current_value}"
+  fi
+
+  printf -v "$var_name" '%s' "$current_value"
+}
+
+prompt_secret() {
+  local var_name="$1"
+  local label="$2"
+  local default_value="${3:-}"
+  local current_value="${!var_name:-}"
+  local answer
+
+  current_value="${current_value:-$default_value}"
+
+  if is_interactive; then
+    if [[ -n "$current_value" ]]; then
+      read -r -s -p "${label} [Enter = оставить текущее]: " answer
+    else
+      read -r -s -p "${label}: " answer
+    fi
+    printf '\n'
+    current_value="${answer:-$current_value}"
+  fi
+
+  printf -v "$var_name" '%s' "$current_value"
+}
+
+prompt_yes_no() {
+  local var_name="$1"
+  local label="$2"
+  local default_value="$3"
+  local prompt default_label answer result
+
+  if [[ "$default_value" == "true" ]]; then
+    default_label="Y/n"
+  else
+    default_label="y/N"
+  fi
+
+  result="$default_value"
+  if is_interactive; then
+    read -r -p "${label} [${default_label}]: " answer
+    case "${answer,,}" in
+      y|yes|д|да) result="true" ;;
+      n|no|н|нет) result="false" ;;
+      "") result="$default_value" ;;
+      *) result="$default_value" ;;
+    esac
+  fi
+
+  printf -v "$var_name" '%s' "$result"
+}
+
 read_env_value() {
   local file="$1"
   local key="$2"
 
   if [[ -f "$file" ]]; then
     grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2-
+  fi
+}
+
+load_existing_env_defaults() {
+  local env_file="${APP_DIR}/sellway-backend/.env"
+  local key value
+
+  [[ -f "$env_file" ]] || return
+
+  for key in DATABASE_URL DB_HOST DB_PORT DB_NAME DB_USER DB_PASS TELEGRAM_BOT_TOKEN TELEGRAM_ADMIN_CHAT_ID SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS YUKASSA_SHOP_ID YUKASSA_SECRET_KEY PLATFORM_COMMISSION; do
+    if [[ -z "${!key:-}" ]]; then
+      value="$(read_env_value "$env_file" "$key")"
+      if [[ -n "$value" ]]; then
+        printf -v "$key" '%s' "$value"
+      fi
+    fi
+  done
+}
+
+configure_wizard() {
+  local use_full_database_url configure_db configure_db_default configure_optional confirm_install
+
+  APP_DIR="${APP_DIR:-/var/www/sellway.pro}"
+  DOMAIN="${DOMAIN:-sellway.pro}"
+  API_PORT="${API_PORT:-3001}"
+
+  if is_interactive; then
+    cat <<'EOF'
+
+SellWay: пошаговый установщик
+Нажимай Enter, чтобы оставить значение в квадратных скобках.
+Безопасный режим FastPanel включен по умолчанию: Nginx напрямую не меняется.
+
+EOF
+  fi
+
+  prompt_value APP_DIR "1/8 Директория проекта APP_DIR" "$APP_DIR"
+  prompt_value DOMAIN "2/8 Домен сайта DOMAIN" "$DOMAIN"
+  prompt_value FRONTEND_URL "3/8 Публичный URL FRONTEND_URL" "${FRONTEND_URL:-https://${DOMAIN}}"
+  prompt_value API_PORT "4/8 Порт backend API_PORT" "$API_PORT"
+  prompt_value SITE_ROOT "5/8 Корневая директория сайта FastPanel SITE_ROOT" "${SITE_ROOT:-${APP_DIR}/sellway-frontend/dist}"
+
+  GENERATED_NGINX_DIR="${GENERATED_NGINX_DIR:-${APP_DIR}/deploy}"
+  load_existing_env_defaults
+
+  configure_db_default="true"
+  if ! is_interactive && [[ -z "${DATABASE_URL:-}" && -z "${DB_PASS:-}" ]]; then
+    configure_db_default="false"
+  fi
+
+  prompt_yes_no configure_db "6/8 Настроить PostgreSQL сейчас" "$configure_db_default"
+  if [[ "$configure_db" == "true" ]]; then
+    if [[ -n "${DATABASE_URL:-}" && "$DATABASE_URL" != *"password@localhost"* ]]; then
+      prompt_yes_no use_full_database_url "Ввести готовый DATABASE_URL вместо отдельных полей" "true"
+    else
+      prompt_yes_no use_full_database_url "Ввести готовый DATABASE_URL вместо отдельных полей" "false"
+    fi
+    if [[ "$use_full_database_url" == "true" ]]; then
+      prompt_value DATABASE_URL "PostgreSQL DATABASE_URL" "${DATABASE_URL:-postgresql://sellway_user:password@localhost:5432/sellway_db}"
+    else
+      prompt_value DB_HOST "PostgreSQL хост DB_HOST" "${DB_HOST:-localhost}"
+      prompt_value DB_PORT "PostgreSQL порт DB_PORT" "${DB_PORT:-5432}"
+      prompt_value DB_NAME "PostgreSQL база DB_NAME" "${DB_NAME:-sellway_db}"
+      prompt_value DB_USER "PostgreSQL пользователь DB_USER" "${DB_USER:-sellway_user}"
+      prompt_secret DB_PASS "PostgreSQL пароль DB_PASS" "${DB_PASS:-}"
+      DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    fi
+    prompt_yes_no INIT_DB "Применить схему БД сейчас" "${INIT_DB:-false}"
+  else
+    INIT_DB="false"
+    DATABASE_URL="${DATABASE_URL:-postgresql://sellway_user:password@localhost:5432/sellway_db}"
+  fi
+
+  prompt_yes_no configure_optional "7/8 Заполнить Telegram, SMTP и ЮKassa сейчас" "false"
+  if [[ "$configure_optional" == "true" ]]; then
+    prompt_value TELEGRAM_BOT_TOKEN "Telegram токен бота TELEGRAM_BOT_TOKEN" "${TELEGRAM_BOT_TOKEN:-}"
+    prompt_value TELEGRAM_ADMIN_CHAT_ID "Telegram chat id админа TELEGRAM_ADMIN_CHAT_ID" "${TELEGRAM_ADMIN_CHAT_ID:-}"
+    prompt_value SMTP_HOST "SMTP хост SMTP_HOST" "${SMTP_HOST:-smtp.yandex.ru}"
+    prompt_value SMTP_PORT "SMTP порт SMTP_PORT" "${SMTP_PORT:-465}"
+    prompt_value SMTP_SECURE "SMTP secure SMTP_SECURE" "${SMTP_SECURE:-true}"
+    prompt_value SMTP_USER "SMTP пользователь SMTP_USER" "${SMTP_USER:-noreply@${DOMAIN}}"
+    prompt_secret SMTP_PASS "SMTP пароль SMTP_PASS" "${SMTP_PASS:-}"
+    prompt_value YUKASSA_SHOP_ID "ЮKassa shop id YUKASSA_SHOP_ID" "${YUKASSA_SHOP_ID:-}"
+    prompt_secret YUKASSA_SECRET_KEY "ЮKassa secret key YUKASSA_SECRET_KEY" "${YUKASSA_SECRET_KEY:-}"
+  fi
+
+  prompt_yes_no FASTPANEL_SAFE "8/8 Оставить безопасный режим FastPanel" "${FASTPANEL_SAFE:-true}"
+  if [[ "$FASTPANEL_SAFE" == "true" ]]; then
+    INSTALL_NGINX="false"
+  else
+    prompt_yes_no INSTALL_NGINX "Применить Nginx-конфиг напрямую" "${INSTALL_NGINX:-false}"
+  fi
+
+  if is_interactive; then
+    cat <<EOF
+
+Сводка:
+  APP_DIR: ${APP_DIR}
+  DOMAIN: ${DOMAIN}
+  FRONTEND_URL: ${FRONTEND_URL}
+  SITE_ROOT: ${SITE_ROOT}
+  API_PORT: ${API_PORT}
+  INIT_DB: ${INIT_DB}
+  FASTPANEL_SAFE: ${FASTPANEL_SAFE}
+  INSTALL_NGINX: ${INSTALL_NGINX}
+
+EOF
+    prompt_yes_no confirm_install "Начать установку" "true"
+    [[ "$confirm_install" == "true" ]] || fail "Installation cancelled."
   fi
 }
 
@@ -167,13 +348,46 @@ write_backend_env() {
     DATABASE_URL="$(read_env_value "$env_file" DATABASE_URL)"
   fi
 
-  ask DATABASE_URL "PostgreSQL DATABASE_URL" "postgresql://sellway_user:password@localhost:5432/sellway_db"
+  DATABASE_URL="${DATABASE_URL:-postgresql://sellway_user:password@localhost:5432/sellway_db}"
 
   set_env_value "$env_file" PORT "$API_PORT"
   set_env_value "$env_file" NODE_ENV "production"
   set_env_value "$env_file" FRONTEND_URL "$FRONTEND_URL"
   set_env_value "$env_file" DATABASE_URL "$DATABASE_URL"
+  set_env_value "$env_file" DB_HOST "${DB_HOST:-localhost}"
+  set_env_value "$env_file" DB_PORT "${DB_PORT:-5432}"
+  set_env_value "$env_file" DB_NAME "${DB_NAME:-sellway_db}"
+  set_env_value "$env_file" DB_USER "${DB_USER:-sellway_user}"
+  set_env_value "$env_file" DB_PASS "${DB_PASS:-your_strong_password}"
   set_env_value "$env_file" UPLOAD_URL "${FRONTEND_URL}/uploads"
+
+  if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+    set_env_value "$env_file" TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN"
+  fi
+  if [[ -n "${TELEGRAM_ADMIN_CHAT_ID:-}" ]]; then
+    set_env_value "$env_file" TELEGRAM_ADMIN_CHAT_ID "$TELEGRAM_ADMIN_CHAT_ID"
+  fi
+  if [[ -n "${SMTP_HOST:-}" ]]; then
+    set_env_value "$env_file" SMTP_HOST "$SMTP_HOST"
+  fi
+  if [[ -n "${SMTP_PORT:-}" ]]; then
+    set_env_value "$env_file" SMTP_PORT "$SMTP_PORT"
+  fi
+  if [[ -n "${SMTP_SECURE:-}" ]]; then
+    set_env_value "$env_file" SMTP_SECURE "$SMTP_SECURE"
+  fi
+  if [[ -n "${SMTP_USER:-}" ]]; then
+    set_env_value "$env_file" SMTP_USER "$SMTP_USER"
+  fi
+  if [[ -n "${SMTP_PASS:-}" ]]; then
+    set_env_value "$env_file" SMTP_PASS "$SMTP_PASS"
+  fi
+  if [[ -n "${YUKASSA_SHOP_ID:-}" ]]; then
+    set_env_value "$env_file" YUKASSA_SHOP_ID "$YUKASSA_SHOP_ID"
+  fi
+  if [[ -n "${YUKASSA_SECRET_KEY:-}" ]]; then
+    set_env_value "$env_file" YUKASSA_SECRET_KEY "$YUKASSA_SECRET_KEY"
+  fi
 
   if grep -q 'your_very_long_random_secret_key_min_64_chars' "$env_file"; then
     set_env_value "$env_file" JWT_SECRET "$(secret)"
@@ -381,6 +595,7 @@ If you changed .env after install:
 EOF
 }
 
+configure_wizard
 install_system_packages
 install_node
 prepare_code

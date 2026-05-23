@@ -4,6 +4,15 @@ const { SocksProxyAgent } = require('socks-proxy-agent');
 const { query } = require('../config/db');
 const logger = require('../config/logger');
 
+const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+if (!telegramToken || telegramToken === 'your_bot_token_from_botfather' || telegramToken.startsWith('your_')) {
+  logger.warn('Telegram bot disabled: TELEGRAM_BOT_TOKEN is not configured');
+  const noop = async () => {};
+  if (require.main === module) setInterval(() => {}, 60 * 60 * 1000);
+  module.exports = { bot: null, sendToUser: noop, sendToChat: noop };
+  return;
+}
+
 // ── SOCKS5 ────────────────────────────────────────────
 function createProxyAgent() {
   if (process.env.PROXY_ENABLED !== 'true') return null;
@@ -15,7 +24,7 @@ function createProxyAgent() {
 }
 
 const agent = createProxyAgent();
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+const bot = new TelegramBot(telegramToken, {
   polling: true,
   ...(agent && { request: { agent } }),
 });
