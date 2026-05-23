@@ -14,17 +14,20 @@ async function createSellerProfile(client, user, ref) {
   let referrerId = null;
   if (ref) {
     const { rows: [referrer] } = await client.query(
-      'SELECT user_id FROM sellers WHERE LOWER(referral_code)=LOWER($1) LIMIT 1',
+      'SELECT user_id FROM sellers WHERE LOWER(referral_code)=LOWER($1) AND referral_enabled=TRUE LIMIT 1',
       [ref]
     );
     referrerId = referrer?.user_id || null;
   }
 
+  const { rows: [setting] } = await client.query("SELECT value FROM settings WHERE key='default_referral_commission_rate' LIMIT 1");
+  const defaultRate = setting?.value || '0.0100';
+
   await client.query(
-    `INSERT INTO sellers (user_id, display_name, referral_code, referred_by_seller_id)
-     VALUES ($1,$2,$3,$4)
+    `INSERT INTO sellers (user_id, display_name, referral_code, referred_by_seller_id, referral_commission_rate, referral_enabled, referral_application_status)
+     VALUES ($1,$2,$3,$4,$5,FALSE,'not_requested')
      ON CONFLICT (user_id) DO NOTHING`,
-    [user.id, user.username, makeReferralCode(), referrerId]
+    [user.id, user.username, makeReferralCode(), referrerId, defaultRate]
   );
 
   if (referrerId) {
@@ -43,6 +46,7 @@ router.post('/register', [
   body('password').isLength({ min: 8 }).withMessage('Пароль минимум 8 символов'),
   body('role').optional().isIn(['buyer', 'seller', 'freelancer']).withMessage('Некорректная роль'),
   body('ref').optional().trim().isLength({ max: 64 }),
+  body('termsAccepted').equals('true').withMessage('Необходимо принять пользовательское соглашение'),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
@@ -54,12 +58,17 @@ router.post('/register', [
       const existing = await client.query('SELECT id FROM users WHERE email=$1 OR username=$2', [email, username]);
       if (existing.rows.length > 0) throw { status: 409, message: 'Email или никнейм уже занят' };
 
+      const { rows: [terms] } = await client.query("SELECT value FROM settings WHERE key='terms_version' LIMIT 1");
+      const termsVersion = terms?.value || '2026-05-24';
       const passwordHash = await bcrypt.hash(password, 12);
       const verifyToken = uuidv4();
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
+      const ua = req.headers['user-agent'] || null;
+
       const { rows: [user] } = await client.query(
-        `INSERT INTO users (email, username, password_hash, role, email_verify_token)
-         VALUES ($1,$2,$3,$4,$5) RETURNING id, email, username, role`,
-        [email, username, passwordHash, role, verifyToken]
+        `INSERT INTO users (email, username, password_hash, role, email_verify_token, terms_accepted_at, terms_version, registration_ip, registration_user_agent)
+         VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8) RETURNING id, email, username, role`,
+        [email, username, passwordHash, role, verifyToken, termsVersion, ip, ua]
       );
 
       await client.query('INSERT INTO wallets (user_id) VALUES ($1)', [user.id]);
