@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getProduct } from '../../api/products';
-import { createOrder } from '../../api/orders';
-import { createServiceOrder } from '../../api/serviceOrders';
-import { createPayment } from '../../api/payments';
+import { createCheckout } from '../../api/payments';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { C, Spinner, Btn, Stars, Modal, Badge, Textarea } from '../../components/UI';
+import { C, Spinner, Btn, Stars, Modal, Badge, Textarea, Input } from '../../components/UI';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const isService = p => p?.delivery_type === 'service';
@@ -26,9 +24,8 @@ export default function ProductPage() {
   const [imgIdx, setImgIdx] = useState(0);
   const [tab, setTab] = useState('desc');
   const [buyLoading, setBuyLoading] = useState(false);
-  const [topupModal, setTopupModal] = useState(false);
-  const [topupAmount, setTopupAmount] = useState('');
-  const [topupLoading, setTopupLoading] = useState(false);
+  const [checkoutModal, setCheckoutModal] = useState(false);
+  const [checkoutEmail, setCheckoutEmail] = useState('');
   const [serviceMessage, setServiceMessage] = useState('');
 
   useEffect(() => {
@@ -39,52 +36,51 @@ export default function ProductPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function handleBuy() {
-    if (!user) return navigate('/login', { state: { from: { pathname: `/product/${id}` } } });
-    if (user.id === product.seller_id) return toast.warn('Нельзя заказать свою позицию');
-
-    if (isService(product)) {
-      setBuyLoading(true);
-      try {
-        const { data } = await createServiceOrder(product.id, serviceMessage);
-        toast.success('Заявка на услугу создана');
-        navigate(`/orders/${data.order.id}`);
-      } catch (err) {
-        toast.error(err.response?.data?.error || 'Ошибка создания заявки');
-      } finally { setBuyLoading(false); }
-      return;
+  useEffect(() => {
+    if (!product) return;
+    const title = `${product.title} — SellWay`;
+    const description = (product.short_desc || product.description || `${product.title} на SellWay`).slice(0, 160);
+    document.title = title;
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'description');
+      document.head.appendChild(meta);
     }
+    meta.setAttribute('content', description);
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', `${window.location.origin}/product/${product.id}`);
+  }, [product]);
+
+  async function handleBuy() {
+    if (user && user.id === product.seller_id) return toast.warn('Нельзя заказать свою позицию');
 
     if (product.delivery_type === 'auto' && product.keys_count < 1) return toast.warn('Товар не в наличии');
     if (product.delivery_type === 'file' && product.files_count < 1) return toast.warn('Файл для выдачи пока не загружен');
+    if (!user) return setCheckoutModal(true);
+    return startCheckout();
+  }
 
-    if (parseFloat(user.balance || 0) < parseFloat(product.price)) {
-      const needed = (parseFloat(product.price) - parseFloat(user.balance || 0)).toFixed(2);
-      setTopupAmount(String(Math.ceil(parseFloat(needed) / 100) * 100));
-      return setTopupModal(true);
-    }
-
+  async function startCheckout(email = '') {
     setBuyLoading(true);
     try {
-      const { data } = await createOrder(id);
-      toast.success('Заказ создан');
-      navigate(`/orders/${data.order.id}`);
+      const { data } = await createCheckout({ product_id: product.id, email, message: service ? serviceMessage : '' });
+      if (data.createdAccount) toast.success('Аккаунт создан. Пароль отправлен на email.');
+      window.location.href = data.confirmationUrl;
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Ошибка создания заказа');
+      toast.error(err.response?.data?.error || 'Ошибка создания платежа');
     } finally { setBuyLoading(false); }
   }
 
-  async function handleTopup(e) {
+  async function handleGuestCheckout(e) {
     e.preventDefault();
-    if (!topupAmount || +topupAmount < 100) return toast.warn('Минимум 100 ₽');
-    setTopupLoading(true);
-    try {
-      const { data } = await createPayment({ amount: +topupAmount, product_id: product.id });
-      window.location.href = data.confirmationUrl;
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Ошибка платежа');
-      setTopupLoading(false);
-    }
+    if (!checkoutEmail.trim()) return toast.warn('Укажите email');
+    await startCheckout(checkoutEmail.trim());
   }
 
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh' }}><Spinner size={40}/></div>;
@@ -143,12 +139,12 @@ export default function ProductPage() {
           </div>}
 
           <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-            <Btn full size="lg" loading={buyLoading} onClick={handleBuy} disabled={!canBuy}>{service ? 'Обсудить и заказать' : 'Купить сейчас'}</Btn>
+            <Btn full size="lg" loading={buyLoading} onClick={handleBuy} disabled={!canBuy}>{service ? 'Оплатить и заказать' : 'Купить сейчас'}</Btn>
             <button style={{ width:46, height:46, borderRadius:9, background:C.card, border:`1px solid ${C.border}`, color:C.t2, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>♡</button>
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:10, marginBottom:22 }}>
-            {service ? [['Безопасная сделка','Оплата резервируется после сметы'],['Этапы','Фрилансер согласует план работ'],['Спор','Можно открыть спор по сделке'],['Цена от','Финал утверждает заказчик']] : [['Безопасная сделка','Средства заморожены до подтверждения'],['Выдача',product.delivery_type==='auto'?'Мгновенно':product.delivery_type==='file'?'Файл автоматически':'Продавец передает вручную'],['Гарантия',product.guarantee_days>0?`${product.guarantee_days} дней`:'Уточните у продавца'],['Возврат','При открытии спора']].map(([t,d])=><div key={t} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:9, padding:'10px 14px' }}><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{t}</div><div style={{ fontSize:11, color:C.t2, marginTop:2 }}>{d}</div></div>)}
+            {(service ? [['Безопасная сделка','Оплата резервируется сразу'],['Этапы','Фрилансер ведёт работу в заказе'],['Спор','Можно открыть спор по сделке'],['Цена от','Оплачивается указанная стартовая стоимость']] : [['Безопасная сделка','Средства заморожены до подтверждения'],['Выдача',product.delivery_type==='auto'?'Мгновенно':product.delivery_type==='file'?'Файл автоматически':'Продавец передает вручную'],['Гарантия',product.guarantee_days>0?`${product.guarantee_days} дней`:'Уточните у продавца'],['Возврат','При открытии спора']]).map(([t,d])=><div key={t} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:9, padding:'10px 14px' }}><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{t}</div><div style={{ fontSize:11, color:C.t2, marginTop:2 }}>{d}</div></div>)}
           </div>
 
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'14px 18px' }}>
@@ -176,11 +172,11 @@ export default function ProductPage() {
         {tab === 'reviews' && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:24 }}>{!product.reviews?.length ? <div style={{ textAlign:'center', color:C.t3, padding:32 }}>Пока нет отзывов</div> : product.reviews.map((r,i)=><div key={i} style={{ borderTop:i?`1px solid ${C.border}`:'none', paddingTop:i?16:0, marginTop:i?16:0 }}><div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}><b style={{ color:C.t1, fontSize:13 }}>{r.buyer_name}</b><span style={{ fontSize:11, color:C.t3 }}>{new Date(r.created_at).toLocaleDateString('ru')}</span></div><Stars n={r.rating} size={12}/>{r.comment && <p style={{ fontSize:13, color:C.t2, lineHeight:1.55 }}>{r.comment}</p>}</div>)}</div>}
       </div>
 
-      {topupModal && <Modal title="Пополнить баланс" onClose={()=>setTopupModal(false)}>
-        <form onSubmit={handleTopup} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#0A1A10', border:`1px solid ${C.green}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.green }}>Для покупки не хватает средств. После оплаты баланс синхронизируется автоматически.</div>
-          <input type="number" value={topupAmount} onChange={e=>setTopupAmount(e.target.value)} min={100} style={{ width:'100%', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:'11px 13px', color:C.t1, fontSize:16, fontWeight:700, outline:'none', fontFamily:'inherit' }} />
-          <Btn type="submit" full loading={topupLoading}>Перейти к оплате</Btn>
+      {checkoutModal && <Modal title="Покупка без регистрации" onClose={()=>setCheckoutModal(false)}>
+        <form onSubmit={handleGuestCheckout} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.t2, lineHeight:1.5 }}>Укажите email. Мы автоматически создадим аккаунт покупателя, отправим пароль на почту и перенаправим на оплату.</div>
+          <Input label="Email для доступа к покупке" type="email" value={checkoutEmail} onChange={e=>setCheckoutEmail(e.target.value)} placeholder="you@example.com" required />
+          <Btn type="submit" full loading={buyLoading}>Перейти к оплате</Btn>
         </form>
       </Modal>}
     </div>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sellway.pro/api/seo/sitemap.xml

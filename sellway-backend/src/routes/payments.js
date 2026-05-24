@@ -1,11 +1,14 @@
 // src/routes/payments.js — ЮKassa интеграция
 const router = require('express').Router();
 const axios  = require('axios');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { query, transaction } = require('../config/db');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 const notify   = require('../services/notify');
 const logger   = require('../config/logger');
+const { sendGuestPasswordEmail } = require('../services/mailer');
 
 const YUKASSA_URL = 'https://api.yookassa.ru/v3';
 const DEFAULT_FRONTEND_URL = 'https://sellway.pro';
@@ -40,6 +43,46 @@ function paymentStatus(payment) {
   return payment?.status || 'pending';
 }
 
+function randomPassword() {
+  return crypto.randomBytes(9).toString('base64url') + 'A1!';
+}
+
+async function makeUniqueUsername(client, email) {
+  const base = String(email).split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'buyer';
+  for (let i = 0; i < 20; i++) {
+    const username = `${base}${i ? i : ''}`.slice(0, 28);
+    const { rows } = await client.query('SELECT id FROM users WHERE username=$1', [username]);
+    if (!rows.length) return username;
+  }
+  return `buyer${crypto.randomBytes(4).toString('hex')}`;
+}
+
+async function createGuestBuyer(client, email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const { rows: [existing] } = await client.query('SELECT id FROM users WHERE LOWER(email)=LOWER($1)', [normalizedEmail]);
+  if (existing) throw { status: 409, message: 'Пользователь с таким email уже есть. Войдите в аккаунт для покупки.' };
+
+  const password = randomPassword();
+  const username = await makeUniqueUsername(client, normalizedEmail);
+  const passwordHash = await bcrypt.hash(password, 12);
+  const { rows: [user] } = await client.query(
+    `INSERT INTO users (email, username, password_hash, role, status, email_verified, terms_accepted_at, terms_version, registration_ip, registration_user_agent)
+     VALUES ($1,$2,$3,'buyer','active',TRUE,NOW(),'guest-checkout',$4,$5)
+     RETURNING id, email, username, role`,
+    [normalizedEmail, username, passwordHash, null, null]
+  );
+  await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [user.id]);
+  return { user, password };
+}
+
+async function commissionForSeller(client, sellerId, price) {
+  const { rows: [seller] } = await client.query('SELECT custom_commission_rate FROM sellers WHERE user_id=$1', [sellerId]);
+  const { rows: [setting] } = await client.query("SELECT value FROM settings WHERE key IN ('default_seller_commission_rate','platform_commission') ORDER BY CASE WHEN key='default_seller_commission_rate' THEN 0 ELSE 1 END LIMIT 1");
+  const rate = seller?.custom_commission_rate != null ? Number(seller.custom_commission_rate) : Number(setting?.value || process.env.PLATFORM_COMMISSION || 0.07);
+  const commission = Number((Number(price) * rate).toFixed(2));
+  return { commission, sellerAmount: Number((Number(price) - commission).toFixed(2)) };
+}
+
 async function markPaymentStatus(paymentId, status) {
   await query(
     `UPDATE transactions
@@ -49,11 +92,134 @@ async function markPaymentStatus(paymentId, status) {
   );
 }
 
+async function completeDirectPurchase(payment, source) {
+  const metadata = payment.metadata || {};
+  const userId = metadata.user_id;
+  const productId = metadata.product_id;
+  const amount = parseFloat(payment.amount?.value || 0);
+
+  if (!userId || !productId || !Number.isFinite(amount) || amount <= 0) {
+    return { credited: false, reason: 'invalid_direct_purchase' };
+  }
+
+  const result = await transaction(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [payment.id]);
+
+    const { rows: [completed] } = await client.query(
+      "SELECT order_id, meta FROM transactions WHERE meta->>'payment_id'=$1 AND meta->>'status'='completed' ORDER BY created_at DESC LIMIT 1",
+      [payment.id]
+    );
+    if (completed?.order_id) return { credited: false, alreadyCompleted: true, orderId: completed.order_id };
+
+    const { rows: [product] } = await client.query(
+      `SELECT p.*, u.id AS seller_user_id
+       FROM products p
+       JOIN users u ON u.id=p.seller_id
+       WHERE p.id=$1 AND p.status='active'
+       FOR UPDATE OF p`,
+      [productId]
+    );
+    if (!product) throw new Error('Product unavailable for direct checkout');
+    if (product.seller_user_id === userId) throw new Error('Self purchase is not allowed');
+    if (Number(product.price).toFixed(2) !== amount.toFixed(2)) throw new Error('Payment amount mismatch');
+    if (product.delivery_type === 'auto' && product.keys_count < 1) throw new Error('No keys in stock');
+
+    let productFile = null;
+    if (product.delivery_type === 'file') {
+      const { rows: [file] } = await client.query('SELECT id, url, filename, mime_type, size_bytes FROM product_files WHERE product_id=$1 ORDER BY created_at DESC LIMIT 1', [productId]);
+      if (!file) throw new Error('Product file is missing');
+      productFile = file;
+    }
+
+    const { commission, sellerAmount } = await commissionForSeller(client, product.seller_user_id, product.price);
+    const meta = product.delivery_type === 'service'
+      ? { service: true, direct_checkout: true, negotiation_status: 'accepted', accepted_at: new Date().toISOString(), customer_message: metadata.message || '' }
+      : {};
+    const initialStatus = product.delivery_type === 'service' ? 'paid' : 'pending';
+    const { rows: [order] } = await client.query(
+      `INSERT INTO orders (buyer_id, seller_id, product_id, status, amount, commission, seller_amount, delivery_type, meta)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING *`,
+      [userId, product.seller_user_id, productId, initialStatus, product.price, commission, sellerAmount, product.delivery_type, JSON.stringify(meta)]
+    );
+
+    await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
+    await client.query('UPDATE wallets SET held=held+$1, total_in=total_in+$1, updated_at=NOW() WHERE user_id=$2', [product.price, userId]);
+
+    let finalStatus = initialStatus;
+    let key = null;
+    if (product.delivery_type === 'auto') {
+      const { rows: [k] } = await client.query(
+        `UPDATE product_keys SET is_sold=TRUE, sold_at=NOW(), order_id=$1
+         WHERE id=(SELECT id FROM product_keys WHERE product_id=$2 AND NOT is_sold LIMIT 1 FOR UPDATE SKIP LOCKED)
+         RETURNING id, key_value`,
+        [order.id, productId]
+      );
+      if (k) {
+        key = k;
+        finalStatus = 'delivered';
+        await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours' WHERE id=$2", [k.id, order.id]);
+        await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, 'Ключ передан автоматически.']);
+      }
+    } else if (product.delivery_type === 'file') {
+      finalStatus = 'delivered';
+      await client.query(`UPDATE orders SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=$1::jsonb WHERE id=$2`, [JSON.stringify({ file: productFile, direct_checkout: true }), order.id]);
+      await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, `Файл передан автоматически: ${productFile.filename}`]);
+    } else {
+      await client.query("UPDATE orders SET status='paid', paid_at=NOW() WHERE id=$1", [order.id]);
+      finalStatus = 'paid';
+    }
+
+    const message = product.delivery_type === 'service'
+      ? 'Оплата услуги получена. Средства зарезервированы на платформе.'
+      : 'Оплата получена. Средства зарезервированы на платформе.';
+    await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, userId, message]);
+    if (metadata.message && product.delivery_type === 'service') {
+      await client.query(`INSERT INTO order_messages (order_id, sender_id, message) VALUES ($1,$2,$3)`, [order.id, userId, metadata.message]);
+    }
+
+    const completedMeta = {
+      status: 'completed',
+      paid_at: new Date().toISOString(),
+      source,
+      payment_ref: metadata.payment_ref || null,
+      purpose: 'direct_purchase',
+      product_id: productId,
+      order_id: order.id,
+      guest_checkout: metadata.guest_checkout === 'true',
+    };
+    const updated = await client.query(
+      `UPDATE transactions
+       SET order_id=$2, meta=COALESCE(meta, '{}'::jsonb) || $3::jsonb
+       WHERE meta->>'payment_id'=$1
+       RETURNING id`,
+      [payment.id, order.id, JSON.stringify(completedMeta)]
+    );
+    if (updated.rowCount === 0) {
+      await client.query(
+        `INSERT INTO transactions (user_id, order_id, type, amount, description, meta)
+         VALUES ($1,$2,'hold',$3,$4,$5)`,
+        [userId, order.id, product.price, `Оплата заказа ${order.order_number}`, JSON.stringify({ payment_id: payment.id, ...completedMeta })]
+      );
+    }
+
+    await notify.buyerOrderCreated(userId, { ...order, status: finalStatus }).catch(() => {});
+    await notify.sellerNewOrder(product.seller_user_id, order, product).catch(() => {});
+    logger.info('Direct checkout completed', { orderId: order.id, buyerId: userId, paymentId: payment.id, keyDelivered: Boolean(key) });
+    return { credited: true, amount, orderId: order.id };
+  });
+
+  return result;
+}
+
 async function completePaidPayment(payment, source) {
   const metadata = payment.metadata || {};
   const userId = metadata.user_id;
   const type = metadata.type || 'balance_topup';
   const amount = parseFloat(payment.amount?.value || 0);
+
+  if (type === 'direct_purchase') {
+    return completeDirectPurchase(payment, source);
+  }
 
   if (!userId || !['balance_topup', 'product_purchase'].includes(type) || !Number.isFinite(amount) || amount <= 0) {
     return { credited: false, reason: 'ignored' };
@@ -122,6 +288,118 @@ async function completePaidPayment(payment, source) {
 }
 
 // ── POST /payments/create ── Пополнение баланса ───────
+
+router.post('/checkout', optionalAuth, async (req, res) => {
+  const productId = req.body.product_id || req.body.productId;
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const message = String(req.body.message || '').trim().slice(0, 2000);
+
+  if (!productId) return res.status(400).json({ error: 'product_id обязателен' });
+  if (!req.user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Укажите корректный email для отправки доступа' });
+  }
+
+  let guestPassword = null;
+  let checkoutUser = req.user || null;
+
+  try {
+    const prepared = await transaction(async (client) => {
+      const { rows: [product] } = await client.query(
+        `SELECT p.*, u.username AS seller_name
+         FROM products p
+         JOIN users u ON u.id=p.seller_id
+         WHERE p.id=$1 AND p.status='active'`,
+        [productId]
+      );
+      if (!product) throw { status: 404, message: 'Позиция не найдена или недоступна' };
+      if (product.delivery_type === 'auto' && product.keys_count < 1) throw { status: 400, message: 'Нет ключей в наличии' };
+      if (product.delivery_type === 'file') {
+        const { rows: [file] } = await client.query('SELECT id FROM product_files WHERE product_id=$1 LIMIT 1', [productId]);
+        if (!file) throw { status: 400, message: 'Файл для выдачи пока не загружен' };
+      }
+
+      let createdAccount = false;
+      if (!checkoutUser) {
+        const created = await createGuestBuyer(client, email);
+        checkoutUser = created.user;
+        guestPassword = created.password;
+        createdAccount = true;
+      }
+      if (product.seller_id === checkoutUser.id) throw { status: 400, message: 'Нельзя купить свою позицию' };
+
+      return { product, user: checkoutUser, createdAccount };
+    });
+
+    const amount = Number(prepared.product.price);
+    if (!Number.isFinite(amount) || amount < 1) return res.status(400).json({ error: 'Некорректная стоимость позиции' });
+
+    const idempotencyKey = uuidv4();
+    const paymentRef = uuidv4();
+    const description = `${prepared.product.delivery_type === 'service' ? 'Оплата услуги' : 'Оплата товара'} SellWay`;
+
+    const { data: payment } = await ykClient.post('/payments', {
+      amount: { value: amount.toFixed(2), currency: 'RUB' },
+      confirmation: { type: 'redirect', return_url: buildReturnUrl(paymentRef, productId) },
+      capture: true,
+      description,
+      metadata: {
+        user_id: prepared.user.id,
+        username: prepared.user.username,
+        type: 'direct_purchase',
+        payment_ref: paymentRef,
+        product_id: productId,
+        guest_checkout: prepared.createdAccount ? 'true' : 'false',
+        message,
+      },
+    }, {
+      headers: { 'Idempotence-Key': idempotencyKey },
+    });
+
+    await query(
+      `INSERT INTO transactions (user_id, type, amount, description, meta)
+       VALUES ($1,'hold',$2,$3,$4)`,
+      [
+        prepared.user.id,
+        amount,
+        description,
+        JSON.stringify({
+          payment_id: payment.id,
+          payment_ref: paymentRef,
+          status: 'pending',
+          purpose: 'direct_purchase',
+          product_id: productId,
+          guest_checkout: prepared.createdAccount,
+        }),
+      ]
+    );
+
+    if (prepared.createdAccount) {
+      sendGuestPasswordEmail(prepared.user.email, prepared.user.username, guestPassword).catch(err => {
+        logger.error('Guest password email error', { err: err.message, email: prepared.user.email });
+      });
+    }
+
+    logger.info('Checkout payment created', { userId: prepared.user.id, productId, amount, paymentId: payment.id, paymentRef, guest: prepared.createdAccount });
+    res.json({
+      paymentId: payment.id,
+      paymentRef,
+      confirmationUrl: payment.confirmation.confirmation_url,
+      status: payment.status,
+      createdAccount: prepared.createdAccount,
+      email: prepared.user.email,
+    });
+  } catch (err) {
+    if (guestPassword && checkoutUser?.email) {
+      sendGuestPasswordEmail(checkoutUser.email, checkoutUser.username, guestPassword).catch(mailErr => {
+        logger.error('Guest password email error after checkout failure', { err: mailErr.message, email: checkoutUser.email });
+      });
+    }
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.code === '23505') return res.status(409).json({ error: 'Пользователь с таким email уже есть. Войдите в аккаунт для покупки.' });
+    logger.error('Checkout create error', { err: err.response?.data || err.message });
+    res.status(500).json({ error: 'Ошибка создания платежа. Попробуйте позже.' });
+  }
+});
 
 router.post('/create', auth, async (req, res) => {
   const amount = parseFloat(req.body.amount);
@@ -220,6 +498,7 @@ router.get('/return/:ref', async (req, res) => {
       status,
       paid: Boolean(payment.paid),
       credited: Boolean(completion.credited || completion.alreadyCompleted),
+      orderId: completion.orderId || null,
     });
   } catch (err) {
     logger.error('Payment return sync error', { err: err.response?.data || err.message, ref: req.params.ref });
@@ -245,6 +524,7 @@ router.get('/:id/status', auth, async (req, res) => {
       status,
       paid: Boolean(payment.paid),
       credited: Boolean(completion.credited || completion.alreadyCompleted),
+      orderId: completion.orderId || null,
     });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка проверки статуса' });

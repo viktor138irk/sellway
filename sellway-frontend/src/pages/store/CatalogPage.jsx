@@ -103,11 +103,6 @@ export default function CatalogPage() {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 20px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 14 : 22, width: '100%', boxSizing: 'border-box' }} className="fade-in">
       <aside style={{ width: isMobile ? '100%' : 230, flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 12, overflowX: isMobile ? 'auto' : 'visible', alignItems: isMobile ? 'stretch' : 'normal' }}>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: 14, minWidth: isMobile ? 260 : 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: C.t3, marginBottom: 12 }}>Раздел</div>
-          {[['products', 'Товары продавцов'], ['services', 'Услуги фрилансеров']].map(([v, l]) => <CategoryRow key={v} cat={{ name: l, emoji: v === 'services' ? '🧑‍💻' : '📦' }} active={kind === v} onClick={() => setParam('kind', v)} />)}
-        </div>
-
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: 14, minWidth: isMobile ? 280 : 'auto' }}>
           <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: C.t3, marginBottom: 12 }}>Категории</div>
           <CategoryRow cat={{ name: kind === 'services' ? 'Все услуги' : 'Все товары', emoji: '•' }} active={!category} onClick={() => setParam('category', '')} />

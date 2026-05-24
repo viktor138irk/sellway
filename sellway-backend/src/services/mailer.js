@@ -29,4 +29,14 @@ async function sendResetEmail(email, username, token) {
   });
 }
 
-module.exports = { sendVerifyEmail, sendResetEmail };
+async function sendGuestPasswordEmail(email, username, password) {
+  const loginLink = `${BASE}/login`;
+  await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: 'SellWay — Доступ к покупке',
+    html: `<h2>Привет, ${username}!</h2><p>Мы создали аккаунт для вашей покупки на SellWay.</p><p><b>Email:</b> ${email}<br/><b>Пароль:</b> ${password}</p><p>Войти можно здесь: <a href="${loginLink}">${loginLink}</a></p><p>После входа рекомендуем сменить пароль в настройках профиля.</p>`,
+  });
+}
+
+module.exports = { sendVerifyEmail, sendResetEmail, sendGuestPasswordEmail };

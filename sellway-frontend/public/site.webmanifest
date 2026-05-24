@@ -1,0 +1,16 @@
+{
+  "name": "SellWay",
+  "short_name": "SellWay",
+  "description": "Маркетплейс цифровых товаров и услуг с безопасными сделками.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080812",
+  "theme_color": "#6C5CE7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml"
+    }
+  ]
+}

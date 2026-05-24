@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#080812"/>
+      <stop offset=".55" stop-color="#111124"/>
+      <stop offset="1" stop-color="#0A1A16"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#6C5CE7"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="90" y="90" width="144" height="144" rx="32" fill="url(#mark)"/>
+  <path d="M170 120 126 188h31l-8 48 50-72h-33l4-44Z" fill="#fff"/>
+  <text x="270" y="158" fill="#fff" font-family="Arial, sans-serif" font-size="74" font-weight="800">SellWay</text>
+  <text x="94" y="330" fill="#fff" font-family="Arial, sans-serif" font-size="58" font-weight="800">Цифровые товары и услуги</text>
+  <text x="96" y="398" fill="#A9A9C8" font-family="Arial, sans-serif" font-size="30">Безопасные сделки, моментальная покупка, авто-выдача ключей и файлов</text>
+  <rect x="96" y="470" width="260" height="54" rx="14" fill="#6C5CE7"/>
+  <text x="126" y="506" fill="#fff" font-family="Arial, sans-serif" font-size="24" font-weight="700">sellway.pro</text>
+</svg>

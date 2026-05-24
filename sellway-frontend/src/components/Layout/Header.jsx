@@ -95,7 +95,6 @@ export default function Header() {
 
   const navLinks = [
     ['/catalog?kind=products', 'Каталог'],
-    ['/catalog?kind=products&delivery=auto', 'Авто-выдача'],
     ['/catalog?kind=services', 'Услуги'],
     ['/catalog?kind=products&sort=newest', 'Новинки'],
   ];
