@@ -3,6 +3,7 @@ const router = require('express').Router();
 const axios  = require('axios');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query, transaction } = require('../config/db');
 const { auth, optionalAuth } = require('../middleware/auth');
@@ -12,6 +13,7 @@ const { sendGuestPasswordEmail } = require('../services/mailer');
 
 const YUKASSA_URL = 'https://api.yookassa.ru/v3';
 const DEFAULT_FRONTEND_URL = 'https://sellway.pro';
+const LEGACY_WRONG_RETURN_HOSTS = new Set(['vpulse.fun', 'www.vpulse.fun', 'pay.vpulse.fun']);
 
 const ykClient = axios.create({
   baseURL: YUKASSA_URL,
@@ -23,10 +25,19 @@ const ykClient = axios.create({
 });
 
 function buildReturnUrl(paymentRef, productId) {
-  const base = process.env.PAYMENT_RETURN_URL || `${process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL}/payment/success`;
+  let base = process.env.PUBLIC_SITE_URL
+    ? `${process.env.PUBLIC_SITE_URL.replace(/\/+$/, '')}/payment/success`
+    : (process.env.PAYMENT_RETURN_URL || `${process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL}/payment/success`);
 
   try {
     const url = new URL(base);
+    if (LEGACY_WRONG_RETURN_HOSTS.has(url.hostname) && process.env.ALLOW_EXTERNAL_PAYMENT_RETURN !== 'true') {
+      url.protocol = 'https:';
+      url.hostname = 'sellway.pro';
+      url.port = '';
+      url.pathname = '/payment/success';
+      url.search = '';
+    }
     url.searchParams.set('payment_ref', paymentRef);
     if (productId) url.searchParams.set('product_id', productId);
     return url.toString();
@@ -41,6 +52,80 @@ function paymentStatus(payment) {
   if (payment?.paid || payment?.status === 'succeeded') return 'completed';
   if (payment?.status === 'canceled') return 'canceled';
   return payment?.status || 'pending';
+}
+
+function generateTokens(userId, role) {
+  const accessToken = jwt.sign(
+    { userId, role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m' }
+  );
+  const refreshToken = jwt.sign(
+    { userId },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES || '30d' }
+  );
+  return { accessToken, refreshToken };
+}
+
+async function saveRefreshToken(userId, refreshToken, ip, userAgent) {
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await query(
+    'INSERT INTO refresh_tokens (user_id, token, ip, user_agent, expires_at) VALUES ($1,$2,$3,$4,$5)',
+    [userId, refreshToken, ip, userAgent, expiresAt]
+  );
+}
+
+async function buildUserResponse(client, userId) {
+  const { rows: [user] } = await client.query(
+    `SELECT u.id, u.email, u.username, u.role, u.status, u.avatar_url,
+            u.phone, u.phone_verified, u.telegram_verified, u.email_verified, u.created_at,
+            COALESCE(w.balance, 0) AS balance, COALESCE(w.held, 0) AS held,
+            s.rating, s.total_sales, s.verified AS seller_verified
+     FROM users u
+     LEFT JOIN wallets w ON w.user_id = u.id
+     LEFT JOIN sellers s ON s.user_id = u.id
+     WHERE u.id = $1`,
+    [userId]
+  );
+  return user;
+}
+
+async function issueGuestCheckoutSession(paymentRef, req) {
+  if (!paymentRef) return null;
+
+  return transaction(async (client) => {
+    const { rows: [tx] } = await client.query(
+      `SELECT id, user_id, meta
+       FROM transactions
+       WHERE meta->>'payment_ref'=$1
+       ORDER BY created_at DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [paymentRef]
+    );
+
+    if (!tx || tx.meta?.guest_checkout !== true || tx.meta?.guest_tokens_issued === true) return null;
+
+    const { rows: [user] } = await client.query('SELECT id, role FROM users WHERE id=$1', [tx.user_id]);
+    if (!user) return null;
+
+    const tokens = generateTokens(user.id, user.role);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await client.query(
+      'INSERT INTO refresh_tokens (user_id, token, ip, user_agent, expires_at) VALUES ($1,$2,$3,$4,$5)',
+      [user.id, tokens.refreshToken, req.ip, req.headers['user-agent'], expiresAt]
+    );
+    await client.query(
+      `UPDATE transactions
+       SET meta=COALESCE(meta, '{}'::jsonb) || $2::jsonb
+       WHERE id=$1`,
+      [tx.id, JSON.stringify({ guest_tokens_issued: true })]
+    );
+    await client.query('UPDATE users SET last_login_at=NOW(), last_login_ip=$1 WHERE id=$2', [req.ip, user.id]);
+
+    return { ...tokens, user: await buildUserResponse(client, user.id) };
+  });
 }
 
 function randomPassword() {
@@ -137,8 +222,8 @@ async function completeDirectPurchase(payment, source) {
       : {};
     const initialStatus = product.delivery_type === 'service' ? 'paid' : 'pending';
     const { rows: [order] } = await client.query(
-      `INSERT INTO orders (buyer_id, seller_id, product_id, status, amount, commission, seller_amount, delivery_type, meta)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING *`,
+      `INSERT INTO orders (buyer_id, seller_id, product_id, status, amount, commission, seller_amount, delivery_type, meta, paid_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,NOW()) RETURNING *`,
       [userId, product.seller_user_id, productId, initialStatus, product.price, commission, sellerAmount, product.delivery_type, JSON.stringify(meta)]
     );
 
@@ -493,12 +578,14 @@ router.get('/return/:ref', async (req, res) => {
     } else if (status === 'canceled') {
       await markPaymentStatus(payment.id, 'canceled');
     }
+    const guestSession = status === 'completed' ? await issueGuestCheckoutSession(req.params.ref, req) : null;
 
     res.json({
       status,
       paid: Boolean(payment.paid),
       credited: Boolean(completion.credited || completion.alreadyCompleted),
       orderId: completion.orderId || null,
+      ...(guestSession || {}),
     });
   } catch (err) {
     logger.error('Payment return sync error', { err: err.response?.data || err.message, ref: req.params.ref });

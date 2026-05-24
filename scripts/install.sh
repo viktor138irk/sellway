@@ -24,8 +24,9 @@ Environment variables:
   DOMAIN=sellway.pro
   DATABASE_URL=postgresql://user:password@localhost:5432/db
   FRONTEND_URL=https://sellway.pro
+  PUBLIC_SITE_URL=https://sellway.pro
   PAYMENT_RETURN_URL=https://sellway.pro/payment/success
-  PAYMENT_WEBHOOK_URL=https://pay.sellway.pro/api/payments/webhook
+  PAYMENT_WEBHOOK_URL=https://pay.vpulse.fun/api/payments/webhook
   API_PORT=3001
   INIT_DB=false
   FASTPANEL_SAFE=true
@@ -160,7 +161,7 @@ load_existing_env_defaults() {
 
   [[ -f "$env_file" ]] || return
 
-  for key in DATABASE_URL DB_HOST DB_PORT DB_NAME DB_USER DB_PASS TELEGRAM_BOT_TOKEN TELEGRAM_ADMIN_CHAT_ID SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS YUKASSA_SHOP_ID YUKASSA_SECRET_KEY PAYMENT_RETURN_URL PAYMENT_WEBHOOK_URL PLATFORM_COMMISSION; do
+  for key in DATABASE_URL DB_HOST DB_PORT DB_NAME DB_USER DB_PASS TELEGRAM_BOT_TOKEN TELEGRAM_ADMIN_CHAT_ID SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS YUKASSA_SHOP_ID YUKASSA_SECRET_KEY PUBLIC_SITE_URL PAYMENT_RETURN_URL PAYMENT_WEBHOOK_URL PLATFORM_COMMISSION; do
     if [[ -z "${!key:-}" ]]; then
       value="$(read_env_value "$env_file" "$key")"
       if [[ -n "$value" ]]; then
@@ -236,7 +237,7 @@ EOF
     prompt_value YUKASSA_SHOP_ID "ЮKassa shop id YUKASSA_SHOP_ID" "${YUKASSA_SHOP_ID:-}"
     prompt_secret YUKASSA_SECRET_KEY "ЮKassa secret key YUKASSA_SECRET_KEY" "${YUKASSA_SECRET_KEY:-}"
     prompt_value PAYMENT_RETURN_URL "URL возврата после оплаты PAYMENT_RETURN_URL" "${PAYMENT_RETURN_URL:-${FRONTEND_URL}/payment/success}"
-    prompt_value PAYMENT_WEBHOOK_URL "Webhook ЮKassa PAYMENT_WEBHOOK_URL" "${PAYMENT_WEBHOOK_URL:-https://pay.${DOMAIN}/api/payments/webhook}"
+    prompt_value PAYMENT_WEBHOOK_URL "Webhook ЮKassa PAYMENT_WEBHOOK_URL" "${PAYMENT_WEBHOOK_URL:-https://pay.vpulse.fun/api/payments/webhook}"
   fi
 
   prompt_yes_no FASTPANEL_SAFE "8/8 Оставить безопасный режим FastPanel" "${FASTPANEL_SAFE:-true}"
@@ -359,6 +360,7 @@ write_backend_env() {
   set_env_value "$env_file" PORT "$API_PORT"
   set_env_value "$env_file" NODE_ENV "production"
   set_env_value "$env_file" FRONTEND_URL "$FRONTEND_URL"
+  set_env_value "$env_file" PUBLIC_SITE_URL "${PUBLIC_SITE_URL:-$FRONTEND_URL}"
   set_env_value "$env_file" PAYMENT_RETURN_URL "${PAYMENT_RETURN_URL:-${FRONTEND_URL}/payment/success}"
   if [[ -n "${PAYMENT_WEBHOOK_URL:-}" ]]; then
     set_env_value "$env_file" PAYMENT_WEBHOOK_URL "$PAYMENT_WEBHOOK_URL"

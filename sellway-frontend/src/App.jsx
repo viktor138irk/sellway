@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Header from './components/Layout/Header';
@@ -92,6 +92,7 @@ function AppRoutes() {
 }
 function PaymentSuccess() {
   const { refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const paymentRef = params.get('payment_ref');
   const productId = params.get('product_id');
@@ -104,7 +105,15 @@ function PaymentSuccess() {
       .then(({ data }) => {
         if (!alive) return;
         setState({ loading: false, status: data.status, error: '', orderId: data.orderId || '' });
-        if (data.status === 'completed') refreshUser().catch(() => {});
+        if (data.accessToken && data.refreshToken) {
+          localStorage.setItem('accessToken', data.accessToken);
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+        if (data.status === 'completed') {
+          refreshUser().catch(() => {}).finally(() => {
+            if (data.orderId) navigate(`/orders/${data.orderId}`, { replace: true });
+          });
+        }
       })
       .catch((err) => {
         if (!alive) return;
@@ -116,7 +125,7 @@ function PaymentSuccess() {
   const loading = state.loading;
   const ok = state.status === 'completed';
   const canceled = state.status === 'canceled';
-  const title = loading ? 'Проверяем платёж...' : ok ? 'Баланс пополнен!' : canceled ? 'Платёж не завершён' : 'Платёж обрабатывается';
+  const title = loading ? 'Проверяем платёж...' : ok ? 'Заказ оплачен!' : canceled ? 'Платёж не завершён' : 'Платёж обрабатывается';
   const text = loading
     ? 'Запрашиваем статус в ЮKassa и создаём заказ.'
     : ok

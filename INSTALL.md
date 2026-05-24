@@ -73,8 +73,9 @@ bash scripts/install.sh
 - `TELEGRAM_ADMIN_CHAT_ID` — ID чата администратора.
 - `SMTP_*` — почта для уведомлений.
 - `YUKASSA_SHOP_ID` и `YUKASSA_SECRET_KEY` — ключи ЮKassa.
-- `PAYMENT_RETURN_URL` — куда вернуть пользователя после оплаты, например `https://vpulse.fun/payment/success`.
-- `PAYMENT_WEBHOOK_URL` — URL webhook в ЮKassa, например `https://pay.vpulse.fun/api/payments/webhook`.
+- `PUBLIC_SITE_URL` и `FRONTEND_URL` — основной сайт, для SellWay: `https://sellway.pro`.
+- `PAYMENT_RETURN_URL` — куда вернуть пользователя после оплаты: `https://sellway.pro/payment/success`.
+- `PAYMENT_WEBHOOK_URL` — URL webhook в ЮKassa: `https://pay.vpulse.fun/api/payments/webhook`.
 
 После изменения `.env` перезапусти процессы:
 
@@ -134,11 +135,12 @@ http://sellway.pro
 
 ## Платёжный шлюз на `pay.vpulse.fun`
 
-Для магазина на `vpulse.fun` можно вынести платежные callback/API на отдельный поддомен:
+Основной сайт остаётся на `sellway.pro`, а платёжный webhook/API можно вынести на отдельный поддомен `pay.vpulse.fun`:
 
 ```env
-FRONTEND_URL=https://vpulse.fun
-PAYMENT_RETURN_URL=https://vpulse.fun/payment/success
+FRONTEND_URL=https://sellway.pro
+PUBLIC_SITE_URL=https://sellway.pro
+PAYMENT_RETURN_URL=https://sellway.pro/payment/success
 PAYMENT_WEBHOOK_URL=https://pay.vpulse.fun/api/payments/webhook
 ```
 
@@ -154,7 +156,7 @@ https://pay.vpulse.fun/api/payments/webhook
 docs/nginx-pay-subdomain.conf.example
 ```
 
-Даже если webhook временно не дошёл, страница `/payment/success` теперь дополнительно проверяет платёж в ЮKassa и синхронизирует баланс.
+Даже если webhook временно не дошёл, страница `https://sellway.pro/payment/success` дополнительно проверяет платёж в ЮKassa и создаёт заказ.
 
 ## Обновление
 
