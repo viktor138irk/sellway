@@ -27,6 +27,7 @@ export default function ProductPage() {
   const [checkoutModal, setCheckoutModal] = useState(false);
   const [checkoutEmail, setCheckoutEmail] = useState('');
   const [serviceMessage, setServiceMessage] = useState('');
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     setLoading(true);
@@ -38,6 +39,8 @@ export default function ProductPage() {
 
   useEffect(() => {
     if (!product) return;
+    if (product.delivery_type === 'auto') setQuantity(q => Math.min(Math.max(1, q), Math.max(1, Number(product.keys_count || 1))));
+    if (product.delivery_type === 'service') setQuantity(1);
     const title = `${product.title} — SellWay`;
     const description = (product.short_desc || product.description || `${product.title} на SellWay`).slice(0, 160);
     document.title = title;
@@ -61,6 +64,7 @@ export default function ProductPage() {
     if (user && user.id === product.seller_id) return toast.warn('Нельзя заказать свою позицию');
 
     if (product.delivery_type === 'auto' && product.keys_count < 1) return toast.warn('Товар не в наличии');
+    if (product.delivery_type === 'auto' && quantity > product.keys_count) return toast.warn(`В наличии только ${product.keys_count} шт.`);
     if (product.delivery_type === 'file' && product.files_count < 1) return toast.warn('Файл для выдачи пока не загружен');
     if (!user) return setCheckoutModal(true);
     return startCheckout();
@@ -69,7 +73,7 @@ export default function ProductPage() {
   async function startCheckout(email = '') {
     setBuyLoading(true);
     try {
-      const { data } = await createCheckout({ product_id: product.id, email, message: service ? serviceMessage : '' });
+      const { data } = await createCheckout({ product_id: product.id, email, quantity: service ? 1 : quantity, message: service ? serviceMessage : '' });
       if (data.createdAccount) toast.success('Аккаунт создан. Пароль отправлен на email.');
       window.location.href = data.confirmationUrl;
     } catch (err) {
@@ -90,7 +94,7 @@ export default function ProductPage() {
   const categoryKind = product.category_type === 'service' || service ? 'services' : 'products';
   const images = product.images || [];
   const disc = product.old_price ? Math.round((1-product.price/product.old_price)*100) : 0;
-  const canBuy = service ? true : product.delivery_type === 'auto' ? product.keys_count > 0 : product.delivery_type === 'file' ? product.files_count > 0 : true;
+  const canBuy = service ? true : product.delivery_type === 'auto' ? product.keys_count > 0 && quantity <= product.keys_count : product.delivery_type === 'file' ? product.files_count > 0 : true;
   const serviceSteps = product.meta?.service_steps || [];
 
   return (
@@ -132,6 +136,23 @@ export default function ProductPage() {
             {product.delivery_type === 'auto' && (product.keys_count > 0 ? <div style={{ fontSize:12, color:C.green, marginTop:4 }}>В наличии: {product.keys_count} шт.</div> : <div style={{ fontSize:12, color:C.red, marginTop:4 }}>Нет в наличии</div>)}
             {product.delivery_type === 'file' && (product.files_count > 0 ? <div style={{ fontSize:12, color:C.green, marginTop:4 }}>Файл готов к выдаче</div> : <div style={{ fontSize:12, color:C.red, marginTop:4 }}>Файл не загружен</div>)}
           </div>
+
+          {!service && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:14, marginBottom:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>Количество</div>
+                <div style={{ fontSize:12, color:C.t2, marginTop:3 }}>
+                  {product.delivery_type === 'auto' ? `Можно купить до ${product.keys_count} шт.` : 'Укажите нужное количество'}
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <button type="button" onClick={()=>setQuantity(q=>Math.max(1, q-1))} style={{ width:34, height:34, borderRadius:8, background:'#0A0A12', border:`1px solid ${C.border}`, color:C.t1, fontSize:18, cursor:'pointer' }}>-</button>
+                <Input type="number" min="1" max={product.delivery_type === 'auto' ? product.keys_count : 100} value={quantity} onChange={e=>setQuantity(Math.min(product.delivery_type === 'auto' ? Number(product.keys_count || 1) : 100, Math.max(1, Number(e.target.value || 1))))} style={{ width:76, textAlign:'center' }} />
+                <button type="button" onClick={()=>setQuantity(q=>Math.min(product.delivery_type === 'auto' ? Number(product.keys_count || 1) : 100, q+1))} style={{ width:34, height:34, borderRadius:8, background:'#0A0A12', border:`1px solid ${C.border}`, color:C.t1, fontSize:18, cursor:'pointer' }}>+</button>
+              </div>
+            </div>
+            {quantity > 1 && <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', fontSize:13 }}><span style={{ color:C.t2 }}>Итого</span><b style={{ color:C.t1 }}>{money(Number(product.price) * quantity)}</b></div>}
+          </div>}
 
           {service && <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:12, padding:14, marginBottom:16 }}>
             <div style={{ fontSize:13, fontWeight:800, color:C.t1, marginBottom:8 }}>Сообщение фрилансеру</div>

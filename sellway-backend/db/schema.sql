@@ -36,6 +36,8 @@ CREATE TABLE users (
   avatar_url        VARCHAR(500),
   phone             VARCHAR(20),
   phone_verified    BOOLEAN DEFAULT FALSE,
+  buyer_rating      DECIMAL(3,2) DEFAULT 0.00,
+  buyer_reviews_count INT DEFAULT 0,
   phone_verify_code_hash VARCHAR(255),
   phone_verify_expires TIMESTAMPTZ,
   email_verified    BOOLEAN DEFAULT FALSE,
@@ -198,6 +200,7 @@ CREATE TABLE orders (
   product_id      UUID NOT NULL REFERENCES products(id),
   key_id          UUID REFERENCES product_keys(id),
   status          order_status NOT NULL DEFAULT 'pending',
+  quantity        INT NOT NULL DEFAULT 1,
   amount          DECIMAL(12,2) NOT NULL,
   commission      DECIMAL(12,2) NOT NULL DEFAULT 0,
   seller_amount   DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -259,6 +262,17 @@ CREATE TABLE reviews (
   rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment     TEXT,
   is_auto     BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(order_id)
+);
+
+CREATE TABLE buyer_reviews (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id    UUID NOT NULL REFERENCES orders(id),
+  seller_id   UUID NOT NULL REFERENCES users(id),
+  buyer_id    UUID NOT NULL REFERENCES users(id),
+  rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment     TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(order_id)
 );
@@ -372,6 +386,8 @@ CREATE INDEX idx_transactions_user   ON transactions(user_id);
 CREATE INDEX idx_notifications_user  ON notifications(user_id, is_read);
 CREATE INDEX idx_reviews_seller      ON reviews(seller_id);
 CREATE INDEX idx_reviews_product     ON reviews(product_id);
+CREATE INDEX idx_buyer_reviews_buyer ON buyer_reviews(buyer_id);
+CREATE INDEX idx_buyer_reviews_seller ON buyer_reviews(seller_id);
 CREATE INDEX idx_sellers_referral_code ON sellers(referral_code);
 CREATE INDEX idx_sellers_referred_by ON sellers(referred_by_seller_id);
 CREATE INDEX idx_keys_product        ON product_keys(product_id, is_sold);
@@ -424,8 +440,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_seller_rating AFTER INSERT ON reviews
+CREATE TRIGGER trg_seller_rating AFTER INSERT OR UPDATE ON reviews
 FOR EACH ROW EXECUTE FUNCTION update_seller_rating();
+
+CREATE OR REPLACE FUNCTION update_buyer_rating()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE users SET
+    buyer_rating = (SELECT COALESCE(AVG(rating),0) FROM buyer_reviews WHERE buyer_id = NEW.buyer_id),
+    buyer_reviews_count = (SELECT COUNT(*) FROM buyer_reviews WHERE buyer_id = NEW.buyer_id)
+  WHERE id = NEW.buyer_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_buyer_rating AFTER INSERT OR UPDATE ON buyer_reviews
+FOR EACH ROW EXECUTE FUNCTION update_buyer_rating();
 
 -- Генерация номера заказа
 CREATE SEQUENCE order_seq START 10000;

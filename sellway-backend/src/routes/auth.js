@@ -290,7 +290,7 @@ router.post('/reset-password', [
 async function buildUserResponse(userId) {
   const { rows: [user] } = await query(
     `SELECT u.id, u.email, u.username, u.role, u.status, u.avatar_url,
-            u.phone, u.phone_verified, u.telegram_verified, u.email_verified, u.created_at,
+            u.phone, u.phone_verified, u.telegram_verified, u.email_verified, u.buyer_rating, u.buyer_reviews_count, u.created_at,
             COALESCE(w.balance, 0) AS balance, COALESCE(w.held, 0) AS held,
             s.rating, s.total_sales, s.verified AS seller_verified
      FROM users u

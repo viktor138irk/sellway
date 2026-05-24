@@ -64,7 +64,7 @@ async function sellerNewOrder(userId, order, product) {
   return create(userId, 'order_new',
     '🛒 Новый заказ!',
     `Заказан "${product.title}". Сумма к получению: ${order.seller_amount} ₽. Заказ: ${order.order_number}`,
-    `/seller/orders/${order.id}`
+    `/orders/${order.id}`
   );
 }
 
@@ -72,7 +72,7 @@ async function sellerOrderConfirmed(userId, order) {
   return create(userId, 'order_confirmed',
     '💰 Оплата получена',
     `Покупатель подтвердил получение по заказу ${order.order_number}. Зачислено: ${order.seller_amount} ₽`,
-    `/seller/orders/${order.id}`
+    `/orders/${order.id}`
   );
 }
 

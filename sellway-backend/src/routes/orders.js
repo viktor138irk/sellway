@@ -6,8 +6,22 @@ const logger = require('../config/logger');
 const ws = require('../ws/server');
 const { paySellerReferral } = require('../services/referrals');
 
+function parseRating(value) {
+  const rating = Number(value);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return null;
+  return rating;
+}
+
+function parseQuantity(value) {
+  const quantity = Number(value || 1);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) return null;
+  return quantity;
+}
+
 router.post('/', auth, async (req, res) => {
   const { product_id } = req.body;
+  const quantity = parseQuantity(req.body.quantity);
+  if (!quantity) return res.status(400).json({ error: 'Укажите корректное количество' });
   if (!product_id) return res.status(400).json({ error: 'product_id обязателен' });
 
   try {
@@ -23,7 +37,7 @@ router.post('/', auth, async (req, res) => {
       if (!product) throw { status: 404, message: 'Товар не найден или недоступен' };
       if (product.delivery_type === 'service') throw { status: 400, message: 'Услуги оформляются через заявку' };
       if (product.seller_user_id === req.user.id) throw { status: 400, message: 'Нельзя купить свой товар' };
-      if (product.delivery_type === 'auto' && product.keys_count < 1) throw { status: 400, message: 'Нет ключей в наличии' };
+      if (product.delivery_type === 'auto' && product.keys_count < quantity) throw { status: 400, message: `В наличии только ${product.keys_count} шт.` };
 
       let productFile = null;
       if (product.delivery_type === 'file') {
@@ -33,35 +47,37 @@ router.post('/', auth, async (req, res) => {
       }
 
       const { rows: [wallet] } = await client.query('SELECT balance FROM wallets WHERE user_id=$1 FOR UPDATE', [req.user.id]);
-      if (!wallet || Number(wallet.balance) < Number(product.price)) throw { status: 402, message: 'Недостаточно средств на балансе' };
+      const amount = Number((Number(product.price) * quantity).toFixed(2));
+      if (!wallet || Number(wallet.balance) < amount) throw { status: 402, message: 'Недостаточно средств на балансе' };
 
       const { rows: [commissionSetting] } = await client.query("SELECT value FROM settings WHERE key IN ('default_seller_commission_rate','platform_commission') ORDER BY CASE WHEN key='default_seller_commission_rate' THEN 0 ELSE 1 END LIMIT 1");
       const defaultCommissionRate = Number(commissionSetting?.value || process.env.PLATFORM_COMMISSION || 0.07);
       const sellerCommissionRate = product.custom_commission_rate != null ? Number(product.custom_commission_rate) : defaultCommissionRate;
-      const commission = Number((Number(product.price) * sellerCommissionRate).toFixed(2));
-      const sellerAmount = Number((Number(product.price) - commission).toFixed(2));
+      const commission = Number((amount * sellerCommissionRate).toFixed(2));
+      const sellerAmount = Number((amount - commission).toFixed(2));
 
       const { rows: [order] } = await client.query(
-        `INSERT INTO orders (buyer_id, seller_id, product_id, amount, commission, seller_amount, delivery_type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-        [req.user.id, product.seller_user_id, product_id, product.price, commission, sellerAmount, product.delivery_type]
+        `INSERT INTO orders (buyer_id, seller_id, product_id, quantity, amount, commission, seller_amount, delivery_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [req.user.id, product.seller_user_id, product_id, quantity, amount, commission, sellerAmount, product.delivery_type]
       );
 
-      await client.query('UPDATE wallets SET balance=balance-$1, held=held+$1 WHERE user_id=$2', [product.price, req.user.id]);
-      await client.query(`INSERT INTO transactions (user_id, order_id, type, amount, description) VALUES ($1,$2,'hold',$3,$4)`, [req.user.id, order.id, product.price, `Оплата заказа ${order.order_number}`]);
+      await client.query('UPDATE wallets SET balance=balance-$1, held=held+$1 WHERE user_id=$2', [amount, req.user.id]);
+      await client.query(`INSERT INTO transactions (user_id, order_id, type, amount, description) VALUES ($1,$2,'hold',$3,$4)`, [req.user.id, order.id, amount, `Оплата заказа ${order.order_number}`]);
 
-      let key = null;
+      let keys = [];
       if (product.delivery_type === 'auto') {
-        const { rows: [k] } = await client.query(
+        const { rows: soldKeys } = await client.query(
           `UPDATE product_keys SET is_sold=TRUE, sold_at=NOW(), order_id=$1
-           WHERE id=(SELECT id FROM product_keys WHERE product_id=$2 AND NOT is_sold LIMIT 1 FOR UPDATE SKIP LOCKED)
+           WHERE id IN (SELECT id FROM product_keys WHERE product_id=$2 AND NOT is_sold ORDER BY created_at ASC LIMIT $3 FOR UPDATE SKIP LOCKED)
            RETURNING id, key_value`,
-          [order.id, product_id]
+          [order.id, product_id, quantity]
         );
-        key = k;
-        if (k) {
-          await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours' WHERE id=$2", [k.id, order.id]);
-          await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, 'Ключ передан автоматически.']);
+        if (soldKeys.length !== quantity) throw { status: 400, message: 'Не удалось зарезервировать нужное количество ключей' };
+        keys = soldKeys;
+        if (keys.length) {
+          await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=COALESCE(meta,'{}'::jsonb) || $2::jsonb WHERE id=$3", [keys[0].id, JSON.stringify({ keys: keys.map(k => k.key_value) }), order.id]);
+          await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, `Ключи переданы автоматически: ${keys.length} шт.`]);
         }
       } else if (product.delivery_type === 'file') {
         await client.query(`UPDATE orders SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=$1::jsonb WHERE id=$2`, [JSON.stringify({ file: productFile }), order.id]);
@@ -74,8 +90,8 @@ router.post('/', auth, async (req, res) => {
       await notify.sellerNewOrder(product.seller_user_id, order, product).catch(() => {});
       await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, req.user.id, 'Сделка создана. Средства заморожены на платформе.']);
 
-      logger.info('Order created', { orderId: order.id, buyerId: req.user.id, amount: product.price });
-      return res.status(201).json({ order: { ...order, status: ['auto', 'file'].includes(product.delivery_type) ? 'delivered' : 'paid' }, key: key ? { value: key.key_value } : null });
+      logger.info('Order created', { orderId: order.id, buyerId: req.user.id, amount, quantity });
+      return res.status(201).json({ order: { ...order, quantity, amount, status: ['auto', 'file'].includes(product.delivery_type) ? 'delivered' : 'paid' }, keys: keys.map(k => ({ value: k.key_value })) });
     });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
@@ -113,9 +129,14 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const { rows: [order] } = await query(
       `SELECT o.*, p.title AS product_title, p.description AS product_desc, p.delivery_type,
-              o.meta->'file' AS file, pk.key_value,
+              o.meta->'file' AS file, o.meta->'keys' AS key_values, pk.key_value,
               buyer.username AS buyer_name, buyer.avatar_url AS buyer_avatar,
-              seller.username AS seller_name, seller.avatar_url AS seller_avatar
+              buyer.buyer_rating, buyer.buyer_reviews_count,
+              seller.username AS seller_name, seller.avatar_url AS seller_avatar,
+              (SELECT json_build_object('rating', r.rating, 'comment', r.comment, 'created_at', r.created_at)
+               FROM reviews r WHERE r.order_id=o.id LIMIT 1) AS seller_review,
+              (SELECT json_build_object('rating', br.rating, 'comment', br.comment, 'created_at', br.created_at)
+               FROM buyer_reviews br WHERE br.order_id=o.id LIMIT 1) AS buyer_review
        FROM orders o
        JOIN products p ON p.id = o.product_id
        LEFT JOIN product_keys pk ON pk.id = o.key_id
@@ -161,10 +182,20 @@ router.post('/:id/deliver', auth, async (req, res) => {
 });
 
 router.post('/:id/confirm', auth, async (req, res) => {
+  const rating = parseRating(req.body?.rating);
+  const comment = String(req.body?.comment || '').trim().slice(0, 1000);
+  if (!rating) return res.status(400).json({ error: 'Укажите оценку продавца от 1 до 5' });
+
   try {
     await transaction(async (client) => {
       const { rows: [order] } = await client.query("SELECT * FROM orders WHERE id=$1 AND buyer_id=$2 AND status='delivered' FOR UPDATE", [req.params.id, req.user.id]);
       if (!order) throw { status: 404, message: 'Заказ не найден или не может быть подтверждён' };
+      await client.query(
+        `INSERT INTO reviews (order_id, buyer_id, seller_id, product_id, rating, comment)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (order_id) DO UPDATE SET rating=EXCLUDED.rating, comment=EXCLUDED.comment`,
+        [order.id, order.buyer_id, order.seller_id, order.product_id, rating, comment || null]
+      );
       await client.query("UPDATE orders SET status='confirmed', confirmed_at=NOW() WHERE id=$1", [order.id]);
       await client.query('UPDATE wallets SET held=held-$1 WHERE user_id=$2', [order.amount, order.buyer_id]);
       await client.query('UPDATE wallets SET balance=balance+$1, total_in=total_in+$1 WHERE user_id=$2', [order.seller_amount, order.seller_id]);
@@ -181,6 +212,40 @@ router.post('/:id/confirm', auth, async (req, res) => {
       return res.json({ message: 'Получение подтверждено. Средства переведены продавцу.', referral });
     });
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Confirm order error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+router.post('/:id/rate-buyer', auth, async (req, res) => {
+  const rating = parseRating(req.body?.rating);
+  const comment = String(req.body?.comment || '').trim().slice(0, 1000);
+  if (!rating) return res.status(400).json({ error: 'Укажите оценку покупателя от 1 до 5' });
+
+  try {
+    await transaction(async (client) => {
+      const { rows: [order] } = await client.query(
+        "SELECT * FROM orders WHERE id=$1 AND seller_id=$2 AND status='confirmed' FOR UPDATE",
+        [req.params.id, req.user.id]
+      );
+      if (!order) throw { status: 404, message: 'Заказ не найден или ещё не завершён' };
+      const { rows: [review] } = await client.query(
+        `INSERT INTO buyer_reviews (order_id, seller_id, buyer_id, rating, comment)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (order_id) DO UPDATE SET rating=EXCLUDED.rating, comment=EXCLUDED.comment
+         RETURNING *`,
+        [order.id, order.seller_id, order.buyer_id, rating, comment || null]
+      );
+      await client.query(
+        `INSERT INTO order_messages (order_id, sender_id, message, is_system)
+         VALUES ($1,$2,$3,TRUE)`,
+        [order.id, order.seller_id, `Продавец оценил покупателя на ${rating}/5.`]
+      );
+      await notify.create(order.buyer_id, 'review_new', '⭐ Вам поставили оценку', `Продавец оценил сделку ${order.order_number} на ${rating}/5.`, `/orders/${order.id}`).catch(() => {});
+      return res.json({ review });
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    logger.error('Rate buyer error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
 });
 
 router.post('/:id/dispute', auth, async (req, res) => {

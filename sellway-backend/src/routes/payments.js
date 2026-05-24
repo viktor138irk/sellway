@@ -54,6 +54,12 @@ function paymentStatus(payment) {
   return payment?.status || 'pending';
 }
 
+function parseQuantity(value) {
+  const quantity = Number(value || 1);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) return null;
+  return quantity;
+}
+
 function generateTokens(userId, role) {
   const accessToken = jwt.sign(
     { userId, role },
@@ -79,7 +85,7 @@ async function saveRefreshToken(userId, refreshToken, ip, userAgent) {
 async function buildUserResponse(client, userId) {
   const { rows: [user] } = await client.query(
     `SELECT u.id, u.email, u.username, u.role, u.status, u.avatar_url,
-            u.phone, u.phone_verified, u.telegram_verified, u.email_verified, u.created_at,
+            u.phone, u.phone_verified, u.telegram_verified, u.email_verified, u.buyer_rating, u.buyer_reviews_count, u.created_at,
             COALESCE(w.balance, 0) AS balance, COALESCE(w.held, 0) AS held,
             s.rating, s.total_sales, s.verified AS seller_verified
      FROM users u
@@ -181,6 +187,7 @@ async function completeDirectPurchase(payment, source) {
   const metadata = payment.metadata || {};
   const userId = metadata.user_id;
   const productId = metadata.product_id;
+  const quantity = parseQuantity(metadata.quantity) || 1;
   const amount = parseFloat(payment.amount?.value || 0);
 
   if (!userId || !productId || !Number.isFinite(amount) || amount <= 0) {
@@ -206,8 +213,9 @@ async function completeDirectPurchase(payment, source) {
     );
     if (!product) throw new Error('Product unavailable for direct checkout');
     if (product.seller_user_id === userId) throw new Error('Self purchase is not allowed');
-    if (Number(product.price).toFixed(2) !== amount.toFixed(2)) throw new Error('Payment amount mismatch');
-    if (product.delivery_type === 'auto' && product.keys_count < 1) throw new Error('No keys in stock');
+    const expectedAmount = Number((Number(product.price) * quantity).toFixed(2));
+    if (expectedAmount.toFixed(2) !== amount.toFixed(2)) throw new Error('Payment amount mismatch');
+    if (product.delivery_type === 'auto' && product.keys_count < quantity) throw new Error('No keys in stock');
 
     let productFile = null;
     if (product.delivery_type === 'file') {
@@ -216,35 +224,34 @@ async function completeDirectPurchase(payment, source) {
       productFile = file;
     }
 
-    const { commission, sellerAmount } = await commissionForSeller(client, product.seller_user_id, product.price);
+    const { commission, sellerAmount } = await commissionForSeller(client, product.seller_user_id, amount);
     const meta = product.delivery_type === 'service'
       ? { service: true, direct_checkout: true, negotiation_status: 'accepted', accepted_at: new Date().toISOString(), customer_message: metadata.message || '' }
       : {};
     const initialStatus = product.delivery_type === 'service' ? 'paid' : 'pending';
     const { rows: [order] } = await client.query(
-      `INSERT INTO orders (buyer_id, seller_id, product_id, status, amount, commission, seller_amount, delivery_type, meta, paid_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,NOW()) RETURNING *`,
-      [userId, product.seller_user_id, productId, initialStatus, product.price, commission, sellerAmount, product.delivery_type, JSON.stringify(meta)]
+      `INSERT INTO orders (buyer_id, seller_id, product_id, status, quantity, amount, commission, seller_amount, delivery_type, meta, paid_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,NOW()) RETURNING *`,
+      [userId, product.seller_user_id, productId, initialStatus, quantity, amount, commission, sellerAmount, product.delivery_type, JSON.stringify(meta)]
     );
 
     await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
-    await client.query('UPDATE wallets SET held=held+$1, total_in=total_in+$1, updated_at=NOW() WHERE user_id=$2', [product.price, userId]);
+    await client.query('UPDATE wallets SET held=held+$1, total_in=total_in+$1, updated_at=NOW() WHERE user_id=$2', [amount, userId]);
 
     let finalStatus = initialStatus;
-    let key = null;
+    let keys = [];
     if (product.delivery_type === 'auto') {
-      const { rows: [k] } = await client.query(
+      const { rows: soldKeys } = await client.query(
         `UPDATE product_keys SET is_sold=TRUE, sold_at=NOW(), order_id=$1
-         WHERE id=(SELECT id FROM product_keys WHERE product_id=$2 AND NOT is_sold LIMIT 1 FOR UPDATE SKIP LOCKED)
+         WHERE id IN (SELECT id FROM product_keys WHERE product_id=$2 AND NOT is_sold ORDER BY created_at ASC LIMIT $3 FOR UPDATE SKIP LOCKED)
          RETURNING id, key_value`,
-        [order.id, productId]
+        [order.id, productId, quantity]
       );
-      if (k) {
-        key = k;
-        finalStatus = 'delivered';
-        await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours' WHERE id=$2", [k.id, order.id]);
-        await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, 'Ключ передан автоматически.']);
-      }
+      if (soldKeys.length !== quantity) throw new Error('Could not reserve keys');
+      keys = soldKeys;
+      finalStatus = 'delivered';
+      await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=COALESCE(meta,'{}'::jsonb) || $2::jsonb WHERE id=$3", [keys[0].id, JSON.stringify({ keys: keys.map(k => k.key_value) }), order.id]);
+      await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, `Ключи переданы автоматически: ${keys.length} шт.`]);
     } else if (product.delivery_type === 'file') {
       finalStatus = 'delivered';
       await client.query(`UPDATE orders SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=$1::jsonb WHERE id=$2`, [JSON.stringify({ file: productFile, direct_checkout: true }), order.id]);
@@ -270,6 +277,7 @@ async function completeDirectPurchase(payment, source) {
       purpose: 'direct_purchase',
       product_id: productId,
       order_id: order.id,
+      quantity,
       guest_checkout: metadata.guest_checkout === 'true',
     };
     const updated = await client.query(
@@ -283,13 +291,13 @@ async function completeDirectPurchase(payment, source) {
       await client.query(
         `INSERT INTO transactions (user_id, order_id, type, amount, description, meta)
          VALUES ($1,$2,'hold',$3,$4,$5)`,
-        [userId, order.id, product.price, `Оплата заказа ${order.order_number}`, JSON.stringify({ payment_id: payment.id, ...completedMeta })]
+        [userId, order.id, amount, `Оплата заказа ${order.order_number}`, JSON.stringify({ payment_id: payment.id, ...completedMeta })]
       );
     }
 
     await notify.buyerOrderCreated(userId, { ...order, status: finalStatus }).catch(() => {});
     await notify.sellerNewOrder(product.seller_user_id, order, product).catch(() => {});
-    logger.info('Direct checkout completed', { orderId: order.id, buyerId: userId, paymentId: payment.id, keyDelivered: Boolean(key) });
+    logger.info('Direct checkout completed', { orderId: order.id, buyerId: userId, paymentId: payment.id, quantity, keysDelivered: keys.length });
     return { credited: true, amount, orderId: order.id };
   });
 
@@ -378,8 +386,10 @@ router.post('/checkout', optionalAuth, async (req, res) => {
   const productId = req.body.product_id || req.body.productId;
   const email = String(req.body.email || '').trim().toLowerCase();
   const message = String(req.body.message || '').trim().slice(0, 2000);
+  const quantity = parseQuantity(req.body.quantity);
 
   if (!productId) return res.status(400).json({ error: 'product_id обязателен' });
+  if (!quantity) return res.status(400).json({ error: 'Укажите корректное количество' });
   if (!req.user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Укажите корректный email для отправки доступа' });
   }
@@ -397,7 +407,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
         [productId]
       );
       if (!product) throw { status: 404, message: 'Позиция не найдена или недоступна' };
-      if (product.delivery_type === 'auto' && product.keys_count < 1) throw { status: 400, message: 'Нет ключей в наличии' };
+      if (product.delivery_type === 'auto' && product.keys_count < quantity) throw { status: 400, message: `В наличии только ${product.keys_count} шт.` };
       if (product.delivery_type === 'file') {
         const { rows: [file] } = await client.query('SELECT id FROM product_files WHERE product_id=$1 LIMIT 1', [productId]);
         if (!file) throw { status: 400, message: 'Файл для выдачи пока не загружен' };
@@ -415,7 +425,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
       return { product, user: checkoutUser, createdAccount };
     });
 
-    const amount = Number(prepared.product.price);
+    const amount = Number((Number(prepared.product.price) * quantity).toFixed(2));
     if (!Number.isFinite(amount) || amount < 1) return res.status(400).json({ error: 'Некорректная стоимость позиции' });
 
     const idempotencyKey = uuidv4();
@@ -433,6 +443,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
         type: 'direct_purchase',
         payment_ref: paymentRef,
         product_id: productId,
+        quantity: String(quantity),
         guest_checkout: prepared.createdAccount ? 'true' : 'false',
         message,
       },
@@ -453,6 +464,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
           status: 'pending',
           purpose: 'direct_purchase',
           product_id: productId,
+          quantity,
           guest_checkout: prepared.createdAccount,
         }),
       ]
@@ -464,7 +476,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
       });
     }
 
-    logger.info('Checkout payment created', { userId: prepared.user.id, productId, amount, paymentId: payment.id, paymentRef, guest: prepared.createdAccount });
+    logger.info('Checkout payment created', { userId: prepared.user.id, productId, amount, quantity, paymentId: payment.id, paymentRef, guest: prepared.createdAccount });
     res.json({
       paymentId: payment.id,
       paymentRef,
