@@ -19,8 +19,6 @@ function ProductCard({ p }) {
         <div style={{ position:'absolute', top:8, left:8, display:'flex', flexDirection:'column', gap:4 }}>
           {disc > 0 && <span style={{ background:C.red, color:'#fff', fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>−{disc}%</span>}
           {service && <span style={{ background:C.accent, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>Услуга</span>}
-          {p.delivery_type === 'auto' && <span style={{ background:C.green, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>Авто</span>}
-          {p.delivery_type === 'file' && <span style={{ background:C.green, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>Файл</span>}
         </div>
         <button onClick={e => { e.stopPropagation(); setFav(f=>!f); }} style={{ position:'absolute', top:8, right:8, width:30, height:30, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>{fav ? '❤️' : '🤍'}</button>
         {images.length > 1 && <><div style={{ position:'absolute', inset:0, display:'flex' }}>{images.map((_,i)=><div key={i} style={{ flex:1 }} onMouseEnter={()=>setImgIdx(i)} />)}</div><div style={{ position:'absolute', bottom:8, left:0, right:0, display:'flex', justifyContent:'center', gap:4 }}>{images.map((_,i)=><div key={i} style={{ width:i===imgIdx?14:5, height:5, borderRadius:3, background:i===imgIdx?'#fff':'rgba(255,255,255,.4)', transition:'all .2s' }} />)}</div></>}
@@ -30,16 +28,21 @@ function ProductCard({ p }) {
         <div style={{ fontSize:12, color:C.t1, lineHeight:1.35, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight:33 }}>{p.title}</div>
         {p.rating > 0 && <div style={{ display:'flex', alignItems:'center', gap:5 }}><Stars n={p.rating} size={11} /><span style={{ fontSize:11, color:C.t3 }}>{parseFloat(p.rating).toFixed(1)} ({p.reviews_count})</span></div>}
         <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>{p.tags?.slice(0,2).map(t=><span key={t} style={{ fontSize:10, background:'#1A1A28', color:C.t2, padding:'2px 7px', borderRadius:5 }}>{t}</span>)}</div>
-        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:'auto', paddingTop:8, borderTop:`1px solid ${C.border}` }}><div style={{ width:18, height:18, borderRadius:'50%', background:C.accent, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{p.seller_name?.[0]?.toUpperCase()}</div><span style={{ fontSize:11, color:C.t2, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.seller_name}</span>{p.seller_verified && <span style={{ fontSize:9, color:'#60A5FA', background:'#1A2E4A', padding:'1px 5px', borderRadius:4 }}>✓</span>}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:'auto', paddingTop:8, borderTop:`1px solid ${C.border}` }}><SellerLogo seller={p} /><span style={{ fontSize:11, color:C.t2, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.seller_name}</span>{p.seller_verified && <span style={{ fontSize:9, color:'#60A5FA', background:'#1A2E4A', padding:'1px 5px', borderRadius:4 }}>✓</span>}</div>
         <button onClick={e=>{ e.stopPropagation(); navigate(`/product/${p.id}`); }} style={{ background:hov?C.accent:'#1A1A28', border:`1px solid ${hov?'transparent':C.border}`, color:'#fff', borderRadius:8, padding:'8px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', transition:'all .2s', marginTop:2 }}>{service ? 'Обсудить' : hov ? 'Купить сейчас →' : 'Подробнее'}</button>
       </div>
     </div>
   );
 }
 
+const categoryImage = cat => cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
+const categoryInitial = cat => String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
+const SellerLogo = ({ seller }) => <div style={{ width:18, height:18, borderRadius:'50%', background:C.accent, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff', overflow:'hidden', flexShrink:0 }}>{seller.seller_avatar ? <img src={seller.seller_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : seller.seller_name?.[0]?.toUpperCase()}</div>;
+
 function CategoryCard({ cat, active, count, onClick }) {
+  const img = categoryImage(cat);
   return <button type="button" onClick={onClick} style={{ background: active ? C.accent+'18' : C.card, border:`1px solid ${active ? C.accent+'88' : C.border}`, borderRadius:13, padding:'16px 12px', textAlign:'center', cursor:'pointer', transition:'border-color .15s', fontFamily:'inherit' }}>
-    <div style={{ width:52, height:52, borderRadius:12, overflow:'hidden', margin:'0 auto 10px', background:'#0A0A14', border:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'center' }}>{cat.image_url ? <img src={cat.image_url} alt={cat.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:26 }}>{cat.emoji||'🎮'}</span>}</div>
+    <div style={{ width:52, height:52, borderRadius:12, overflow:'hidden', margin:'0 auto 10px', background:'#0A0A14', border:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'center' }}>{img ? <img src={img} alt={cat.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:22, fontWeight:900, color:C.t2 }}>{categoryInitial(cat)}</span>}</div>
     <div style={{ fontSize:13, fontWeight:700, color:active ? C.accent : C.t1, marginBottom:3 }}>{cat.name}</div>
     <div style={{ fontSize:11, color:C.t3 }}>{count ?? (cat.product_count||0).toLocaleString('ru')}</div>
   </button>;

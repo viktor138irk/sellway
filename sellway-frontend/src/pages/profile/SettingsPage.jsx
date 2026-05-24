@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { getTelegramLink } from '../../api/seller';
+import { getTelegramLink, uploadSellerAvatar } from '../../api/seller';
 import { C, Btn, Input, Card, Toggle, Modal } from '../../components/UI';
 import client from '../../api/client';
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
   const toast = useToast();
+  const avatarRef = useRef(null);
   const [tab, setTab]   = useState('profile');
   const [saving, setSaving] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   // Profile form
   const [profile, setProfile] = useState({ username: user?.username || '', phone: user?.phone || '' });
@@ -41,6 +43,23 @@ export default function SettingsPage() {
       toast.error(err.response?.data?.error || 'Ошибка');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAvatar(file) {
+    if (!file) return;
+    setAvatarLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('avatar', file);
+      await uploadSellerAvatar(fd);
+      await refreshUser();
+      toast.success('Логотип магазина обновлён');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось загрузить логотип');
+    } finally {
+      setAvatarLoading(false);
+      if (avatarRef.current) avatarRef.current.value = '';
     }
   }
 
@@ -132,18 +151,23 @@ export default function SettingsPage() {
       {tab === 'profile' && (
         <Card style={{ padding: 24 }}>
           <form onSubmit={saveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
               <div style={{ width: 64, height: 64, borderRadius: 16, background: `linear-gradient(135deg,${C.accent},#A78BFA)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff' }}>
-                {user?.username?.slice(0, 2).toUpperCase()}
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff', overflow: 'hidden', flexShrink: 0 }}>
+                {user?.avatar_url ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : user?.username?.slice(0, 2).toUpperCase()}
               </div>
-              <div>
+              <div style={{ flex: '1 1 220px' }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: C.t1 }}>{user?.username}</div>
                 <div style={{ fontSize: 12, color: C.t2 }}>{user?.email}</div>
                 <div style={{ fontSize: 11, color: user?.email_verified ? C.green : C.amber, marginTop: 3 }}>
                   {user?.email_verified ? '✓ Email подтверждён' : '⚠ Email не подтверждён'}
                 </div>
               </div>
+              {['seller','freelancer','admin'].includes(user?.role) && <div>
+                <input ref={avatarRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleAvatar(e.target.files?.[0])} />
+                <Btn type="button" variant="ghost" size="sm" loading={avatarLoading} onClick={() => avatarRef.current?.click()}>Сменить логотип</Btn>
+                <div style={{ fontSize: 10, color: C.t3, marginTop: 5 }}>Используется как логотип магазина</div>
+              </div>}
             </div>
             <Input label="Никнейм" value={profile.username}
               onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} />

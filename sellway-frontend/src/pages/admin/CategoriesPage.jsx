@@ -9,9 +9,11 @@ const EMOJIS = ['🎮','🧱','⛏️','💳','🏆','🌟','🔑','💎','👑'
 const toSlug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
 
 function CategoryAvatar({ cat, size = 42 }) {
+  const img = cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
+  const letter = String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
   return (
     <span style={{ width: size, height: size, borderRadius: 12, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      {cat?.image_url ? <img src={cat.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(18, size * 0.5) }}>{cat?.emoji || '📂'}</span>}
+      {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(14, size * 0.42), fontWeight: 900, color: C.t2 }}>{letter}</span>}
     </span>
   );
 }
@@ -67,7 +69,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Иконка</div>
           <button type="button" onClick={() => ref.current.click()} style={{ width: 82, height: 82, borderRadius: 16, overflow: 'hidden', cursor: 'pointer', border: `2px dashed ${image ? C.accent : C.border}`, background: '#0A0A12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {image ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <span style={{ fontSize: 30 }}>{emoji}</span>}
+            {image ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <span style={{ fontSize: 22, fontWeight: 900, color: C.t2 }}>{String(name || '?').trim().slice(0, 1).toUpperCase()}</span>}
           </button>
           <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => pickImg(e.target.files?.[0])} />
           {image && <button type="button" onClick={() => { setImage(null); setImgFile(null); }} style={{ background: 'transparent', border: 'none', color: C.red, fontSize: 11, cursor: 'pointer', marginTop: 6 }}>Убрать</button>}
@@ -83,7 +85,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
       <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?kind=${categoryType === 'service' ? 'services' : 'products'}&category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
       <Select label="Родительская категория" value={parentId} onChange={e => setParentId(e.target.value)}>
         <option value="">Нет, это основная категория</option>
-        {categories.filter(c => !c.parent_id && c.id !== initial?.id).map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+        {categories.filter(c => !c.parent_id && c.id !== initial?.id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
       </Select>
       <Input label="Порядок сортировки" type="number" value={sortOrder} onChange={e => setSortOrder(e.target.value)} />
       <Textarea label="Описание" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
@@ -136,7 +138,7 @@ export default function CategoriesPage({ type = 'product' }) {
     catch { toast.error('Ошибка'); }
   }
 
-  function openCreate(parent = null) { setEditCat(parent ? { parent_id: parent.id, emoji: parent.emoji } : null); setModal('create'); }
+  function openCreate(parent = null) { setEditCat(parent ? { parent_id: parent.id } : null); setModal('create'); }
   function openEdit(cat) { setEditCat(cat); setModal('edit'); }
 
   const card = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 };

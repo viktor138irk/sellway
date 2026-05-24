@@ -1,5 +1,7 @@
 const router = require('express').Router();
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
 const { query, transaction } = require('../config/db');
 const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
@@ -8,8 +10,35 @@ const { canUseReferralProgram, referralRequirements } = require('../services/ref
 
 router.use(auth, requireRole('seller', 'freelancer', 'admin'));
 
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, process.env.UPLOAD_DIR || 'uploads'),
+    filename: (req, file, cb) => cb(null, `seller-${req.user.id}-${Date.now()}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880', 10) },
+  fileFilter: (req, file, cb) => {
+    const ok = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'].includes(file.mimetype);
+    cb(ok ? null : new Error('Можно загрузить только изображение'), ok);
+  },
+});
+
 function roleForLink(role) { return role === 'freelancer' ? 'freelancer' : 'seller'; }
 function referralLink(code, role) { return code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=${roleForLink(role)}&ref=${code}` : null; }
+
+router.post('/avatar', avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    const baseUrl = process.env.UPLOAD_URL || '/uploads';
+    const avatarUrl = `${baseUrl}/${req.file.filename}`;
+    await query('UPDATE users SET avatar_url=$1 WHERE id=$2', [avatarUrl, req.user.id]);
+    await query('UPDATE sellers SET updated_at=NOW() WHERE user_id=$1', [req.user.id]).catch(() => {});
+    logger.info('Seller avatar updated', { userId: req.user.id, avatarUrl });
+    res.json({ avatar_url: avatarUrl });
+  } catch (err) {
+    logger.error('Seller avatar upload error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка загрузки логотипа' });
+  }
+});
 
 router.get('/dashboard', async (req, res) => {
   try {

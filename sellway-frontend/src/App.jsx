@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Header from './components/Layout/Header';
@@ -21,6 +21,7 @@ const SellerReferrals  = lazy(() => import('./pages/seller/ReferralsPage'));
 const SellerWithdrawal = lazy(() => import('./pages/seller/WithdrawalPage'));
 const SellerSettings   = lazy(() => import('./pages/seller/SettingsPage'));
 const SellerPlaceholder = lazy(() => import('./pages/seller/PlaceholderPage'));
+const PurchasesPage = lazy(() => import('./pages/profile/PurchasesPage'));
 const SettingsPage = lazy(() => import('./pages/profile/SettingsPage'));
 const AdminDashboard    = lazy(() => import('./pages/admin/DashboardPage'));
 const AdminUsers        = lazy(() => import('./pages/admin/UsersPage'));
@@ -51,6 +52,11 @@ function GuestOnly({ children }) {
   return children;
 }
 
+function LegacySellerOrderRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/orders/${id}`} replace />;
+}
+
 function AppRoutes() {
   const location = useLocation();
   const isAdminPage  = location.pathname.startsWith('/admin');
@@ -62,7 +68,10 @@ function AppRoutes() {
     <Route path="/login" element={<GuestOnly><LoginPage/></GuestOnly>}/>
     <Route path="/register" element={<GuestOnly><RegisterPage/></GuestOnly>}/>
     <Route path="/orders/:id" element={<Protected><OrderPage/></Protected>}/>
+    <Route path="/seller/orders/:id" element={<Protected><LegacySellerOrderRedirect/></Protected>}/>
     <Route path="/terms" element={<TermsPage/>}/>
+    <Route path="/profile" element={<Protected><Navigate to="/profile/purchases" replace/></Protected>}/>
+    <Route path="/profile/purchases" element={<Protected><PurchasesPage/></Protected>}/>
     <Route path="/seller" element={<Protected roles={SELLER_ROLES}><SellerDashboard/></Protected>}/>
     <Route path="/seller/products" element={<Protected roles={SELLER_ROLES}><ProductsPage/></Protected>}/>
     <Route path="/seller/products/new" element={<Protected roles={SELLER_ROLES}><ProductsPage mode="create"/></Protected>}/>
@@ -84,7 +93,11 @@ function AppRoutes() {
     <Route path="/admin/referrals" element={<Protected roles={['admin']}><AdminReferrals/></Protected>}/>
     <Route path="/admin/categories" element={<Protected roles={['admin']}><AdminCategories type="product"/></Protected>}/>
     <Route path="/admin/service-categories" element={<Protected roles={['admin']}><AdminCategories type="service"/></Protected>}/>
-    <Route path="/admin/settings" element={<Protected roles={['admin']}><AdminSettings/></Protected>}/>
+    <Route path="/admin/settings" element={<Protected roles={['admin']}><Navigate to="/admin/settings/finance" replace/></Protected>}/>
+    <Route path="/admin/settings/finance" element={<Protected roles={['admin']}><AdminSettings page="finance"/></Protected>}/>
+    <Route path="/admin/settings/telegram" element={<Protected roles={['admin']}><AdminSettings page="telegram"/></Protected>}/>
+    <Route path="/admin/settings/notifications" element={<Protected roles={['admin']}><AdminSettings page="notifications"/></Protected>}/>
+    <Route path="/admin/settings/system" element={<Protected roles={['admin']}><AdminSettings page="system"/></Protected>}/>
     <Route path="/admin/logs" element={<Protected roles={['admin']}><AdminLogs/></Protected>}/>
     <Route path="/payment/success" element={<PaymentSuccess/>}/>
     <Route path="*" element={<NotFound/>}/>

@@ -84,8 +84,10 @@ function ServiceStepsEditor({ steps, onChange }) {
 }
 
 function CategoryIcon({ cat, size = 30 }) {
+  const img = cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
+  const letter = String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
   return <span style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-    {cat?.image_url ? <img src={cat.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(14, size * .5) }}>{cat?.emoji || '📂'}</span>}
+    {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(11, size * .38), fontWeight: 900, color: C.t2 }}>{letter}</span>}
   </span>;
 }
 
@@ -170,11 +172,11 @@ function ProductForm({ productId, onSave, onCancel, user }) {
         <div style={{ gridColumn: '1/-1' }}><Input label={service ? 'Название услуги *' : 'Название товара *'} value={form.title} onChange={setFromInput('title')} placeholder={service ? 'Разработка лендинга под ключ' : 'CS2 Аккаунт | Prime Status'} /></div>
         <Select label="Категория *" value={parentCategoryId} onChange={e => { const id = e.target.value; setParentCategoryId(id); set('category_id')(cats.some(c => c.parent_id === id) ? '' : id); }}>
           <option value="">Выберите категорию</option>
-          {rootCats.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+          {rootCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
         <Select label="Подкатегория" value={form.category_id} onChange={e => set('category_id')(e.target.value)} disabled={!parentCategoryId || subCats.length === 0}>
           <option value={subCats.length ? '' : parentCategoryId}>{subCats.length ? 'Выберите подкатегорию' : 'Без подкатегории'}</option>
-          {subCats.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+          {subCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
         {selectedCategory && <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', alignSelf: 'end' }}>
           <CategoryIcon cat={selectedCategory} />
@@ -294,7 +296,7 @@ export default function ProductsPage({ mode }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: C.t1, lineHeight: 1.35 }}>{p.title}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.t3, marginTop: 5 }}>
-                        <CategoryIcon cat={{ image_url: p.category_image_url, emoji: p.category_emoji }} size={20} />
+                        <CategoryIcon cat={{ image_url: p.category_image_url, name: p.category_name }} size={20} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.category_name || 'Без категории'}</span>
                       </div>
                     </div>

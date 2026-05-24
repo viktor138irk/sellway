@@ -78,9 +78,13 @@ export default function Header() {
     const old = notifs;
     if (!n.is_read) setNotifState(old.map(x => x.id === n.id ? { ...x, is_read: true } : x));
     try { if (!n.is_read) await readNotif(n.id); } catch { setNotifState(old); }
-    if (n.link) navigate(n.link);
+    if (n.link) navigate(normalizeNotificationLink(n.link));
     setShowNotifs(false);
     loadNotifs();
+  }
+
+  function normalizeNotificationLink(link) {
+    return String(link || '').replace(/^\/seller\/orders\//, '/orders/');
   }
 
   function handleSearch(e) {
@@ -164,7 +168,7 @@ export default function Header() {
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{user.username}</div>
                 <div style={{ fontSize: 11, color: C.t2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
               </div>
-              {[[isSellerRole ? '/seller' : '/profile', 'Личный кабинет'], ['/profile/settings', 'Настройки'], ...(user.role === 'admin' ? [['/admin', 'Админ-панель']] : [])].map(([to, label]) => <Link key={to} to={to} style={{ display: 'block', padding: '10px 16px', fontSize: 13, color: C.t2, textDecoration: 'none', borderBottom: `1px solid ${C.border}` }}>{label}</Link>)}
+              {[[isSellerRole ? '/seller' : '/profile/purchases', isSellerRole ? 'Кабинет продавца' : 'Личный кабинет'], ['/profile/purchases', 'Покупки'], ['/profile/settings', 'Настройки'], ...(user.role === 'admin' ? [['/admin', 'Админ-панель']] : [])].map(([to, label]) => <Link key={to} to={to} style={{ display: 'block', padding: '10px 16px', fontSize: 13, color: C.t2, textDecoration: 'none', borderBottom: `1px solid ${C.border}` }}>{label}</Link>)}
               <button type="button" onClick={handleLogout} style={{ width: '100%', background: 'transparent', border: 'none', color: C.red, fontSize: 13, padding: '10px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>Выйти</button>
             </div>}
           </div>

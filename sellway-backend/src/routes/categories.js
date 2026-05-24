@@ -11,11 +11,15 @@ router.get('/', optionalAuth, async (req, res) => {
   const isAdmin = ['admin', 'moderator'].includes(req.user?.role);
   const categoryType = normalizeType(req.query.type || req.query.category_type);
   const { rows } = await query(
-    `SELECT id, category_type, name, slug, image_url, emoji, description, parent_id, is_active, sort_order, product_count
-     FROM categories
-     WHERE category_type=$1
-       AND ($2::boolean = TRUE OR is_active=TRUE)
-     ORDER BY COALESCE(parent_id, id), parent_id NULLS FIRST, sort_order, name`,
+    `SELECT c.id, c.category_type, c.name, c.slug, c.image_url, c.emoji, c.description, c.parent_id,
+            c.is_active, c.sort_order, c.product_count,
+            parent.image_url AS parent_image_url,
+            COALESCE(c.image_url, parent.image_url) AS display_image_url
+     FROM categories c
+     LEFT JOIN categories parent ON parent.id=c.parent_id
+     WHERE c.category_type=$1
+       AND ($2::boolean = TRUE OR c.is_active=TRUE)
+     ORDER BY COALESCE(c.parent_id, c.id), c.parent_id NULLS FIRST, c.sort_order, c.name`,
     [categoryType, isAdmin]
   );
   res.json(rows);

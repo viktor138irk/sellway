@@ -114,9 +114,9 @@ router.get('/', optionalAuth, async (req, res) => {
       `SELECT p.id, p.title, p.short_desc, p.price, p.old_price, p.status,
               p.delivery_type, p.keys_count, p.rating, p.reviews_count,
               p.sales_count, p.tags, p.guarantee_days, p.seller_id, p.meta,
-              c.name AS category_name, c.slug AS category_slug, c.category_type, c.image_url AS category_image_url, c.emoji AS category_emoji,
+              c.name AS category_name, c.slug AS category_slug, c.category_type, COALESCE(c.image_url, parent.image_url) AS category_image_url, c.emoji AS category_emoji,
               parent.id AS parent_category_id, parent.name AS parent_category_name, parent.slug AS parent_category_slug,
-              u.username AS seller_name, u.role AS seller_role,
+              u.username AS seller_name, u.avatar_url AS seller_avatar, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
               (SELECT url FROM product_images WHERE product_id=p.id AND is_main=TRUE LIMIT 1) AS main_image,
               (SELECT COALESCE(json_agg(url ORDER BY sort_order), '[]'::json) FROM product_images WHERE product_id=p.id) AS images,
@@ -151,7 +151,7 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.category_type, c.image_url AS category_image_url, c.emoji AS category_emoji, c.parent_id AS parent_category_id,
+      `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.category_type, COALESCE(c.image_url, parent.image_url) AS category_image_url, c.emoji AS category_emoji, c.parent_id AS parent_category_id,
               u.username AS seller_name, u.avatar_url AS seller_avatar, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
               s.response_time_min, s.description AS seller_description, s.is_online AS seller_online,
@@ -160,6 +160,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
               (SELECT COUNT(*)::int FROM product_files WHERE product_id=p.id) AS files_count
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN categories parent ON parent.id = c.parent_id
        LEFT JOIN users u ON u.id = p.seller_id
        LEFT JOIN sellers s ON s.user_id = p.seller_id
        WHERE p.id = $1 AND (p.status = 'active' OR p.seller_id = $2)`,

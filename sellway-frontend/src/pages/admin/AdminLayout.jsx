@@ -26,7 +26,15 @@ const SECTIONS = [
     items: [
       ['/admin/categories', '📂', 'Категории товаров'],
       ['/admin/service-categories', '🧑‍💻', 'Категории услуг'],
-      ['/admin/settings',   '⚙️', 'Настройки'],
+    ],
+  },
+  {
+    title: 'НАСТРОЙКИ',
+    items: [
+      ['/admin/settings/finance', '💰', 'Финансы'],
+      ['/admin/settings/telegram', '✈️', 'Настройки телеграм'],
+      ['/admin/settings/notifications', '✉️', 'Уведомления'],
+      ['/admin/settings/system', '⚙️', 'Система'],
     ],
   },
 ];

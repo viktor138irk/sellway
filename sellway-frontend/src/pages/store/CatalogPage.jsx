@@ -22,8 +22,6 @@ function ProductCard({ p, compact }) {
         <div style={{ position: 'absolute', top: 7, left: 7, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {disc > 0 && <span style={{ background: C.red, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>-{disc}%</span>}
           {service && <span style={{ background: C.accent, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>Услуга</span>}
-          {p.delivery_type === 'auto' && <span style={{ background: C.green, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>Авто</span>}
-          {p.delivery_type === 'file' && <span style={{ background: C.green, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>Файл</span>}
         </div>
       </div>
       <div style={{ padding: compact ? '9px 10px' : '10px 11px', display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 0 }}>
@@ -34,7 +32,7 @@ function ProductCard({ p, compact }) {
         <div style={{ fontSize: 12, color: C.t1, lineHeight: 1.35, minHeight: 33, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.title}</div>
         {p.rating > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Stars n={p.rating} size={10} /><span style={{ fontSize: 10, color: C.t3 }}>{parseFloat(p.rating).toFixed(1)}</span></div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', paddingTop: 6, borderTop: `1px solid ${C.border}`, minWidth: 0 }}>
-          <div style={{ width: 17, height: 17, borderRadius: '50%', background: service ? C.accent : C.green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#fff', flexShrink: 0 }}>{p.seller_name?.[0]?.toUpperCase()}</div>
+          <SellerLogo seller={p} service={service} />
           <span style={{ fontSize: 10, color: C.t2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.seller_name}</span>
         </div>
       </div>
@@ -42,10 +40,15 @@ function ProductCard({ p, compact }) {
   );
 }
 
+const categoryImage = cat => cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
+const categoryInitial = cat => String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
+const SellerLogo = ({ seller, service }) => <div style={{ width: 17, height: 17, borderRadius: '50%', background: service ? C.accent : C.green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#fff', overflow:'hidden', flexShrink: 0 }}>{seller.seller_avatar ? <img src={seller.seller_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : seller.seller_name?.[0]?.toUpperCase()}</div>;
+
 function CategoryRow({ cat, active, onClick, indent = 0 }) {
+  const img = categoryImage(cat);
   return <button type="button" onClick={onClick} style={{ width: '100%', padding: `8px 10px 8px ${10 + indent}px`, borderRadius: 7, cursor: 'pointer', fontSize: 13, marginBottom: 2, background: active ? '#1A1A30' : 'transparent', border: 'none', borderLeft: `3px solid ${active ? C.accent : 'transparent'}`, color: active ? C.accentL : C.t2, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', textAlign: 'left', fontFamily: 'inherit' }}>
     <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-      {cat.image_url ? <img src={cat.image_url} style={{ width: 16, height: 16, borderRadius: 4, objectFit: 'cover' }} alt="" /> : <span style={{ fontSize: 14 }}>{cat.emoji || '•'}</span>}
+      {img ? <img src={img} style={{ width: 16, height: 16, borderRadius: 4, objectFit: 'cover' }} alt="" /> : <span style={{ width: 16, height: 16, borderRadius: 4, background: '#1A1A28', color: C.t2, fontSize: 10, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{categoryInitial(cat)}</span>}
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
     </span>
     <span style={{ fontSize: 10, color: C.t3 }}>{(cat.product_count || 0).toLocaleString('ru')}</span>

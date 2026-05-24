@@ -7,6 +7,7 @@ const { query, transaction } = require('../config/db');
 const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
+const { paySellerReferral } = require('../services/referrals');
 
 const ENV_FILE = path.resolve(__dirname, '..', '..', '.env');
 const ENV_SETTINGS = {
@@ -274,11 +275,12 @@ router.get('/products', async (req, res) => {
   const offset = (page - 1) * limit;
   try {
     const { rows } = await query(
-      `SELECT p.*, c.name AS category_name, c.category_type, c.image_url AS category_image_url, c.emoji AS category_emoji,
+      `SELECT p.*, c.name AS category_name, c.category_type, COALESCE(c.image_url, parent.image_url) AS category_image_url, c.emoji AS category_emoji,
               u.username AS seller_name, u.email AS seller_email,
               (SELECT url FROM product_images WHERE product_id=p.id AND is_main=TRUE LIMIT 1) AS main_image
        FROM products p
        LEFT JOIN categories c ON c.id=p.category_id
+       LEFT JOIN categories parent ON parent.id=c.parent_id
        JOIN users u ON u.id=p.seller_id
        WHERE p.status=$1
        ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,
@@ -533,6 +535,82 @@ router.put('/settings', requireRole('admin'), async (req, res) => {
   } catch (err) {
     logger.error('Settings update error', { err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.post('/settings/actions/reset-moderation-stats', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await query(
+      `UPDATE products
+       SET moderated_by=NULL, moderated_at=NULL, reject_reason=NULL
+       WHERE moderated_by IS NOT NULL OR moderated_at IS NOT NULL OR reject_reason IS NOT NULL
+       RETURNING id`
+    );
+    await query(
+      `INSERT INTO audit_logs (user_id, action, entity, entity_id, new_data)
+       VALUES ($1,'reset_moderation_stats','system',NULL,$2::jsonb)`,
+      [req.user.id, JSON.stringify({ affected_products: rows.length })]
+    ).catch(() => {});
+    logger.info('Moderation stats reset', { adminId: req.user.id, count: rows.length });
+    res.json({ message: `Статистика модерации сброшена. Затронуто товаров: ${rows.length}`, count: rows.length });
+  } catch (err) {
+    logger.error('Reset moderation stats error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сброса статистики модерации' });
+  }
+});
+
+router.post('/settings/actions/auto-confirm-expired', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await transaction(async (client) => {
+      const { rows: orders } = await client.query(
+        `SELECT *
+         FROM orders
+         WHERE status='delivered'
+           AND auto_confirm_at IS NOT NULL
+           AND auto_confirm_at <= NOW()
+         ORDER BY auto_confirm_at ASC
+         FOR UPDATE SKIP LOCKED`
+      );
+
+      const confirmed = [];
+      for (const order of orders) {
+        await client.query("UPDATE orders SET status='confirmed', confirmed_at=NOW() WHERE id=$1", [order.id]);
+        await client.query('UPDATE wallets SET held=GREATEST(held-$1,0) WHERE user_id=$2', [order.amount, order.buyer_id]);
+        await client.query('UPDATE wallets SET balance=balance+$1, total_in=total_in+$1 WHERE user_id=$2', [order.seller_amount, order.seller_id]);
+        await client.query(
+          `INSERT INTO transactions (user_id, order_id, type, amount, description)
+           VALUES ($1,$2,'release',$3,$4)`,
+          [order.buyer_id, order.id, order.amount, `Авто-подтверждение заказа ${order.order_number}`]
+        );
+        await client.query(
+          `INSERT INTO transactions (user_id, order_id, type, amount, description)
+           VALUES ($1,$2,'credit',$3,$4)`,
+          [order.seller_id, order.id, order.seller_amount, `Выплата за заказ ${order.order_number}`]
+        );
+        await client.query('UPDATE sellers SET total_sales=total_sales+1 WHERE user_id=$1', [order.seller_id]);
+        await client.query('UPDATE products SET sales_count=sales_count+1 WHERE id=$1', [order.product_id]);
+        const referral = await paySellerReferral(client, order);
+        const referralText = referral?.paid ? ` Реферальная выплата: ${referral.amount.toLocaleString('ru')} ₽.` : '';
+        await client.query(
+          `INSERT INTO order_messages (order_id, sender_id, message, is_system)
+           VALUES ($1,$2,$3,TRUE)`,
+          [order.id, req.user.id, `Сделка автоматически завершена администратором после истечения срока подтверждения. Средства переведены продавцу.${referralText}`]
+        );
+        confirmed.push({ id: order.id, order_number: order.order_number, buyer_id: order.buyer_id, seller_id: order.seller_id });
+      }
+
+      return confirmed;
+    });
+
+    await Promise.all(result.flatMap(order => [
+      notify.create(order.buyer_id, 'order_confirmed', 'Сделка завершена автоматически', `Заказ ${order.order_number} закрыт после истечения срока подтверждения.`, `/orders/${order.id}`).catch(() => {}),
+      notify.create(order.seller_id, 'order_confirmed', 'Сделка завершена автоматически', `Средства по заказу ${order.order_number} зачислены на баланс.`, `/orders/${order.id}`).catch(() => {}),
+    ]));
+    logger.info('Expired orders auto-confirmed', { adminId: req.user.id, count: result.length });
+    res.json({ message: `Просроченные сделки завершены: ${result.length}`, count: result.length, orders: result });
+  } catch (err) {
+    logger.error('Auto-confirm expired orders error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка завершения просроченных сделок' });
   }
 });
 

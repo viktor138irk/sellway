@@ -24,11 +24,12 @@ function createProxyAgent() {
 }
 
 const agent = createProxyAgent();
+const pollingEnabled = require.main === module || process.env.TELEGRAM_POLLING === 'true';
 const bot = new TelegramBot(telegramToken, {
-  polling: true,
+  polling: pollingEnabled,
   ...(agent && { request: { agent } }),
 });
-logger.info('Telegram bot started');
+logger.info(pollingEnabled ? 'Telegram bot polling started' : 'Telegram bot client ready');
 
 // ── Helpers ───────────────────────────────────────────
 const EMOJI = { ok: '✅', err: '❌', warn: '⚠️', money: '💰', order: '🛒', key: '🔑', dispute: '🚨', lock: '🔒', bell: '🔔' };
@@ -53,10 +54,11 @@ async function getTelegramUser(userId) {
 
 const fmt = (a) => parseFloat(a).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽';
 
+const isSellerRole = role => ['seller', 'freelancer', 'admin'].includes(role);
 const mainKb = (role) => ({
   reply_markup: {
     keyboard: [
-      role === 'seller'
+      isSellerRole(role)
         ? [{ text: '📊 Баланс' }, { text: '📦 Мои товары' }]
         : [{ text: '🛒 Мои заказы' }],
       [{ text: '🔔 Уведомления' }, { text: '❓ Помощь' }],
@@ -162,7 +164,7 @@ bot.onText(/\/orders|🛒 Мои заказы|📦 Мои товары/, async (
   if (!user) return bot.sendMessage(chatId, '❗ Сначала привяжи аккаунт: /start');
 
   try {
-    const field = user.role === 'seller' ? 'seller_id' : 'buyer_id';
+    const field = isSellerRole(user.role) ? 'seller_id' : 'buyer_id';
     const { rows } = await query(
       `SELECT o.order_number, o.status, o.amount, p.title, o.created_at
        FROM orders o JOIN products p ON p.id=o.product_id

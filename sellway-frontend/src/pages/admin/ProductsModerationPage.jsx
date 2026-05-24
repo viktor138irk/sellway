@@ -21,7 +21,7 @@ function money(v) { return Number(v || 0).toLocaleString('ru') + ' ₽'; }
 function isService(p) { return p.delivery_type === 'service'; }
 function CategoryIcon({ product, size = 20 }) {
   return <span style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-    {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(12, size * .55) }}>{product.category_emoji || '📂'}</span>}
+    {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(10, size * .45), fontWeight: 900, color: C.t2 }}>{String(product.category_name || '?').trim().slice(0, 1).toUpperCase()}</span>}
   </span>;
 }
 

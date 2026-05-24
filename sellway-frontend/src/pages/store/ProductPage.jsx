@@ -5,12 +5,13 @@ import { createCheckout } from '../../api/payments';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { C, Spinner, Btn, Stars, Modal, Badge, Textarea, Input } from '../../components/UI';
+import useMediaQuery from '../../hooks/useMediaQuery';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const isService = p => p?.delivery_type === 'service';
 function CategoryIcon({ product, size = 20 }) {
   return <span style={{ width:size, height:size, borderRadius:6, overflow:'hidden', background:'#0A0A14', border:`1px solid ${C.border}`, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-    {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:Math.max(12, size * .55) }}>{product.category_emoji || '📂'}</span>}
+    {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:Math.max(10, size * .45), fontWeight:900, color:C.t2 }}>{String(product.category_name || '?').trim().slice(0, 1).toUpperCase()}</span>}
   </span>;
 }
 
@@ -28,6 +29,7 @@ export default function ProductPage() {
   const [checkoutEmail, setCheckoutEmail] = useState('');
   const [serviceMessage, setServiceMessage] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const isMobile = useMediaQuery('(max-width: 760px)');
 
   useEffect(() => {
     setLoading(true);
@@ -98,14 +100,14 @@ export default function ProductPage() {
   const serviceSteps = product.meta?.service_steps || [];
 
   return (
-    <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 20px' }} className="fade-in">
+    <div style={{ maxWidth:1100, margin:'0 auto', padding:isMobile ? '16px 12px' : '24px 20px', width:'100%', boxSizing:'border-box' }} className="fade-in">
       <div style={{ display:'flex', gap:6, fontSize:12, color:C.t2, marginBottom:22, alignItems:'center', flexWrap:'wrap' }}>
         <Link to="/" style={{ color:C.accent, textDecoration:'none' }}>Главная</Link><span>/</span>
         <Link to="/catalog" style={{ color:C.accent, textDecoration:'none' }}>Каталог</Link>
         {product.category_name && <><span>/</span><Link to={`/catalog?kind=${categoryKind}&category=${product.category_slug}`} style={{ color:C.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:5 }}><CategoryIcon product={product} size={18}/>{product.category_name}</Link></>}
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 420px) 1fr', gap:28 }}>
+      <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'minmax(280px, 420px) 1fr', gap:isMobile ? 18 : 28 }}>
         <div>
           <div style={{ background:'#0A0A14', borderRadius:16, overflow:'hidden', aspectRatio:'1', border:`1px solid ${C.border}`, marginBottom:10, position:'relative' }}>
             {images.length > 0 ? <img src={images[imgIdx]} alt={product.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>{service ? '🧑‍💻' : '📦'}</div>}
@@ -170,7 +172,7 @@ export default function ProductPage() {
 
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'14px 18px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:42, height:42, borderRadius:12, background:service?C.accent:C.green, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, color:'#fff', flexShrink:0 }}>{product.seller_name?.[0]?.toUpperCase()}</div>
+              <div style={{ width:42, height:42, borderRadius:12, background:service?C.accent:C.green, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, color:'#fff', flexShrink:0, overflow:'hidden' }}>{product.seller_avatar ? <img src={product.seller_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : product.seller_name?.[0]?.toUpperCase()}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>{product.seller_name}</div>
                 {product.seller_rating > 0 && <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3 }}><Stars n={product.seller_rating} size={12}/><span style={{ fontSize:11, color:C.t2 }}>{parseFloat(product.seller_rating).toFixed(1)} · {product.seller_sales} продаж</span></div>}
