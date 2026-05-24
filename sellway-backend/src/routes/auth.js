@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const { query, transaction } = require('../config/db');
@@ -348,6 +349,20 @@ router.put('/profile', require('../middleware/auth').auth, [
   } catch (err) {
     logger.error('Profile update error', { err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ── POST /auth/telegram-link ── Генерация ссылки привязки Telegram для любого пользователя ──
+router.post('/telegram-link', require('../middleware/auth').auth, async (req, res) => {
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
+    const expires = new Date(Date.now() + 10 * 60 * 1000);
+    await query('UPDATE users SET telegram_link_token=$1, telegram_link_expires=$2 WHERE id=$3', [token, expires, req.user.id]);
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'SellWayBot';
+    res.json({ link: `https://t.me/${botUsername}?start=${token}`, token, expiresAt: expires });
+  } catch (err) {
+    logger.error('Telegram link error', { err: err.message, userId: req.user?.id });
+    res.status(500).json({ error: 'Ошибка генерации ссылки Telegram' });
   }
 });
 

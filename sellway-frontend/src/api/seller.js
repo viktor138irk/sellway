@@ -4,7 +4,7 @@ export const getReferrals   = () => client.get('/seller/referrals');
 export const applyReferrals = (data) => client.post('/seller/referrals/apply', data);
 export const requestWithdraw = (data) => client.post('/seller/withdrawal', data);
 export const getWithdrawConfig = () => client.get('/seller/withdrawal/config');
-export const getTelegramLink = () => client.post('/seller/telegram-link');
+export const getTelegramLink = () => client.post('/auth/telegram-link');
 export const uploadSellerAvatar = (formData) => client.post('/seller/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const getNotifications = () => client.get('/notifications');
 export const readAllNotifs    = () => client.post('/notifications/read-all');
