@@ -51,6 +51,7 @@ const PAGES = {
       ]},
       { title: 'SOCKS5 для Telegram', keys: [
         ['PROXY_ENABLED','Использовать SOCKS5','toggle','false','Нужно, если Telegram недоступен напрямую'],
+        ['PROXY_SCHEME','Схема прокси','text','socks5h','Рекомендуется socks5h, чтобы DNS api.telegram.org резолвил прокси'],
         ['PROXY_HOST','Хост прокси','text','127.0.0.1','IP или домен прокси'],
         ['PROXY_PORT','Порт прокси','number','1080',''],
         ['PROXY_USERNAME','Логин прокси','text','','Оставь пустым, если авторизация не нужна'],
@@ -94,7 +95,7 @@ const PAGES = {
 
 const RESTART_KEYS = new Set([
   'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_BOT_TOKEN', 'TELEGRAM_ADMIN_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID',
-  'PROXY_ENABLED', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_USERNAME', 'PROXY_PASSWORD',
+  'PROXY_ENABLED', 'PROXY_SCHEME', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_USERNAME', 'PROXY_PASSWORD',
   'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS',
   'SMSPILOT_ENABLED', 'SMSPILOT_API_KEY', 'SMSPILOT_SENDER', 'SMS_CODE_TEMPLATE',
 ]);

@@ -18,6 +18,7 @@ const ENV_SETTINGS = {
   TELEGRAM_ADMIN_BOT_USERNAME: 'Username отдельного админского Telegram-бота без @',
   TELEGRAM_ADMIN_CHAT_ID: 'Chat ID администратора для уведомлений',
   PROXY_ENABLED: 'Включить SOCKS5-прокси для Telegram',
+  PROXY_SCHEME: 'Схема SOCKS-прокси: socks5h рекомендуется для Telegram',
   PROXY_HOST: 'Хост SOCKS5-прокси',
   PROXY_PORT: 'Порт SOCKS5-прокси',
   PROXY_USERNAME: 'Логин SOCKS5-прокси',

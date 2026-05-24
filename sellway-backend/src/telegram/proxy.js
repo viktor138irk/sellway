@@ -7,10 +7,11 @@ function proxyEnabled() {
 
 function proxySummary() {
   if (!proxyEnabled()) return 'disabled';
+  const scheme = process.env.PROXY_SCHEME || 'socks5h';
   const host = process.env.PROXY_HOST || '';
   const port = process.env.PROXY_PORT || '';
   const auth = process.env.PROXY_USERNAME ? 'auth' : 'no-auth';
-  return `${host}:${port} (${auth})`;
+  return `${scheme}://${host}:${port} (${auth})`;
 }
 
 function createTelegramRequestOptions(label = 'Telegram') {
@@ -18,6 +19,7 @@ function createTelegramRequestOptions(label = 'Telegram') {
 
   const host = process.env.PROXY_HOST;
   const port = process.env.PROXY_PORT;
+  const scheme = process.env.PROXY_SCHEME || 'socks5h';
   const username = process.env.PROXY_USERNAME;
   const password = process.env.PROXY_PASSWORD;
 
@@ -29,8 +31,8 @@ function createTelegramRequestOptions(label = 'Telegram') {
   const auth = username && password
     ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
     : '';
-  const proxyUrl = `socks5://${auth}${host}:${port}`;
-  logger.info(`${label} using SOCKS5 proxy`, { host, port, auth: Boolean(username && password) });
+  const proxyUrl = `${scheme}://${auth}${host}:${port}`;
+  logger.info(`${label} using SOCKS proxy`, { scheme, host, port, auth: Boolean(username && password) });
 
   return {
     request: {
