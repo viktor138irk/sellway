@@ -15,6 +15,7 @@ const server = http.createServer(app);
 
 ['uploads','logs'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
+app.set('trust proxy', Number(process.env.TRUST_PROXY || 1));
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: [process.env.FRONTEND_URL||'https://sellway.pro','http://localhost:5173'], credentials: true }));
 app.use('/api/auth', rateLimit({ windowMs: 15*60*1000, max: 30, message: { error: 'Слишком много запросов' } }));
