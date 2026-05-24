@@ -3,6 +3,7 @@ const { transaction } = require('../config/db');
 const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
+const { canUseReferralProgram, referralRequirements } = require('../services/referralEligibility');
 
 router.use(auth, requireRole('admin'));
 
@@ -24,8 +25,9 @@ router.post('/referrals/:userId/approve', async (req, res) => {
     const result = await transaction(async (client) => {
       const user = await loadUserForReferral(client, req.params.userId);
       if (!user) throw { status: 404, message: 'Пользователь не найден' };
-      if (!user.email_verified || !user.phone_verified || !user.telegram_verified) {
-        throw { status: 400, message: 'Нельзя одобрить: email, телефон и Telegram должны быть подтверждены' };
+      if (!canUseReferralProgram(user)) {
+        const req = referralRequirements(user);
+        throw { status: 400, message: req.full ? 'Нельзя одобрить: email, телефон и Telegram должны быть подтверждены' : 'Нельзя одобрить: email должен быть подтверждён' };
       }
       const { rows: [updated] } = await client.query(
         `UPDATE sellers

@@ -83,6 +83,12 @@ function ServiceStepsEditor({ steps, onChange }) {
   );
 }
 
+function CategoryIcon({ cat, size = 30 }) {
+  return <span style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    {cat?.image_url ? <img src={cat.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(14, size * .5) }}>{cat?.emoji || '📂'}</span>}
+  </span>;
+}
+
 function ProductForm({ productId, onSave, onCancel, user }) {
   const toast = useToast();
   const mode = roleMode(user?.role);
@@ -102,6 +108,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
   const setFromInput = k => e => set(k)(e.target.value);
   const rootCats = cats.filter(c => !c.parent_id);
   const subCats = cats.filter(c => c.parent_id === parentCategoryId);
+  const selectedCategory = cats.find(c => c.id === form.category_id) || cats.find(c => c.id === parentCategoryId);
 
   useEffect(() => {
     getCategories().then(r => setCats(r.data)).catch(() => {});
@@ -169,6 +176,10 @@ function ProductForm({ productId, onSave, onCancel, user }) {
           <option value={subCats.length ? '' : parentCategoryId}>{subCats.length ? 'Выберите подкатегорию' : 'Без подкатегории'}</option>
           {subCats.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
         </Select>
+        {selectedCategory && <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', alignSelf: 'end' }}>
+          <CategoryIcon cat={selectedCategory} />
+          <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, color: C.t3 }}>Выбрана категория</div><div style={{ fontSize: 13, color: C.t1, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCategory.name}</div></div>
+        </div>}
         {!service && <Select label="Тип выдачи" value={form.delivery_type} onChange={e => set('delivery_type')(e.target.value)}>
           <option value="auto">🔑 Автовыдача ключей</option>
           <option value="file">📎 Автовыдача файла</option>
@@ -282,7 +293,10 @@ export default function ProductsPage({ mode }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start', marginBottom: 8 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: C.t1, lineHeight: 1.35 }}>{p.title}</div>
-                      <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>{p.category_name || 'Без категории'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.t3, marginTop: 5 }}>
+                        <CategoryIcon cat={{ image_url: p.category_image_url, emoji: p.category_emoji }} size={20} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.category_name || 'Без категории'}</span>
+                      </div>
                     </div>
                     <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20, whiteSpace: 'nowrap', background: (STATUS_COLOR[p.status] || C.t3) + '22', color: STATUS_COLOR[p.status] || C.t3 }}>{STATUS_LABEL[p.status] || p.status}</span>
                   </div>

@@ -10,6 +10,7 @@ const HomePage       = lazy(() => import('./pages/store/HomePage'));
 const CatalogPage    = lazy(() => import('./pages/store/CatalogPage'));
 const ProductPage    = lazy(() => import('./pages/store/ProductPage'));
 const OrderPage      = lazy(() => import('./pages/order/OrderPage'));
+const TermsPage      = lazy(() => import('./pages/legal/TermsPage'));
 const LoginPage    = lazy(() => import('./pages/auth/AuthPages').then(m=>({default:m.LoginPage})));
 const RegisterPage = lazy(() => import('./pages/auth/AuthPages').then(m=>({default:m.RegisterPage})));
 const SellerDashboard  = lazy(() => import('./pages/seller/DashboardPage'));
@@ -61,6 +62,7 @@ function AppRoutes() {
     <Route path="/login" element={<GuestOnly><LoginPage/></GuestOnly>}/>
     <Route path="/register" element={<GuestOnly><RegisterPage/></GuestOnly>}/>
     <Route path="/orders/:id" element={<Protected><OrderPage/></Protected>}/>
+    <Route path="/terms" element={<TermsPage/>}/>
     <Route path="/seller" element={<Protected roles={SELLER_ROLES}><SellerDashboard/></Protected>}/>
     <Route path="/seller/products" element={<Protected roles={SELLER_ROLES}><ProductsPage/></Protected>}/>
     <Route path="/seller/products/new" element={<Protected roles={SELLER_ROLES}><ProductsPage mode="create"/></Protected>}/>

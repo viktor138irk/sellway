@@ -80,7 +80,7 @@ function CategoryForm({ initial, parent, categories, onSave, onCancel }) {
         </div>
       </div>
       <Input label="Название *" value={name} onChange={e => onName(e.target.value)} placeholder="Сайты" />
-      <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
+      <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?kind=products&category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
       <Select label="Родительская категория" value={parentId} onChange={e => setParentId(e.target.value)}>
         <option value="">Нет, это основная категория</option>
         {categories.filter(c => !c.parent_id && c.id !== initial?.id).map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}

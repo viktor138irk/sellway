@@ -12,7 +12,7 @@ const auth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const { rows } = await query(
-      'SELECT id, email, username, role, status FROM users WHERE id = $1',
+      'SELECT id, email, username, role, status, email_verified, phone_verified, telegram_verified FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -42,7 +42,7 @@ const optionalAuth = async (req, res, next) => {
     if (!authHeader?.startsWith('Bearer ')) return next();
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { rows } = await query('SELECT id, email, username, role, status FROM users WHERE id = $1', [decoded.userId]);
+    const { rows } = await query('SELECT id, email, username, role, status, email_verified, phone_verified, telegram_verified FROM users WHERE id = $1', [decoded.userId]);
     if (rows[0]) req.user = rows[0];
   } catch {}
   next();

@@ -274,7 +274,7 @@ router.get('/products', async (req, res) => {
   const offset = (page - 1) * limit;
   try {
     const { rows } = await query(
-      `SELECT p.*, c.name AS category_name,
+      `SELECT p.*, c.name AS category_name, c.image_url AS category_image_url, c.emoji AS category_emoji,
               u.username AS seller_name, u.email AS seller_email,
               (SELECT url FROM product_images WHERE product_id=p.id AND is_main=TRUE LIMIT 1) AS main_image
        FROM products p

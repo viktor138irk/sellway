@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Input, Toggle, Select } from '../../components/UI';
-import { getAdminReferrals, saveReferralSettings } from '../../api/admin';
+import { getAdminReferrals, saveReferralSettings, approveReferral, rejectReferral } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
@@ -35,11 +35,24 @@ export default function AdminReferralsPage() {
     finally { setSaving(false); }
   }
 
+  async function approve(userId) {
+    try { await approveReferral(userId, {}); toast.success('Заявка одобрена'); load(); }
+    catch (err) { toast.error(err.response?.data?.error || 'Ошибка одобрения'); }
+  }
+
+  async function reject(userId) {
+    const reason = window.prompt('Причина отказа');
+    if (!reason?.trim()) return;
+    try { await rejectReferral(userId, reason.trim()); toast.success('Заявка отклонена'); load(); }
+    catch (err) { toast.error(err.response?.data?.error || 'Ошибка отказа'); }
+  }
+
   if (loading) return <AdminLayout><div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh' }}><Spinner size={40}/></div></AdminLayout>;
   const summary = data?.summary || {};
   const top = data?.topReferrers || [];
   const invited = data?.invited || [];
   const payments = data?.recentPayments || [];
+  const applications = data?.applications || [];
 
   return <AdminLayout><div style={{ padding:'24px 28px', display:'flex', flexDirection:'column', gap:20 }} className="fade-in">
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
@@ -74,6 +87,28 @@ export default function AdminReferralsPage() {
       <Tile label="Выплат" value={summary.payments_count || 0} />
       <Tile label="Рефереров" value={summary.referrers_count || 0} />
       <Tile label="Приглашённых" value={summary.invited_count || 0} />
+    </div>
+
+    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+      <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Заявки на участие</div>
+      {applications.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.t3, fontSize:13 }}>Нет заявок</div> : applications.map(u => {
+        const pending = u.referral_application_status === 'pending';
+        return <div key={u.user_id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:12, alignItems:'center', padding:'13px 18px', borderBottom:`1px solid ${C.border}` }}>
+          <div>
+            <div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div>
+            <div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · {pending ? 'ожидает' : 'отклонён'}</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:7 }}>
+              {[['Email', u.email_verified], ['Телефон', u.phone_verified], ['Telegram', u.telegram_verified]].map(([l, ok]) => <span key={l} style={{ fontSize:10, color:ok ? C.green : C.amber, background:(ok ? C.green : C.amber) + '18', borderRadius:999, padding:'2px 7px', fontWeight:800 }}>{l}: {ok ? 'OK' : 'нет'}</span>)}
+            </div>
+            {u.referral_reject_reason && <div style={{ fontSize:11, color:C.red, marginTop:6 }}>Причина: {u.referral_reject_reason}</div>}
+          </div>
+          <div style={{ fontSize:11, color:C.t3, textAlign:'right' }}>{u.referral_requested_at ? new Date(u.referral_requested_at).toLocaleString('ru') : '—'}</div>
+          <div style={{ display:'flex', gap:8 }}>
+            {pending && <><Btn size="sm" variant="danger" onClick={() => reject(u.user_id)}>Отказать</Btn><Btn size="sm" variant="green" onClick={() => approve(u.user_id)}>Одобрить</Btn></>}
+            {!pending && <Btn size="sm" variant="ghost" onClick={() => approve(u.user_id)}>Одобрить</Btn>}
+          </div>
+        </div>;
+      })}
     </div>
 
     <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(340px,.8fr)', gap:16 }}>

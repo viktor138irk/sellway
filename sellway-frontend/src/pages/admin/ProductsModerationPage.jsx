@@ -19,6 +19,11 @@ const DELIVERY = {
 
 function money(v) { return Number(v || 0).toLocaleString('ru') + ' ₽'; }
 function isService(p) { return p.delivery_type === 'service'; }
+function CategoryIcon({ product, size = 20 }) {
+  return <span style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(12, size * .55) }}>{product.category_emoji || '📂'}</span>}
+  </span>;
+}
 
 function ProductDetail({ product, onClose, onAction }) {
   const [reason, setReason] = useState('');
@@ -42,7 +47,7 @@ function ProductDetail({ product, onClose, onAction }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'start', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 900, color: C.t1 }}>{product.title}</div>
-              <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{product.category_name || 'Без категории'} · {deliveryLabel}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.t3, marginTop: 5 }}><CategoryIcon product={product} />{product.category_name || 'Без категории'} · {deliveryLabel}</div>
             </div>
             <div style={{ fontSize: 20, fontWeight: 900, color: C.t1, whiteSpace: 'nowrap' }}>{isService(product) ? 'от ' : ''}{money(product.price)}</div>
           </div>
@@ -109,7 +114,7 @@ function ModerationCard({ product, filter, onSelect, onAction }) {
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 900, color: C.t1, lineHeight: 1.35 }}>{product.title}</div>
-          <div style={{ fontSize: 11, color: C.t3, marginTop: 4 }}>{product.seller_name || '—'} · {product.category_name || 'Без категории'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.t3, marginTop: 5 }}><CategoryIcon product={product} />{product.seller_name || '—'} · {product.category_name || 'Без категории'}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Цена</div><div style={{ fontSize: 14, fontWeight: 900, color: C.t1 }}>{service ? 'от ' : ''}{money(product.price)}</div></div>

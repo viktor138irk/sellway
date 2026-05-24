@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import SellerLayout from '../../components/Layout/SellerLayout';
-import { C, Spinner, Btn } from '../../components/UI';
-import { getReferrals } from '../../api/seller';
+import { C, Spinner, Btn, Textarea } from '../../components/UI';
+import { getReferrals, applyReferrals } from '../../api/seller';
 import { useToast } from '../../contexts/ToastContext';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
@@ -19,14 +19,32 @@ export default function ReferralsPage() {
   const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [note, setNote] = useState('');
+  const [applying, setApplying] = useState(false);
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
     getReferrals().then(r => setData(r.data)).catch(() => toast.error('Ошибка загрузки рефералов')).finally(() => setLoading(false));
-  }, []);
+  }
+  useEffect(load, []);
 
   async function copy(text, label) {
     try { await navigator.clipboard.writeText(text || ''); toast.success(`${label} скопирован`); }
     catch { toast.error('Не удалось скопировать'); }
+  }
+
+  async function apply() {
+    setApplying(true);
+    try {
+      await applyReferrals({ note });
+      toast.success('Заявка отправлена');
+      setNote('');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось отправить заявку');
+    } finally {
+      setApplying(false);
+    }
   }
 
   if (loading) return <SellerLayout><div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:400 }}><Spinner size={40}/></div></SellerLayout>;
@@ -34,6 +52,10 @@ export default function ReferralsPage() {
   const summary = data?.summary || {};
   const referred = data?.referred || [];
   const payments = data?.payments || [];
+  const req = referral.requirements || {};
+  const ready = Boolean(req.email && req.phone && req.telegram);
+  const status = referral.applicationStatus || 'not_requested';
+  const statusLabel = { not_requested: 'Заявка не отправлена', pending: 'На модерации', approved: 'Одобрено', rejected: 'Отклонено' }[status] || status;
 
   return <SellerLayout><div style={{ padding:'clamp(16px,4vw,28px)', display:'flex', flexDirection:'column', gap:22 }} className="fade-in">
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
@@ -42,10 +64,22 @@ export default function ReferralsPage() {
         <div style={{ fontSize:13, color:C.t2 }}>Приглашайте продавцов и фрилансеров, получайте выплаты автоматически после подтверждения их сделок.</div>
       </div>
       <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-        <Btn variant="ghost" onClick={() => copy(referral.code, 'Код')}>Копировать код</Btn>
-        <Btn onClick={() => copy(referral.link, 'Ссылка')}>Копировать ссылку</Btn>
+        <Btn variant="ghost" onClick={() => copy(referral.code, 'Код')} disabled={!referral.code}>Копировать код</Btn>
+        <Btn onClick={() => copy(referral.link, 'Ссылка')} disabled={!referral.link}>Копировать ссылку</Btn>
       </div>
     </div>
+
+    {status !== 'approved' && <div style={{ background:C.card, border:`1px solid ${status === 'rejected' ? C.red + '55' : C.border}`, borderRadius:16, padding:18 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', gap:12, flexWrap:'wrap', alignItems:'center', marginBottom:14 }}>
+        <div><div style={{ fontSize:15, color:C.t1, fontWeight:900 }}>Доступ к реферальной программе</div><div style={{ fontSize:12, color:C.t2, marginTop:4 }}>Участие доступно после подтверждения телефона, Telegram и одобрения администратором.</div></div>
+        <div style={{ fontSize:12, color:status === 'rejected' ? C.red : status === 'pending' ? C.amber : C.t2, fontWeight:800 }}>{statusLabel}</div>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10, marginBottom:14 }}>
+        {[['Email', req.email], ['Телефон', req.phone], ['Telegram', req.telegram]].map(([label, ok]) => <div key={label} style={{ background:'#0A0A12', border:`1px solid ${ok ? C.green + '44' : C.border}`, borderRadius:10, padding:10 }}><div style={{ fontSize:12, color:C.t2 }}>{label}</div><div style={{ fontSize:13, color:ok ? C.green : C.amber, fontWeight:900, marginTop:3 }}>{ok ? 'Подтверждён' : 'Нужно подтвердить'}</div></div>)}
+      </div>
+      {status === 'rejected' && referral.rejectReason && <div style={{ color:C.red, fontSize:12, marginBottom:12 }}>Причина отказа: {referral.rejectReason}</div>}
+      {ready && status !== 'pending' && <div style={{ display:'flex', flexDirection:'column', gap:10 }}><Textarea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Комментарий для администратора, если нужно" /><Btn loading={applying} onClick={apply}>Отправить заявку</Btn></div>}
+    </div>}
 
     <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:18 }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>

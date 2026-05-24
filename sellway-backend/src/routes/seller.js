@@ -4,12 +4,12 @@ const { query, transaction } = require('../config/db');
 const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
+const { canUseReferralProgram, referralRequirements } = require('../services/referralEligibility');
 
 router.use(auth, requireRole('seller', 'freelancer', 'admin'));
 
 function roleForLink(role) { return role === 'freelancer' ? 'freelancer' : 'seller'; }
 function referralLink(code, role) { return code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=${roleForLink(role)}&ref=${code}` : null; }
-function verified(user) { return Boolean(user?.email_verified && user?.phone_verified && user?.telegram_verified); }
 
 router.get('/dashboard', async (req, res) => {
   try {
@@ -21,7 +21,8 @@ router.get('/dashboard', async (req, res) => {
       query(`SELECT COUNT(*) AS referred_count, COALESCE(SUM(CASE WHEN child.created_at >= NOW()-INTERVAL '30 days' THEN 1 ELSE 0 END),0) AS referred_30d FROM sellers child WHERE child.referred_by_seller_id=$1`, [req.user.id]),
     ]);
     const s = seller.rows[0] || {};
-    const canUseReferral = Boolean(s.referral_enabled && s.referral_application_status === 'approved' && verified(req.user));
+    const requirements = referralRequirements(req.user);
+    const canUseReferral = Boolean(s.referral_enabled && s.referral_application_status === 'approved' && canUseReferralProgram(req.user));
     res.json({
       wallet: wallet.rows[0], seller: s, recentOrders: recentOrders.rows, products: products.rows,
       referral: {
@@ -35,7 +36,7 @@ router.get('/dashboard', async (req, res) => {
         role: roleForLink(req.user.role),
         enabled: canUseReferral,
         applicationStatus: s.referral_application_status || 'not_requested',
-        requirements: { email: !!req.user.email_verified, phone: !!req.user.phone_verified, telegram: !!req.user.telegram_verified },
+        requirements,
       },
     });
   } catch (err) { logger.error('Seller dashboard error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
@@ -45,12 +46,13 @@ router.get('/referrals', async (req, res) => {
   try {
     const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
     if (!seller) return res.status(404).json({ error: 'Профиль продавца/фрилансера не найден' });
-    const canUseReferral = Boolean(seller.referral_enabled && seller.referral_application_status === 'approved' && verified(req.user));
+    const requirements = referralRequirements(req.user);
+    const canUseReferral = Boolean(seller.referral_enabled && seller.referral_application_status === 'approved' && canUseReferralProgram(req.user));
     const { rows: referred } = await query(`SELECT child.user_id, u.username, u.email, u.role, child.created_at, child.referral_commission_rate, child.total_sales, COALESCE(SUM(o.amount),0) AS turnover, COUNT(o.id)::int AS orders_count, COALESCE(SUM(rt.amount),0) AS paid_to_you FROM sellers child JOIN users u ON u.id=child.user_id LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' LEFT JOIN transactions rt ON rt.order_id=o.id AND rt.user_id=$1 AND rt.meta->>'source'='seller_referral' WHERE child.referred_by_seller_id=$1 GROUP BY child.user_id, u.username, u.email, u.role, child.created_at, child.referral_commission_rate, child.total_sales ORDER BY child.created_at DESC`, [req.user.id]);
     const { rows: payments } = await query(`SELECT t.id, t.amount, t.description, t.created_at, t.order_id, o.order_number, p.title AS product_title, seller_u.username AS seller_name FROM transactions t LEFT JOIN orders o ON o.id=t.order_id LEFT JOIN products p ON p.id=o.product_id LEFT JOIN users seller_u ON seller_u.id=o.seller_id WHERE t.user_id=$1 AND t.meta->>'source'='seller_referral' ORDER BY t.created_at DESC LIMIT 50`, [req.user.id]);
     const summary = referred.reduce((acc, r) => { acc.referredCount += 1; acc.turnover += Number(r.turnover || 0); acc.ordersCount += Number(r.orders_count || 0); acc.paidToYou += Number(r.paid_to_you || 0); return acc; }, { referredCount: 0, turnover: 0, ordersCount: 0, paidToYou: 0 });
     res.json({
-      referral: { code: seller.referral_code, link: canUseReferral ? referralLink(seller.referral_code, req.user.role) : null, rate: seller.referral_commission_rate || '0.0100', earnings: seller.referral_earnings || '0.00', role: roleForLink(req.user.role), enabled: canUseReferral, applicationStatus: seller.referral_application_status || 'not_requested', rejectReason: seller.referral_reject_reason || '', requirements: { email: !!req.user.email_verified, phone: !!req.user.phone_verified, telegram: !!req.user.telegram_verified } },
+      referral: { code: seller.referral_code, link: canUseReferral ? referralLink(seller.referral_code, req.user.role) : null, rate: seller.referral_commission_rate || '0.0100', earnings: seller.referral_earnings || '0.00', role: roleForLink(req.user.role), enabled: canUseReferral, applicationStatus: seller.referral_application_status || 'not_requested', rejectReason: seller.referral_reject_reason || '', requirements },
       summary, referred, payments,
     });
   } catch (err) { logger.error('Referrals page error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
@@ -58,7 +60,10 @@ router.get('/referrals', async (req, res) => {
 
 router.post('/referrals/apply', async (req, res) => {
   try {
-    if (!verified(req.user)) return res.status(400).json({ error: 'Для заявки нужно подтвердить email, телефон и Telegram' });
+    if (!canUseReferralProgram(req.user)) {
+      const requirements = referralRequirements(req.user);
+      return res.status(400).json({ error: requirements.full ? 'Для заявки нужно подтвердить email, телефон и Telegram' : 'Для заявки нужно подтвердить email' });
+    }
     const note = String(req.body?.note || '').trim().slice(0, 1000);
     await transaction(async (client) => {
       const { rows: [seller] } = await client.query('SELECT * FROM sellers WHERE user_id=$1 FOR UPDATE', [req.user.id]);

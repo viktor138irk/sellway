@@ -1,9 +1,6 @@
 const notify = require('./notify');
 const logger = require('../config/logger');
-
-function isFullyVerified(user) {
-  return Boolean(user?.email_verified && user?.phone_verified && user?.telegram_verified);
-}
+const { canUseReferralProgram } = require('./referralEligibility');
 
 async function paySellerReferral(client, order) {
   const { rows: [seller] } = await client.query(
@@ -26,7 +23,7 @@ async function paySellerReferral(client, order) {
     return { paid: false, amount: 0, skipped: 'referrer_not_approved' };
   }
 
-  if (!isFullyVerified(seller)) {
+  if (!canUseReferralProgram(seller)) {
     return { paid: false, amount: 0, skipped: 'referrer_not_verified' };
   }
 

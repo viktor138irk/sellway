@@ -71,7 +71,7 @@ export function RegisterPage() {
   const initialRef = params.get('ref') || '';
   const requestedRole = params.get('role');
   const initialRole = ['seller', 'freelancer'].includes(requestedRole) ? requestedRole : (initialRef ? 'seller' : 'buyer');
-  const [form, setForm] = useState({ email: '', username: '', password: '', role: initialRole, ref: initialRef });
+  const [form, setForm] = useState({ email: '', username: '', password: '', role: initialRole, ref: initialRef, termsAccepted: false });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -83,7 +83,7 @@ export function RegisterPage() {
     setErrors({});
     setLoading(true);
     try {
-      await register(form);
+      await register({ ...form, termsAccepted: form.termsAccepted ? 'true' : 'false' });
       setDone(true);
       success('Аккаунт создан! Проверьте email.');
     } catch (err) {
@@ -141,15 +141,18 @@ export function RegisterPage() {
         {['seller', 'freelancer'].includes(form.role) && (
           <Input label="Реферальный код" value={form.ref} placeholder="если есть" onChange={e => setForm(f => ({ ...f, ref: e.target.value.trim() }))} error={errors.ref} />
         )}
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#0A0A12', border: `1px solid ${errors.termsAccepted ? C.red : C.border}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.termsAccepted} onChange={e => setForm(f => ({ ...f, termsAccepted: e.target.checked }))} style={{ marginTop: 2, accentColor: C.accent }} />
+          <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.5 }}>
+            Я принимаю <Link to="/terms" target="_blank" style={{ color: C.accent }}>правила площадки</Link> и условия безопасной сделки.
+            {errors.termsAccepted && <span style={{ display: 'block', color: C.red, marginTop: 4 }}>{errors.termsAccepted}</span>}
+          </span>
+        </label>
         <Btn type="submit" full loading={loading} size="lg">Создать аккаунт</Btn>
       </form>
       <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: C.t2 }}>
         Уже есть аккаунт?{' '}
         <Link to="/login" style={{ color: C.accent, textDecoration: 'none', fontWeight: 700 }}>Войти</Link>
-      </div>
-      <div style={{ marginTop: 16, fontSize: 11, color: C.t3, textAlign: 'center', lineHeight: 1.5 }}>
-        Регистрируясь, вы соглашаетесь с{' '}
-        <Link to="/terms" style={{ color: C.t2 }}>Условиями использования</Link>
       </div>
     </AuthWrap>
   );

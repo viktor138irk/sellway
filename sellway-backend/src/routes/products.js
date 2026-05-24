@@ -67,7 +67,7 @@ const fileUpload = multer({ storage, limits: { fileSize: parseInt(process.env.PR
 
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 24, category, search, sort = 'popular', min_price, max_price, delivery, seller, status } = req.query;
+    const { page = 1, limit = 24, category, search, sort = 'popular', min_price, max_price, delivery, seller, status, kind } = req.query;
     const offset = (Math.max(1, parseInt(page)) - 1) * Math.min(parseInt(limit), 100);
     const params = [];
     const where = [];
@@ -88,6 +88,8 @@ router.get('/', optionalAuth, async (req, res) => {
     if (search) { params.push(`%${search}%`); where.push(`(p.title ILIKE $${params.length} OR p.short_desc ILIKE $${params.length})`); }
     if (min_price) { params.push(parseFloat(min_price)); where.push(`p.price >= $${params.length}`); }
     if (max_price) { params.push(parseFloat(max_price)); where.push(`p.price <= $${params.length}`); }
+    if (kind === 'services') where.push(`p.delivery_type = 'service' AND u.role = 'freelancer'`);
+    if (kind === 'products') where.push(`p.delivery_type != 'service' AND u.role IN ('seller','admin')`);
     if (delivery) { params.push(delivery); where.push(`p.delivery_type = $${params.length}`); }
 
     const orderMap = { popular: 'p.sales_count DESC', newest: 'p.created_at DESC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', rating: 'p.rating DESC' };
@@ -100,7 +102,7 @@ router.get('/', optionalAuth, async (req, res) => {
       `SELECT p.id, p.title, p.short_desc, p.price, p.old_price, p.status,
               p.delivery_type, p.keys_count, p.rating, p.reviews_count,
               p.sales_count, p.tags, p.guarantee_days, p.seller_id, p.meta,
-              c.name AS category_name, c.slug AS category_slug,
+              c.name AS category_name, c.slug AS category_slug, c.image_url AS category_image_url, c.emoji AS category_emoji,
               parent.id AS parent_category_id, parent.name AS parent_category_name, parent.slug AS parent_category_slug,
               u.username AS seller_name, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
@@ -122,6 +124,7 @@ router.get('/', optionalAuth, async (req, res) => {
       `SELECT COUNT(*)::int FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        LEFT JOIN categories parent ON parent.id = c.parent_id
+       LEFT JOIN users u ON u.id = p.seller_id
        ${whereStr}`,
       params.slice(0, -2)
     );
@@ -136,7 +139,7 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.parent_id AS parent_category_id,
+      `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.image_url AS category_image_url, c.emoji AS category_emoji, c.parent_id AS parent_category_id,
               u.username AS seller_name, u.avatar_url AS seller_avatar, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
               s.response_time_min, s.description AS seller_description, s.is_online AS seller_online,

@@ -115,7 +115,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
 
     // Очищаем токен
     await query(
-      'UPDATE users SET telegram_link_token=NULL, telegram_link_expires=NULL WHERE id=$1',
+      'UPDATE users SET telegram_link_token=NULL, telegram_link_expires=NULL, telegram_verified=TRUE WHERE id=$1',
       [user.id]
     );
 

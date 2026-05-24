@@ -72,7 +72,7 @@ router.get('/stats', async (req, res) => {
 
 router.get('/referrals', requireRole('admin'), async (req, res) => {
   try {
-    const [settings, summary, topReferrers, recentPayments, invited] = await Promise.all([
+    const [settings, summary, topReferrers, recentPayments, invited, applications] = await Promise.all([
       query(`SELECT key, value FROM settings WHERE key IN ('referral_enabled','default_referral_commission_rate','max_referral_commission_rate','referral_payout_basis')`),
       query(`SELECT COALESCE(SUM(t.amount),0) AS paid_total,
                     COALESCE(SUM(CASE WHEN t.created_at::date=CURRENT_DATE THEN t.amount END),0) AS paid_today,
@@ -118,6 +118,14 @@ router.get('/referrals', requireRole('admin'), async (req, res) => {
              WHERE child.referred_by_seller_id IS NOT NULL
              GROUP BY child.user_id, child.created_at, child.referral_commission_rate, u.username, u.email, u.role, ref.username, ref.email
              ORDER BY child.created_at DESC LIMIT 100`),
+      query(`SELECT s.user_id, s.referral_application_status, s.referral_requested_at, s.referral_reviewed_at,
+                    s.referral_reject_reason, s.referral_moderation_note, s.referral_enabled,
+                    u.username, u.email, u.role, u.email_verified, u.phone_verified, u.telegram_verified
+             FROM sellers s
+             JOIN users u ON u.id=s.user_id
+             WHERE s.referral_application_status IN ('pending','rejected')
+             ORDER BY s.referral_requested_at DESC NULLS LAST, s.created_at DESC
+             LIMIT 100`),
     ]);
 
     const cfg = Object.fromEntries(settings.rows.map(r => [r.key, r.value]));
@@ -132,6 +140,7 @@ router.get('/referrals', requireRole('admin'), async (req, res) => {
       topReferrers: topReferrers.rows,
       recentPayments: recentPayments.rows,
       invited: invited.rows,
+      applications: applications.rows,
     });
   } catch (err) { logger.error('Admin referrals error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });

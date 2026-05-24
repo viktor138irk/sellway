@@ -3,25 +3,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { C } from '../UI';
 import { getNotifications, readAllNotifs, readNotif } from '../../api/seller';
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const sync = () => setIsMobile(window.matchMedia('(max-width: 640px)').matches);
-    sync();
-    window.addEventListener('resize', sync);
-    return () => window.removeEventListener('resize', sync);
-  }, []);
-
-  return isMobile;
-}
+import useMediaQuery from '../../hooks/useMediaQuery';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useIsMobile();
+  const isMobile = useMediaQuery('(max-width: 640px)');
   const [q, setQ] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUser, setShowUser] = useState(false);
@@ -97,7 +85,7 @@ export default function Header() {
 
   function handleSearch(e) {
     e.preventDefault();
-    if (q.trim()) navigate(`/catalog?search=${encodeURIComponent(q)}`);
+    if (q.trim()) navigate(`/catalog?kind=products&search=${encodeURIComponent(q)}`);
   }
 
   async function handleLogout() {
@@ -106,10 +94,10 @@ export default function Header() {
   }
 
   const navLinks = [
-    ['/catalog', 'Каталог'],
-    ['/catalog?delivery=auto', 'Авто-выдача'],
-    ['/catalog?delivery=service', 'Услуги'],
-    ['/catalog?sort=newest', 'Новинки'],
+    ['/catalog?kind=products', 'Каталог'],
+    ['/catalog?kind=products&delivery=auto', 'Авто-выдача'],
+    ['/catalog?kind=services', 'Услуги'],
+    ['/catalog?kind=products&sort=newest', 'Новинки'],
   ];
   const isSellerRole = ['seller', 'freelancer', 'admin'].includes(user?.role);
   const mobilePanelBase = isMobile
@@ -190,7 +178,15 @@ export default function Header() {
 
     <div style={{ borderTop: `1px solid ${C.border}`, padding: isMobile ? '0 10px' : '0 20px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 0, overflowX: 'auto' }}>
-        {navLinks.map(([to, label]) => <Link key={to} to={to} style={{ padding: '9px 16px', fontSize: 13, color: location.pathname + location.search === to ? C.accent : C.t2, textDecoration: 'none', fontWeight: 600, borderBottom: `2px solid ${location.pathname === to.split('?')[0] ? C.accent : 'transparent'}`, whiteSpace: 'nowrap' }}>{label}</Link>)}
+        {navLinks.map(([to, label]) => {
+          const target = new URLSearchParams(to.split('?')[1] || '');
+          const current = new URLSearchParams(location.search);
+          const active = location.pathname === '/catalog'
+            && (target.get('kind') || 'products') === (current.get('kind') || 'products')
+            && (target.get('delivery') || '') === (current.get('delivery') || '')
+            && (target.get('sort') || '') === (current.get('sort') || '');
+          return <Link key={to} to={to} style={{ padding: '9px 16px', fontSize: 13, color: active ? C.accent : C.t2, textDecoration: 'none', fontWeight: 600, borderBottom: `2px solid ${active ? C.accent : 'transparent'}`, whiteSpace: 'nowrap' }}>{label}</Link>;
+        })}
         {isSellerRole && <Link to="/seller/products/new" style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: 13, color: C.accent, textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>{user.role === 'freelancer' ? '+ Услуга' : '+ Продать'}</Link>}
       </div>
     </div>
