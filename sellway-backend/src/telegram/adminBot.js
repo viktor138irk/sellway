@@ -1,7 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const TelegramBot = require('node-telegram-bot-api');
-const { SocksProxyAgent } = require('socks-proxy-agent');
 const logger = require('../config/logger');
+const { createTelegramRequestOptions } = require('./proxy');
 
 const telegramToken = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
 
@@ -18,26 +19,29 @@ if (!telegramToken || telegramToken === 'your_admin_bot_token_from_botfather' ||
   return;
 }
 
-function createProxyAgent() {
-  if (process.env.PROXY_ENABLED !== 'true') return null;
-  const { PROXY_HOST: h, PROXY_PORT: p, PROXY_USERNAME: u, PROXY_PASSWORD: pw } = process.env;
-  if (!h || !p) {
-    logger.warn('PROXY_ENABLED=true but PROXY_HOST/PORT missing');
-    return null;
-  }
-  const auth = u && pw ? `${u}:${pw}@` : '';
-  logger.info(`Telegram admin bot using SOCKS5 proxy: ${h}:${p}`);
-  return new SocksProxyAgent(`socks5://${auth}${h}:${p}`);
-}
-
-const agent = createProxyAgent();
 const pollingEnabled = require.main === module || process.env.TELEGRAM_ADMIN_POLLING === 'true';
 const bot = new TelegramBot(telegramToken, {
-  polling: pollingEnabled,
-  ...(agent && { request: { agent } }),
+  polling: false,
+  ...createTelegramRequestOptions('Telegram admin bot'),
 });
 
-logger.info(pollingEnabled ? 'Telegram admin bot polling started' : 'Telegram admin bot client ready');
+async function startPolling() {
+  try {
+    if (typeof bot.deleteWebHook === 'function') {
+      await bot.deleteWebHook({ drop_pending_updates: false });
+    } else if (typeof bot.deleteWebhook === 'function') {
+      await bot.deleteWebhook({ drop_pending_updates: false });
+    }
+    await bot.startPolling({ restart: true });
+    const me = await bot.getMe();
+    logger.info('Telegram admin bot polling started', { username: me.username, id: me.id });
+  } catch (err) {
+    logger.error('Telegram admin bot polling start error', { err: err.message });
+  }
+}
+
+if (pollingEnabled) startPolling();
+else logger.info('Telegram admin bot client ready');
 
 bot.onText(/\/start|\/help/, async (msg) => {
   await bot.sendMessage(

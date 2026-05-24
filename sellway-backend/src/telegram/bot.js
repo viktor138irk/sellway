@@ -1,8 +1,9 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const TelegramBot = require('node-telegram-bot-api');
-const { SocksProxyAgent } = require('socks-proxy-agent');
 const { query } = require('../config/db');
 const logger = require('../config/logger');
+const { createTelegramRequestOptions } = require('./proxy');
 
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!telegramToken || telegramToken === 'your_bot_token_from_botfather' || telegramToken.startsWith('your_')) {
@@ -14,22 +15,29 @@ if (!telegramToken || telegramToken === 'your_bot_token_from_botfather' || teleg
 }
 
 // ── SOCKS5 ────────────────────────────────────────────
-function createProxyAgent() {
-  if (process.env.PROXY_ENABLED !== 'true') return null;
-  const { PROXY_HOST: h, PROXY_PORT: p, PROXY_USERNAME: u, PROXY_PASSWORD: pw } = process.env;
-  if (!h || !p) { logger.warn('PROXY_ENABLED=true but PROXY_HOST/PORT missing'); return null; }
-  const auth = u && pw ? `${u}:${pw}@` : '';
-  logger.info(`Telegram bot using SOCKS5 proxy: ${h}:${p}`);
-  return new SocksProxyAgent(`socks5://${auth}${h}:${p}`);
-}
-
-const agent = createProxyAgent();
 const pollingEnabled = require.main === module || process.env.TELEGRAM_POLLING === 'true';
 const bot = new TelegramBot(telegramToken, {
-  polling: pollingEnabled,
-  ...(agent && { request: { agent } }),
+  polling: false,
+  ...createTelegramRequestOptions('Telegram user bot'),
 });
-logger.info(pollingEnabled ? 'Telegram bot polling started' : 'Telegram bot client ready');
+
+async function startPolling() {
+  try {
+    if (typeof bot.deleteWebHook === 'function') {
+      await bot.deleteWebHook({ drop_pending_updates: false });
+    } else if (typeof bot.deleteWebhook === 'function') {
+      await bot.deleteWebhook({ drop_pending_updates: false });
+    }
+    await bot.startPolling({ restart: true });
+    const me = await bot.getMe();
+    logger.info('Telegram bot polling started', { username: me.username, id: me.id });
+  } catch (err) {
+    logger.error('Telegram bot polling start error', { err: err.message });
+  }
+}
+
+if (pollingEnabled) startPolling();
+else logger.info('Telegram bot client ready');
 
 // ── Helpers ───────────────────────────────────────────
 const EMOJI = { ok: '✅', err: '❌', warn: '⚠️', money: '💰', order: '🛒', key: '🔑', dispute: '🚨', lock: '🔒', bell: '🔔' };

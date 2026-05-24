@@ -258,6 +258,9 @@ export default function SettingsPage({ page = 'finance' }) {
                 <Input label="Chat ID" value={testChatId || settings.TELEGRAM_ADMIN_CHAT_ID || ''} onChange={e => setTestChatId(e.target.value)} placeholder="123456789" />
                 <Btn loading={actionLoading === 'test-telegram'} onClick={() => handleAction('test-telegram', { chatId: testChatId || settings.TELEGRAM_ADMIN_CHAT_ID }, false)}>Отправить тест</Btn>
               </div>
+              <div style={{ marginTop:12 }}>
+                <Btn variant="ghost" loading={actionLoading === 'test-telegram-connection'} onClick={() => handleAction('test-telegram-connection', {}, false)}>Проверить SOCKS5 и API Telegram</Btn>
+              </div>
             </div>
           )}
 

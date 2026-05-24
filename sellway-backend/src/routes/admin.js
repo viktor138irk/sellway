@@ -647,6 +647,27 @@ router.post('/settings/actions/test-telegram', requireRole('admin'), async (req,
   }
 });
 
+router.post('/settings/actions/test-telegram-connection', requireRole('admin'), async (req, res) => {
+  try {
+    delete require.cache[require.resolve('../telegram/bot')];
+    delete require.cache[require.resolve('../telegram/adminBot')];
+    const userBot = require('../telegram/bot');
+    const adminBot = require('../telegram/adminBot');
+    const results = [];
+    if (!userBot.bot) throw new Error('TELEGRAM_BOT_TOKEN не настроен');
+    if (!adminBot.bot) throw new Error('TELEGRAM_ADMIN_BOT_TOKEN не настроен');
+    const userMe = await userBot.bot.getMe();
+    const adminMe = await adminBot.bot.getMe();
+    results.push(`user @${userMe.username}`);
+    results.push(`admin @${adminMe.username}`);
+    logger.info('Telegram bots connection test ok', { adminId: req.user.id, results });
+    res.json({ message: `Telegram API доступен: ${results.join(', ')}` });
+  } catch (err) {
+    logger.error('Telegram bots connection test error', { err: err.message, adminId: req.user.id });
+    res.status(500).json({ error: `Telegram API недоступен через текущие настройки SOCKS5: ${err.message}` });
+  }
+});
+
 router.get('/logs', async (req, res) => {
   const { page = 1, limit = 100 } = req.query;
   const { rows } = await query(
