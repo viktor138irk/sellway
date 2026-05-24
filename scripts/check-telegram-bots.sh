@@ -24,6 +24,11 @@ echo "TELEGRAM_BOT_USERNAME=$(read_env TELEGRAM_BOT_USERNAME)"
 echo "TELEGRAM_ADMIN_BOT_TOKEN=$(mask "$(read_env TELEGRAM_ADMIN_BOT_TOKEN)")"
 echo "TELEGRAM_ADMIN_BOT_USERNAME=$(read_env TELEGRAM_ADMIN_BOT_USERNAME)"
 echo "TELEGRAM_ADMIN_CHAT_ID=$(read_env TELEGRAM_ADMIN_CHAT_ID)"
+echo "PROXY_ENABLED=$(read_env PROXY_ENABLED)"
+echo "PROXY_HOST=$(read_env PROXY_HOST)"
+echo "PROXY_PORT=$(read_env PROXY_PORT)"
+echo "PROXY_USERNAME=$([ -n "$(read_env PROXY_USERNAME)" ] && echo '<set>' || echo '<empty>')"
+echo "PROXY_PASSWORD=$([ -n "$(read_env PROXY_PASSWORD)" ] && echo '<set>' || echo '<empty>')"
 echo
 
 echo "==> PM2 status"
