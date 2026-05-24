@@ -1,0 +1,40 @@
+# Пример отдельного платежного шлюза для FastPanel/Nginx.
+# Замените домены и IP listen под свой сервер.
+# Для vpulse.fun обычно:
+#   FRONTEND_URL=https://vpulse.fun
+#   PAYMENT_RETURN_URL=https://vpulse.fun/payment/success
+#   Webhook в ЮKassa: https://pay.vpulse.fun/api/payments/webhook
+
+server {
+    server_name pay.vpulse.fun;
+    listen 80;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    server_name pay.vpulse.fun;
+    listen 443 ssl http2;
+
+    ssl_certificate "/var/www/httpd-cert/pay.vpulse.fun.crt";
+    ssl_certificate_key "/var/www/httpd-cert/pay.vpulse.fun.key";
+
+    charset utf-8;
+
+    location /health {
+        proxy_pass http://127.0.0.1:3001/health;
+        include /etc/nginx/proxy_params;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        return 302 https://vpulse.fun$request_uri;
+    }
+}

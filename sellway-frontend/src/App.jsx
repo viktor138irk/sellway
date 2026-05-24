@@ -1,9 +1,10 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Header from './components/Layout/Header';
 import { C, Spinner } from './components/UI';
+import { syncPaymentReturn } from './api/payments';
 
 const HomePage       = lazy(() => import('./pages/store/HomePage'));
 const CatalogPage    = lazy(() => import('./pages/store/CatalogPage'));
@@ -86,6 +87,49 @@ function AppRoutes() {
     <Route path="*" element={<NotFound/>}/>
   </Routes></Suspense></>;
 }
-function PaymentSuccess() { return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20 }}><div style={{ fontSize:56 }}>🎉</div><h1 style={{ fontSize:26, fontWeight:900, color:C.t1 }}>Баланс пополнен!</h1><p style={{ fontSize:14, color:C.t2, textAlign:'center' }}>Средства зачислены на ваш счёт SellWay.</p><a href="/" style={{ background:C.accent, color:'#fff', borderRadius:10, padding:'11px 24px', textDecoration:'none', fontSize:14, fontWeight:700 }}>← На главную</a></div>; }
+function PaymentSuccess() {
+  const { refreshUser } = useAuth();
+  const [params] = useSearchParams();
+  const paymentRef = params.get('payment_ref');
+  const productId = params.get('product_id');
+  const [state, setState] = useState({ loading: Boolean(paymentRef), status: paymentRef ? 'checking' : 'completed', error: '' });
+
+  useEffect(() => {
+    if (!paymentRef) return;
+    let alive = true;
+    syncPaymentReturn(paymentRef)
+      .then(({ data }) => {
+        if (!alive) return;
+        setState({ loading: false, status: data.status, error: '' });
+        if (data.status === 'completed') refreshUser().catch(() => {});
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setState({ loading: false, status: 'error', error: err.response?.data?.error || 'Не удалось проверить платёж' });
+      });
+    return () => { alive = false; };
+  }, [paymentRef]);
+
+  const loading = state.loading;
+  const ok = state.status === 'completed';
+  const canceled = state.status === 'canceled';
+  const title = loading ? 'Проверяем платёж...' : ok ? 'Баланс пополнен!' : canceled ? 'Платёж не завершён' : 'Платёж обрабатывается';
+  const text = loading
+    ? 'Запрашиваем статус в ЮKassa и синхронизируем баланс.'
+    : ok
+      ? 'Средства зачислены на ваш счёт.'
+      : canceled
+        ? 'ЮKassa вернула отмену платежа. Деньги на баланс не зачислялись.'
+        : (state.error || 'Если оплата прошла, баланс обновится после подтверждения ЮKassa.');
+  const href = productId ? `/product/${productId}` : '/';
+  const button = productId ? 'Вернуться к товару' : 'На главную';
+
+  return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20, textAlign:'center' }}>
+    <div style={{ fontSize:56 }}>{loading ? '⏳' : ok ? '🎉' : canceled ? '⚠️' : '⌛'}</div>
+    <h1 style={{ fontSize:26, fontWeight:900, color:C.t1 }}>{title}</h1>
+    <p style={{ fontSize:14, color:C.t2, maxWidth:420 }}>{text}</p>
+    <a href={href} style={{ background:C.accent, color:'#fff', borderRadius:10, padding:'11px 24px', textDecoration:'none', fontSize:14, fontWeight:700 }}>← {button}</a>
+  </div>;
+}
 function NotFound() { return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20 }}><div style={{ fontSize:56 }}>🔍</div><h1 style={{ fontSize:26, fontWeight:900, color:C.t1 }}>404</h1><p style={{ fontSize:14, color:C.t2 }}>Страница не найдена</p><a href="/" style={{ color:C.accent, textDecoration:'none', fontSize:14, fontWeight:700 }}>← На главную</a></div>; }
 export default function App() { return <BrowserRouter><AuthProvider><ToastProvider><div style={{ minHeight:'100vh', background:C.bg, color:C.t1, fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}><AppRoutes/><footer style={{ borderTop:`1px solid ${C.border}`, padding:'20px', textAlign:'center', fontSize:12, color:C.t3, marginTop:40 }}>© 2025 SellWay · sellway.pro · Безопасный маркетплейс цифровых товаров и услуг</footer></div></ToastProvider></AuthProvider></BrowserRouter>; }

@@ -74,7 +74,7 @@ export default function ProductPage() {
     if (!topupAmount || +topupAmount < 100) return toast.warn('Минимум 100 ₽');
     setTopupLoading(true);
     try {
-      const { data } = await createPayment({ amount: +topupAmount });
+      const { data } = await createPayment({ amount: +topupAmount, product_id: product.id });
       window.location.href = data.confirmationUrl;
     } catch (err) {
       toast.error(err.response?.data?.error || 'Ошибка платежа');
@@ -172,7 +172,7 @@ export default function ProductPage() {
 
       {topupModal && <Modal title="Пополнить баланс" onClose={()=>setTopupModal(false)}>
         <form onSubmit={handleTopup} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#0A1A10', border:`1px solid ${C.green}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.green }}>Для покупки нужно {money(product.price)}. Пополните баланс через ЮKassa.</div>
+          <div style={{ background:'#0A1A10', border:`1px solid ${C.green}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.green }}>Для покупки не хватает средств. После оплаты баланс синхронизируется автоматически.</div>
           <input type="number" value={topupAmount} onChange={e=>setTopupAmount(e.target.value)} min={100} style={{ width:'100%', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:'11px 13px', color:C.t1, fontSize:16, fontWeight:700, outline:'none', fontFamily:'inherit' }} />
           <Btn type="submit" full loading={topupLoading}>Перейти к оплате</Btn>
         </form>

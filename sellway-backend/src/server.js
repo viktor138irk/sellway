@@ -52,6 +52,6 @@ server.listen(PORT, '0.0.0.0', () => {
   logger.info(`   ЮKassa webhook: /api/payments/webhook`);
 });
 
-process.on('SIGTERM', async () => { server.close(() => pool.end().then(() => pool.end()).finally(() => process.exit(0))); });
+process.on('SIGTERM', async () => { server.close(() => pool.end().finally(() => process.exit(0))); });
 process.on('unhandledRejection', (r) => logger.error('Unhandled rejection', { reason: String(r) }));
 module.exports = { app, server };
