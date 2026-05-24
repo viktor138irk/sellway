@@ -51,6 +51,18 @@ function assertRoleCanUseDelivery(user, deliveryType) {
   return null;
 }
 
+async function assertCategoryMatchesDelivery(categoryId, deliveryType) {
+  const expectedType = deliveryType === 'service' ? 'service' : 'product';
+  const { rows: [category] } = await query('SELECT id, category_type FROM categories WHERE id=$1 AND is_active=TRUE', [categoryId]);
+  if (!category) return 'Категория не найдена или скрыта';
+  if (category.category_type !== expectedType) {
+    return deliveryType === 'service'
+      ? 'Для услуги выберите категорию из раздела услуг'
+      : 'Для товара выберите категорию из товарного каталога';
+  }
+  return null;
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, process.env.UPLOAD_DIR || 'uploads'),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
@@ -88,8 +100,8 @@ router.get('/', optionalAuth, async (req, res) => {
     if (search) { params.push(`%${search}%`); where.push(`(p.title ILIKE $${params.length} OR p.short_desc ILIKE $${params.length})`); }
     if (min_price) { params.push(parseFloat(min_price)); where.push(`p.price >= $${params.length}`); }
     if (max_price) { params.push(parseFloat(max_price)); where.push(`p.price <= $${params.length}`); }
-    if (kind === 'services') where.push(`p.delivery_type = 'service' AND u.role = 'freelancer'`);
-    if (kind === 'products') where.push(`p.delivery_type != 'service' AND u.role IN ('seller','admin')`);
+    if (kind === 'services') where.push(`p.delivery_type = 'service' AND u.role = 'freelancer' AND c.category_type = 'service'`);
+    if (kind === 'products') where.push(`p.delivery_type != 'service' AND u.role IN ('seller','admin') AND c.category_type = 'product'`);
     if (delivery) { params.push(delivery); where.push(`p.delivery_type = $${params.length}`); }
 
     const orderMap = { popular: 'p.sales_count DESC', newest: 'p.created_at DESC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', rating: 'p.rating DESC' };
@@ -102,7 +114,7 @@ router.get('/', optionalAuth, async (req, res) => {
       `SELECT p.id, p.title, p.short_desc, p.price, p.old_price, p.status,
               p.delivery_type, p.keys_count, p.rating, p.reviews_count,
               p.sales_count, p.tags, p.guarantee_days, p.seller_id, p.meta,
-              c.name AS category_name, c.slug AS category_slug, c.image_url AS category_image_url, c.emoji AS category_emoji,
+              c.name AS category_name, c.slug AS category_slug, c.category_type, c.image_url AS category_image_url, c.emoji AS category_emoji,
               parent.id AS parent_category_id, parent.name AS parent_category_name, parent.slug AS parent_category_slug,
               u.username AS seller_name, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
@@ -139,7 +151,7 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.image_url AS category_image_url, c.emoji AS category_emoji, c.parent_id AS parent_category_id,
+      `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.category_type, c.image_url AS category_image_url, c.emoji AS category_emoji, c.parent_id AS parent_category_id,
               u.username AS seller_name, u.avatar_url AS seller_avatar, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
               s.response_time_min, s.description AS seller_description, s.is_online AS seller_online,
@@ -185,6 +197,9 @@ router.post('/', auth, requireRole('seller', 'freelancer', 'admin'), [
   const meta = buildMeta(delivery_type, service_steps);
 
   try {
+    const categoryError = await assertCategoryMatchesDelivery(category_id, delivery_type);
+    if (categoryError) return res.status(400).json({ error: categoryError });
+
     const { rows: [product] } = await query(
       `INSERT INTO products (seller_id, category_id, title, description, short_desc, price, old_price, delivery_type, guarantee_days, tags, meta, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,'pending') RETURNING *`,
@@ -201,7 +216,7 @@ router.post('/', auth, requireRole('seller', 'freelancer', 'admin'), [
 
 router.put('/:id', auth, requireRole('seller', 'freelancer', 'admin'), async (req, res) => {
   try {
-    const { rows: [existing] } = await query('SELECT seller_id, delivery_type, meta FROM products WHERE id=$1', [req.params.id]);
+    const { rows: [existing] } = await query('SELECT seller_id, category_id, delivery_type, meta FROM products WHERE id=$1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     if (existing.seller_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Нет доступа' });
 
@@ -209,6 +224,9 @@ router.put('/:id', auth, requireRole('seller', 'freelancer', 'admin'), async (re
     const finalDeliveryType = delivery_type || existing.delivery_type;
     const roleError = assertRoleCanUseDelivery(req.user, finalDeliveryType);
     if (roleError) return res.status(403).json({ error: roleError });
+    const finalCategoryId = category_id || existing.category_id;
+    const categoryError = await assertCategoryMatchesDelivery(finalCategoryId, finalDeliveryType);
+    if (categoryError) return res.status(400).json({ error: categoryError });
 
     const tags = normalizeTags(req.body.tags);
     const meta = buildMeta(finalDeliveryType, service_steps, existing.meta);

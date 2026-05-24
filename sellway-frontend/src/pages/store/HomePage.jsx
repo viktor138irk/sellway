@@ -56,7 +56,7 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    Promise.all([getCategories(), getProducts({ kind:'products', sort:'popular', limit:8 }), getProducts({ kind:'products', sort:'newest', limit:4 })])
+    Promise.all([getCategories({ type: 'product' }), getProducts({ kind:'products', sort:'popular', limit:8 }), getProducts({ kind:'products', sort:'newest', limit:4 })])
       .then(([c,p,n]) => { setCats((c.data || []).filter(x=>x.is_active)); setPopular(p.data.products || []); setNewest(n.data.products || []); })
       .catch(console.error).finally(()=>setLoading(false));
   }, []);

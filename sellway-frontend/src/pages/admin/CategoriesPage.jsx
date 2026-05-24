@@ -16,7 +16,7 @@ function CategoryAvatar({ cat, size = 42 }) {
   );
 }
 
-function CategoryForm({ initial, parent, categories, onSave, onCancel }) {
+function CategoryForm({ initial, parent, categories, categoryType, onSave, onCancel }) {
   const ref = useRef();
   const toast = useToast();
   const [name, setName] = useState(initial?.name || '');
@@ -51,7 +51,7 @@ function CategoryForm({ initial, parent, categories, onSave, onCancel }) {
         const r = await client.post('/admin/upload-image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
         imageUrl = r.data.url;
       }
-      const data = { name: name.trim(), slug: slug.trim(), emoji, image_url: imageUrl, description, is_active: active, parent_id: parentId || null, sort_order: Number(sortOrder || 0) };
+      const data = { category_type: categoryType, name: name.trim(), slug: slug.trim(), emoji, image_url: imageUrl, description, is_active: active, parent_id: parentId || null, sort_order: Number(sortOrder || 0) };
       if (initial?.id) await updateCategory(initial.id, data);
       else await createCategory(data);
       toast.success(initial?.id ? 'Категория обновлена' : 'Категория создана');
@@ -80,7 +80,7 @@ function CategoryForm({ initial, parent, categories, onSave, onCancel }) {
         </div>
       </div>
       <Input label="Название *" value={name} onChange={e => onName(e.target.value)} placeholder="Сайты" />
-      <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?kind=products&category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
+      <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?kind=${categoryType === 'service' ? 'services' : 'products'}&category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
       <Select label="Родительская категория" value={parentId} onChange={e => setParentId(e.target.value)}>
         <option value="">Нет, это основная категория</option>
         {categories.filter(c => !c.parent_id && c.id !== initial?.id).map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
@@ -99,8 +99,12 @@ function CategoryForm({ initial, parent, categories, onSave, onCancel }) {
   );
 }
 
-export default function CategoriesPage() {
+export default function CategoriesPage({ type = 'product' }) {
   const toast = useToast();
+  const isService = type === 'service';
+  const labels = isService
+    ? { title: '🧑‍💻 Услуги: категории и подкатегории', hint: 'Отдельный каталог для услуг фрилансеров. Товарные категории здесь не показываются.', root: 'Основные категории услуг', addRoot: '+ Категория услуг', empty: 'Категорий услуг пока нет', products: 'Услуг' }
+    : { title: '📂 Категории и подкатегории', hint: 'Товарный каталог продавцов. Категории услуг находятся в отдельном разделе.', root: 'Основные категории товаров', addRoot: '+ Основная категория', empty: 'Категорий пока нет', products: 'Товаров' };
   const [cats, setCats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState('');
@@ -114,13 +118,14 @@ export default function CategoriesPage() {
 
   function load() {
     setLoading(true);
-    getCategories().then(r => {
+    getCategories({ type }).then(r => {
       const list = r.data || [];
       setCats(list);
-      if (!selectedId && list.find(c => !c.parent_id)) setSelectedId(list.find(c => !c.parent_id).id);
+      const roots = list.filter(c => !c.parent_id);
+      if (!roots.some(c => c.id === selectedId)) setSelectedId(roots[0]?.id || '');
     }).catch(() => toast.error('Ошибка загрузки категорий')).finally(() => setLoading(false));
   }
-  useEffect(load, []);
+  useEffect(load, [type]);
 
   async function toggle(cat, is_active) {
     await updateCategory(cat.id, { is_active }).catch(() => toast.error('Ошибка'));
@@ -141,17 +146,17 @@ export default function CategoriesPage() {
       <div style={{ padding: 'clamp(16px, 4vw, 28px)' }} className="fade-in">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22, gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>📂 Категории и подкатегории</h1>
-            <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Слева основные разделы, справа подкатегории выбранного раздела.</div>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{labels.title}</h1>
+            <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{labels.hint}</div>
           </div>
-          <Btn onClick={() => openCreate(null)}>+ Основная категория</Btn>
+          <Btn onClick={() => openCreate(null)}>{labels.addRoot}</Btn>
         </div>
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320 }}><Spinner size={36} /></div>
         : <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 390px) 1fr', gap: 16 }}>
             <div style={{ ...card, overflow: 'hidden' }}>
               <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: C.t1 }}>Основные категории</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: C.t1 }}>{labels.root}</div>
                 <span style={{ fontSize: 11, color: C.t3 }}>{roots.length} шт.</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -169,7 +174,7 @@ export default function CategoriesPage() {
                     </button>
                   );
                 })}
-                {roots.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: C.t3 }}>Категорий пока нет</div>}
+                {roots.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: C.t3 }}>{labels.empty}</div>}
               </div>
             </div>
 
@@ -190,7 +195,7 @@ export default function CategoriesPage() {
                 </div>
                 <div style={{ padding: 16, borderBottom: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                   <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{children.length}</div><div style={{ fontSize: 11, color: C.t3 }}>Подкатегорий</div></div>
-                  <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{Number(selected.product_count || 0).toLocaleString('ru')}</div><div style={{ fontSize: 11, color: C.t3 }}>Товаров</div></div>
+                  <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{Number(selected.product_count || 0).toLocaleString('ru')}</div><div style={{ fontSize: 11, color: C.t3 }}>{labels.products}</div></div>
                   <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: selected.is_active ? C.green : C.t3 }}>{selected.is_active ? 'Активна' : 'Скрыта'}</div><div style={{ fontSize: 11, color: C.t3 }}>Статус</div></div>
                 </div>
                 <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
@@ -203,7 +208,7 @@ export default function CategoriesPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, color: C.t2 }}>{Number(cat.product_count || 0).toLocaleString('ru')} товаров</div>
+                      <div style={{ fontSize: 12, color: C.t2 }}>{Number(cat.product_count || 0).toLocaleString('ru')} {isService ? 'услуг' : 'товаров'}</div>
                       <Toggle value={cat.is_active} onChange={v => toggle(cat, v)} />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -219,7 +224,7 @@ export default function CategoriesPage() {
       </div>
 
       {(modal === 'create' || modal === 'edit') && <Modal title={modal === 'edit' ? 'Редактировать категорию' : (editCat?.parent_id ? 'Новая подкатегория' : 'Новая категория')} onClose={() => setModal(null)}>
-        <CategoryForm initial={editCat?.id ? editCat : null} parent={editCat?.parent_id && !editCat?.id ? cats.find(c => c.id === editCat.parent_id) : null} categories={cats} onSave={() => { setModal(null); load(); }} onCancel={() => setModal(null)} />
+        <CategoryForm initial={editCat?.id ? editCat : null} parent={editCat?.parent_id && !editCat?.id ? cats.find(c => c.id === editCat.parent_id) : null} categories={cats} categoryType={type} onSave={() => { setModal(null); load(); }} onCancel={() => setModal(null)} />
       </Modal>}
 
       {deleteCat && <Modal title="Скрыть категорию?" onClose={() => setDeleteCat(null)} width={420}>

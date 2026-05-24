@@ -85,7 +85,12 @@ export default function CatalogPage() {
     setParams(p);
   };
 
-  useEffect(() => { getCategories().then(r => setCats(r.data.filter(c => c.is_active))).catch(() => {}); }, []);
+  useEffect(() => {
+    setCats([]);
+    getCategories({ type: kind === 'services' ? 'service' : 'product' })
+      .then(r => setCats(r.data.filter(c => c.is_active)))
+      .catch(() => {});
+  }, [kind]);
   useEffect(() => {
     setLoading(true);
     getProducts({ kind, category, search, sort, delivery, max_price: maxPrice || undefined, page, limit: 30 })

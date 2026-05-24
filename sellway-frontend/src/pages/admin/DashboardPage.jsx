@@ -97,7 +97,8 @@ export default function AdminDashboard() {
       <QuickAction title="Модерация" sub={`${s.products?.pending || 0} ожидают`} to="/admin/products" />
       <QuickAction title="Споры" sub={`${s.disputes?.open || 0} открытых`} to="/admin/disputes" />
       <QuickAction title="Пользователи" sub="роли, комиссии, рефералы" to="/admin/users" />
-      <QuickAction title="Категории" sub="управление каталогом" to="/admin/categories" />
+      <QuickAction title="Категории товаров" sub="каталог продавцов" to="/admin/categories" />
+      <QuickAction title="Услуги" sub="категории фрилансеров" to="/admin/service-categories" />
     </div>
 
     <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:18 }}>

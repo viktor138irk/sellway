@@ -111,7 +111,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
   const selectedCategory = cats.find(c => c.id === form.category_id) || cats.find(c => c.id === parentCategoryId);
 
   useEffect(() => {
-    getCategories().then(r => setCats(r.data)).catch(() => {});
+    getCategories({ type: service ? 'service' : 'product' }).then(r => setCats(r.data)).catch(() => {});
     if (productId) {
       setLoading(true);
       const promises = [getProduct(productId)];

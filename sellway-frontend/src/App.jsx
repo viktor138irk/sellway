@@ -82,7 +82,8 @@ function AppRoutes() {
     <Route path="/admin/disputes" element={<Protected roles={['admin','moderator']}><AdminDisputes/></Protected>}/>
     <Route path="/admin/withdrawals" element={<Protected roles={['admin']}><AdminWithdrawals/></Protected>}/>
     <Route path="/admin/referrals" element={<Protected roles={['admin']}><AdminReferrals/></Protected>}/>
-    <Route path="/admin/categories" element={<Protected roles={['admin']}><AdminCategories/></Protected>}/>
+    <Route path="/admin/categories" element={<Protected roles={['admin']}><AdminCategories type="product"/></Protected>}/>
+    <Route path="/admin/service-categories" element={<Protected roles={['admin']}><AdminCategories type="service"/></Protected>}/>
     <Route path="/admin/settings" element={<Protected roles={['admin']}><AdminSettings/></Protected>}/>
     <Route path="/admin/logs" element={<Protected roles={['admin']}><AdminLogs/></Protected>}/>
     <Route path="/payment/success" element={<PaymentSuccess/>}/>

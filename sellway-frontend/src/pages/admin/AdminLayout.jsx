@@ -24,7 +24,8 @@ const SECTIONS = [
   {
     title: 'КОНТЕНТ',
     items: [
-      ['/admin/categories', '📂', 'Категории'],
+      ['/admin/categories', '📂', 'Категории товаров'],
+      ['/admin/service-categories', '🧑‍💻', 'Услуги'],
       ['/admin/settings',   '⚙️', 'Настройки'],
     ],
   },

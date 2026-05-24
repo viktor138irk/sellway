@@ -91,6 +91,7 @@ export default function ProductPage() {
   if (!product) return null;
 
   const service = isService(product);
+  const categoryKind = product.category_type === 'service' || service ? 'services' : 'products';
   const images = product.images || [];
   const disc = product.old_price ? Math.round((1-product.price/product.old_price)*100) : 0;
   const canBuy = service ? true : product.delivery_type === 'auto' ? product.keys_count > 0 : product.delivery_type === 'file' ? product.files_count > 0 : true;
@@ -101,7 +102,7 @@ export default function ProductPage() {
       <div style={{ display:'flex', gap:6, fontSize:12, color:C.t2, marginBottom:22, alignItems:'center', flexWrap:'wrap' }}>
         <Link to="/" style={{ color:C.accent, textDecoration:'none' }}>Главная</Link><span>/</span>
         <Link to="/catalog" style={{ color:C.accent, textDecoration:'none' }}>Каталог</Link>
-        {product.category_name && <><span>/</span><Link to={`/catalog?kind=${service ? 'services' : 'products'}&category=${product.category_slug}`} style={{ color:C.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:5 }}><CategoryIcon product={product} size={18}/>{product.category_name}</Link></>}
+        {product.category_name && <><span>/</span><Link to={`/catalog?kind=${categoryKind}&category=${product.category_slug}`} style={{ color:C.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:5 }}><CategoryIcon product={product} size={18}/>{product.category_name}</Link></>}
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 420px) 1fr', gap:28 }}>
@@ -124,7 +125,7 @@ export default function ProductPage() {
           </div>
 
           <h1 style={{ fontSize:24, fontWeight:900, color:C.t1, marginBottom:8, lineHeight:1.3 }}>{product.title}</h1>
-          {product.category_name && <div style={{ fontSize:13, color:C.t2, marginBottom:18, display:'flex', alignItems:'center', gap:6 }}>Категория: <Link to={`/catalog?kind=${service ? 'services' : 'products'}&category=${product.category_slug}`} style={{ color:C.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:6 }}><CategoryIcon product={product}/>{product.category_name}</Link></div>}
+          {product.category_name && <div style={{ fontSize:13, color:C.t2, marginBottom:18, display:'flex', alignItems:'center', gap:6 }}>Категория: <Link to={`/catalog?kind=${categoryKind}&category=${product.category_slug}`} style={{ color:C.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:6 }}><CategoryIcon product={product}/>{product.category_name}</Link></div>}
 
           <div style={{ marginBottom:20 }}>
             <div style={{ display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap' }}>
