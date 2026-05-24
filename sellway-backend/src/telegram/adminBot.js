@@ -24,9 +24,14 @@ const bot = new TelegramBot(telegramToken, {
   polling: false,
   ...createTelegramRequestOptions('Telegram admin bot'),
 });
+let pollingRetryTimer = null;
 
 async function startPolling() {
   try {
+    if (pollingRetryTimer) {
+      clearTimeout(pollingRetryTimer);
+      pollingRetryTimer = null;
+    }
     if (typeof bot.deleteWebHook === 'function') {
       await bot.deleteWebHook({ drop_pending_updates: false });
     } else if (typeof bot.deleteWebhook === 'function') {
@@ -37,10 +42,14 @@ async function startPolling() {
     logger.info('Telegram admin bot polling started', { username: me.username, id: me.id });
   } catch (err) {
     logger.error('Telegram admin bot polling start error', { err: err.message });
+    pollingRetryTimer = setTimeout(startPolling, 60 * 1000);
   }
 }
 
-if (pollingEnabled) startPolling();
+if (pollingEnabled) {
+  startPolling();
+  setInterval(() => {}, 60 * 60 * 1000);
+}
 else logger.info('Telegram admin bot client ready');
 
 bot.onText(/\/start|\/help/, async (msg) => {
