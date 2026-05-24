@@ -34,6 +34,7 @@ function ProductCard({ p, compact }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', paddingTop: 6, borderTop: `1px solid ${C.border}`, minWidth: 0 }}>
           <SellerLogo seller={p} service={service} />
           <span style={{ fontSize: 10, color: C.t2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.seller_name}</span>
+          {Number(p.seller_rating) > 0 && <span style={{ fontSize: 10, color: C.amber, whiteSpace: 'nowrap' }}>★ {Number(p.seller_rating).toFixed(1)}</span>}
         </div>
       </div>
     </button>

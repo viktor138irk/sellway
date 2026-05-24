@@ -39,11 +39,50 @@ textarea {
 
   .fade-in {
     min-width: 0;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .site-header-row {
+    gap: 7px !important;
+  }
+
+  .site-header input {
+    font-size: 13px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .site-nav {
+    scrollbar-width: none;
+  }
+
+  .site-nav::-webkit-scrollbar,
+  .seller-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .seller-sidebar {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .seller-identity {
+    min-width: 0 !important;
+    max-width: none !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #1e1e2e !important;
+    justify-content: flex-start;
+  }
+
+  .seller-nav {
+    width: 100% !important;
+    flex: none !important;
   }
 
   table {
-    width: 100%;
-    max-width: 100%;
+    min-width: 580px;
   }
 
   [style*="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))"],
@@ -52,6 +91,20 @@ textarea {
   }
 
   [style*="grid-template-columns: minmax(280px, 390px) 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  [style*="grid-template-columns: 1fr 160px 120px 90px 80px"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  [style*="grid-template-columns: 1fr 130px 36px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  [style*="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))"] {
     grid-template-columns: 1fr !important;
   }
 
@@ -86,5 +139,47 @@ textarea {
   aside[style*="width: 220"] + main {
     width: 100% !important;
     min-width: 0 !important;
+  }
+
+  .support-chat-panel {
+    right: 12px !important;
+    bottom: 76px !important;
+    width: calc(100vw - 24px) !important;
+    height: min(470px, calc(100vh - 100px)) !important;
+  }
+
+  .support-chat-button {
+    right: 12px !important;
+    bottom: 12px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-header-row {
+    height: auto !important;
+    min-height: 58px;
+    flex-wrap: wrap;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .site-actions {
+    margin-left: auto;
+  }
+
+  .site-search {
+    order: 3;
+    flex: 1 0 100% !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .site-nav-wrap {
+    padding: 0 4px !important;
+  }
+
+  .site-nav a {
+    padding-left: 11px !important;
+    padding-right: 11px !important;
   }
 }

@@ -4,13 +4,14 @@ const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const { transaction } = require('../config/db');
 const { sendVerifyEmail } = require('../services/mailer');
+const notify = require('../services/notify');
 const logger = require('../config/logger');
 
 function makeReferralCode() {
   return uuidv4().replace(/-/g, '').slice(0, 10).toUpperCase();
 }
 
-async function createSellerProfile(client, user, ref) {
+async function createSellerProfile(client, user, ref, commercialTermsAccepted) {
   let referrerId = null;
   if (ref) {
     const { rows: [referrer] } = await client.query(
@@ -23,11 +24,17 @@ async function createSellerProfile(client, user, ref) {
   const { rows: [setting] } = await client.query("SELECT value FROM settings WHERE key='default_referral_commission_rate' LIMIT 1");
   const defaultRate = setting?.value || '0.0100';
 
+  const { rows: [terms] } = await client.query("SELECT value FROM settings WHERE key='commercial_terms_version' LIMIT 1");
+  const commercialTermsVersion = terms?.value || '2026-05-25';
   await client.query(
-    `INSERT INTO sellers (user_id, display_name, referral_code, referred_by_seller_id, referral_commission_rate, referral_enabled, referral_application_status)
-     VALUES ($1,$2,$3,$4,$5,FALSE,'not_requested')
+    `INSERT INTO sellers (
+       user_id, display_name, referral_code, referred_by_seller_id, referral_commission_rate,
+       referral_enabled, referral_application_status,
+       commercial_terms_accepted_at, commercial_terms_version, commercial_application_status, commercial_requested_at
+     )
+     VALUES ($1,$2,$3,$4,$5,FALSE,'not_requested',NOW(),$6,'pending',NOW())
      ON CONFLICT (user_id) DO NOTHING`,
-    [user.id, user.username, makeReferralCode(), referrerId, defaultRate]
+    [user.id, user.username, makeReferralCode(), referrerId, defaultRate, commercialTermsAccepted ? commercialTermsVersion : null]
   );
 
   if (referrerId) {
@@ -52,6 +59,10 @@ router.post('/register', [
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
 
   const { email, username, password, role = 'buyer', ref } = req.body;
+  const commercialTermsAccepted = [true, 'true', '1', 'on', 'yes'].includes(req.body.commercialTermsAccepted);
+  if ((role === 'seller' || role === 'freelancer') && !commercialTermsAccepted) {
+    return res.status(422).json({ errors: [{ msg: 'Для магазина или фрилансера нужно принять дополнительные условия площадки' }] });
+  }
 
   try {
     const result = await transaction(async (client) => {
@@ -74,7 +85,7 @@ router.post('/register', [
       await client.query('INSERT INTO wallets (user_id) VALUES ($1)', [user.id]);
 
       if (role === 'seller' || role === 'freelancer') {
-        await createSellerProfile(client, user, ref);
+        await createSellerProfile(client, user, ref, commercialTermsAccepted);
       }
 
       return { user, verifyToken };
@@ -85,6 +96,14 @@ router.post('/register', [
     });
 
     logger.info('User registered', { userId: result.user.id, email, role });
+    if (role === 'seller' || role === 'freelancer') {
+      notify.notifyAdmins(
+        'system',
+        'Новая заявка на коммерческий аккаунт',
+        `${username} (${email}) зарегистрировался как ${role === 'freelancer' ? 'фрилансер' : 'продавец'} и ждет модерации`,
+        '/admin/users'
+      ).catch(() => {});
+    }
     return res.status(201).json({
       message: 'Регистрация успешна. Проверьте email для верификации.',
       user: result.user,

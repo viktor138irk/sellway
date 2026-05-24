@@ -71,7 +71,7 @@ export function RegisterPage() {
   const initialRef = params.get('ref') || '';
   const requestedRole = params.get('role');
   const initialRole = ['seller', 'freelancer'].includes(requestedRole) ? requestedRole : (initialRef ? 'seller' : 'buyer');
-  const [form, setForm] = useState({ email: '', username: '', password: '', role: initialRole, ref: initialRef, termsAccepted: false });
+  const [form, setForm] = useState({ email: '', username: '', password: '', role: initialRole, ref: initialRef, termsAccepted: false, commercialTermsAccepted: false });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -83,14 +83,22 @@ export function RegisterPage() {
     setErrors({});
     setLoading(true);
     try {
-      await register({ ...form, termsAccepted: form.termsAccepted ? 'true' : 'false' });
+      await register({
+        ...form,
+        termsAccepted: form.termsAccepted ? 'true' : 'false',
+        commercialTermsAccepted: form.commercialTermsAccepted ? 'true' : 'false',
+      });
       setDone(true);
       success('Аккаунт создан! Проверьте email.');
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors) {
         const errs = {};
-        data.errors.forEach(e => { errs[e.path || e.param] = e.msg; });
+        data.errors.forEach(e => {
+          const key = e.path || e.param;
+          if (key) errs[key] = e.msg;
+          else showError(e.msg);
+        });
         setErrors(errs);
       } else {
         showError(data?.error || 'Ошибка регистрации');
@@ -126,7 +134,7 @@ export function RegisterPage() {
           <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Я хочу</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: 8 }}>
             {roleOptions.map(([val, icon, label, hint]) => (
-              <button key={val} type="button" onClick={() => setForm(f => ({ ...f, role: val }))}
+              <button key={val} type="button" onClick={() => setForm(f => ({ ...f, role: val, commercialTermsAccepted: val === 'buyer' ? false : f.commercialTermsAccepted }))}
                 style={{ background: form.role === val ? C.accent + '18' : '#0A0A12', border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 10, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: form.role === val ? C.accent : C.t1 }}>{label}</div>
@@ -148,6 +156,15 @@ export function RegisterPage() {
             {errors.termsAccepted && <span style={{ display: 'block', color: C.red, marginTop: 4 }}>{errors.termsAccepted}</span>}
           </span>
         </label>
+        {['seller', 'freelancer'].includes(form.role) && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#0A0A12', border: `1px solid ${errors.commercialTermsAccepted ? C.red : C.border}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.commercialTermsAccepted} onChange={e => setForm(f => ({ ...f, commercialTermsAccepted: e.target.checked }))} style={{ marginTop: 2, accentColor: C.accent }} />
+            <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.5 }}>
+              Я принимаю дополнительные условия для коммерческого аккаунта и понимаю, что публикация товаров или услуг станет доступна только после модерации администратором.
+              {errors.commercialTermsAccepted && <span style={{ display: 'block', color: C.red, marginTop: 4 }}>{errors.commercialTermsAccepted}</span>}
+            </span>
+          </label>
+        )}
         <Btn type="submit" full loading={loading} size="lg">Создать аккаунт</Btn>
       </form>
       <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: C.t2 }}>

@@ -7,6 +7,8 @@ export const getWithdrawConfig = () => client.get('/seller/withdrawal/config');
 export const saveAutoPayout = (data) => client.put('/seller/withdrawal/auto-payout', data);
 export const getTelegramLink = () => client.post('/auth/telegram-link');
 export const uploadSellerAvatar = (formData) => client.post('/seller/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const getCommercialStatus = () => client.get('/seller/commercial-status');
+export const acceptCommercialTerms = () => client.post('/seller/commercial-terms');
 export const getNotifications = () => client.get('/notifications');
 export const readAllNotifs    = () => client.post('/notifications/read-all');
 export const readNotif        = (id) => client.post(`/notifications/${id}/read`);

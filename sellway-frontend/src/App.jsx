@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams, u
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Header from './components/Layout/Header';
+import SupportWidget from './components/SupportWidget';
 import { C, Spinner } from './components/UI';
 import { syncPaymentReturn } from './api/payments';
 
@@ -101,7 +102,7 @@ function AppRoutes() {
     <Route path="/admin/logs" element={<Protected roles={['admin']}><AdminLogs/></Protected>}/>
     <Route path="/payment/success" element={<PaymentSuccess/>}/>
     <Route path="*" element={<NotFound/>}/>
-  </Routes></Suspense></>;
+  </Routes></Suspense><SupportWidget/></>;
 }
 function PaymentSuccess() {
   const { refreshUser } = useAuth();

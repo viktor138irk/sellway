@@ -178,13 +178,13 @@ router.get('/users', async (req, res) => {
   const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
   params.push(Number(limit), offset);
   try {
-    const { rows } = await query(`SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
+    const { rows } = await query(`SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
     res.json({ users: rows });
   } catch (err) { logger.error('Admin users list error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 router.put('/users/:id', requireRole('admin'), async (req, res) => {
-  const { role, status, custom_commission_rate, referral_commission_rate, referred_by } = req.body;
+  const { role, status, seller_verified, custom_commission_rate, referral_commission_rate, referred_by } = req.body;
   const allowedRoles = ['buyer', 'seller', 'freelancer', 'moderator', 'admin'];
   if (role && !allowedRoles.includes(role)) return res.status(400).json({ error: 'Некорректная роль' });
   try {
@@ -212,6 +212,23 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
         if (custom_commission_rate !== undefined) { values.push(commissionRate); updates.push(`custom_commission_rate=$${values.length}`); }
         if (referralRate !== undefined) { values.push(referralRate); updates.push(`referral_commission_rate=$${values.length}`); }
         if (referrerId !== undefined) { values.push(referrerId); updates.push(`referred_by_seller_id=$${values.length}`); }
+        if (seller_verified !== undefined) {
+          const approved = seller_verified === true || seller_verified === 'true';
+          if (approved) {
+            const { rows: [profile] } = await client.query(
+              'SELECT commercial_terms_accepted_at FROM sellers WHERE user_id=$1',
+              [user.id]
+            );
+            if (!profile?.commercial_terms_accepted_at) {
+              throw { status: 400, message: 'Пользователь еще не принял дополнительные условия' };
+            }
+          }
+          values.push(approved); updates.push(`verified=$${values.length}`);
+          updates.push(`verified_at=CASE WHEN ${approved ? 'TRUE' : 'FALSE'} THEN NOW() ELSE NULL END`);
+          updates.push(`commercial_application_status=CASE WHEN ${approved ? 'TRUE' : 'FALSE'} THEN 'approved' ELSE 'pending' END`);
+          updates.push(`commercial_reviewed_at=CASE WHEN ${approved ? 'TRUE' : 'FALSE'} THEN NOW() ELSE commercial_reviewed_at END`);
+          values.push(req.user.id); updates.push(`commercial_reviewed_by=CASE WHEN ${approved ? 'TRUE' : 'FALSE'} THEN $${values.length} ELSE commercial_reviewed_by END`);
+        }
         if (updates.length) { values.push(user.id); await client.query(`UPDATE sellers SET ${updates.join(', ')} WHERE user_id=$${values.length}`, values); }
         await client.query(`UPDATE sellers s SET referred_sellers_count=(SELECT COUNT(*) FROM sellers child WHERE child.referred_by_seller_id=s.user_id)`);
       }
@@ -220,6 +237,70 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
     logger.info('User updated by admin users fix', { targetId: req.params.id, adminId: req.user.id, role, status });
     res.json(result);
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Admin users update error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+router.post('/users/:id/approve-commercial', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows: [user] } = await transaction(async (client) => {
+      const { rows: [target] } = await client.query('SELECT id, username, email, role FROM users WHERE id=$1', [req.params.id]);
+      if (!target) throw { status: 404, message: 'Пользователь не найден' };
+      if (!COMMERCIAL_ROLES.includes(target.role)) throw { status: 400, message: 'Это не коммерческая роль' };
+      await ensureSellerProfile(client, target);
+      const { rows } = await client.query(
+        `UPDATE sellers
+         SET verified=TRUE,
+             verified_at=NOW(),
+             commercial_application_status='approved',
+             commercial_reviewed_at=NOW(),
+             commercial_reviewed_by=$1,
+             commercial_reject_reason=NULL,
+             updated_at=NOW()
+         WHERE user_id=$2 AND commercial_terms_accepted_at IS NOT NULL
+         RETURNING user_id`,
+        [req.user.id, target.id]
+      );
+      if (!rows.length) throw { status: 400, message: 'Пользователь еще не принял дополнительные условия' };
+      return { rows: [target] };
+    });
+    if (!user) return res.status(404).json({ error: 'Профиль не найден' });
+    res.json({ message: 'Коммерческий аккаунт одобрен', user });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    logger.error('Approve commercial user error', { err: err.message, targetId: req.params.id });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.post('/users/:id/reject-commercial', requireRole('admin'), async (req, res) => {
+  const reason = String(req.body?.reason || 'Не прошел модерацию').trim().slice(0, 500);
+  try {
+    const { rows: [user] } = await transaction(async (client) => {
+      const { rows: [target] } = await client.query('SELECT id, username, email, role FROM users WHERE id=$1', [req.params.id]);
+      if (!target) throw { status: 404, message: 'Пользователь не найден' };
+      if (!COMMERCIAL_ROLES.includes(target.role)) throw { status: 400, message: 'Это не коммерческая роль' };
+      await ensureSellerProfile(client, target);
+      const { rows } = await client.query(
+        `UPDATE sellers
+         SET verified=FALSE,
+             verified_at=NULL,
+             commercial_application_status='rejected',
+             commercial_reviewed_at=NOW(),
+             commercial_reviewed_by=$1,
+             commercial_reject_reason=$2,
+             updated_at=NOW()
+         WHERE user_id=$3
+         RETURNING user_id`,
+        [req.user.id, reason, target.id]
+      );
+      return { rows: rows.length ? [target] : [] };
+    });
+    if (!user) return res.status(404).json({ error: 'Профиль не найден' });
+    res.json({ message: 'Коммерческий аккаунт отклонен', user });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    logger.error('Reject commercial user error', { err: err.message, targetId: req.params.id });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
 });
 
 module.exports = router;

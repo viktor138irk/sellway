@@ -136,7 +136,7 @@ async function adminNewProduct(product) {
   return notifyAdmins('system',
     '📦 Новый товар на модерации',
     `Товар "${product.title}" ожидает проверки.`,
-    `/admin/products/${product.id}`
+    '/admin/products'
   );
 }
 

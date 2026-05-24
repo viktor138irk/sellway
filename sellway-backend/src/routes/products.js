@@ -7,6 +7,7 @@ const { query, transaction } = require('../config/db');
 const { auth, requireRole, optionalAuth } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
+const { assertRoleCanUseDelivery, assertCommercialAccess } = require('../services/commercialAccess');
 
 const DELIVERY_TYPES = ['auto', 'manual', 'file', 'service'];
 
@@ -38,17 +39,6 @@ function buildMeta(deliveryType, serviceSteps, previous = {}) {
     delete meta.service_steps;
   }
   return meta;
-}
-
-function assertRoleCanUseDelivery(user, deliveryType) {
-  if (user.role === 'admin') return null;
-  if (deliveryType === 'service' && user.role !== 'freelancer') {
-    return 'Услуги может создавать только фрилансер';
-  }
-  if (deliveryType !== 'service' && user.role !== 'seller') {
-    return 'Цифровые товары может создавать только продавец';
-  }
-  return null;
 }
 
 async function assertCategoryMatchesDelivery(categoryId, deliveryType) {
@@ -200,6 +190,8 @@ router.post('/', auth, requireRole('seller', 'freelancer', 'admin'), [
   try {
     const categoryError = await assertCategoryMatchesDelivery(category_id, delivery_type);
     if (categoryError) return res.status(400).json({ error: categoryError });
+    const commercial = await assertCommercialAccess(req.user, delivery_type);
+    if (!commercial.ok) return res.status(commercial.status || 403).json({ error: commercial.error, code: commercial.code });
 
     const { rows: [product] } = await query(
       `INSERT INTO products (seller_id, category_id, title, description, short_desc, price, old_price, delivery_type, guarantee_days, tags, meta, status)
@@ -228,6 +220,8 @@ router.put('/:id', auth, requireRole('seller', 'freelancer', 'admin'), async (re
     const finalCategoryId = category_id || existing.category_id;
     const categoryError = await assertCategoryMatchesDelivery(finalCategoryId, finalDeliveryType);
     if (categoryError) return res.status(400).json({ error: categoryError });
+    const commercial = await assertCommercialAccess(req.user, finalDeliveryType);
+    if (!commercial.ok) return res.status(commercial.status || 403).json({ error: commercial.error, code: commercial.code });
 
     const tags = normalizeTags(req.body.tags);
     const meta = buildMeta(finalDeliveryType, service_steps, existing.meta);

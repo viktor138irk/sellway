@@ -39,6 +39,7 @@ app.use('/api/admin',          require('./routes/adminReferralModeration'));
 app.use('/api/admin',          require('./routes/adminUsersFix'));
 app.use('/api/admin',          require('./routes/admin'));
 app.use('/api/notifications',  require('./routes/notifications'));
+app.use('/api/support',        require('./routes/support'));
 app.use('/api/payments',       require('./routes/payments'));
 app.use('/api/seo',            require('./routes/seo'));
 app.use('/api/settings',       require('./routes/publicSettings'));

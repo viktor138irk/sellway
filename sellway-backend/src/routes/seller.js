@@ -7,6 +7,7 @@ const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
 const { canUseReferralProgram, referralRequirements } = require('../services/referralEligibility');
+const { describeCommercialAccess } = require('../services/commercialAccess');
 
 router.use(auth, requireRole('seller', 'freelancer', 'admin'));
 
@@ -24,6 +25,18 @@ const avatarUpload = multer({
 
 function roleForLink(role) { return role === 'freelancer' ? 'freelancer' : 'seller'; }
 function referralLink(code, role) { return code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=${roleForLink(role)}&ref=${code}` : null; }
+async function requireApprovedCommercial(req, res, next) {
+  if (req.user.role === 'admin') return next();
+  try {
+    const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
+    const access = describeCommercialAccess(req.user, seller);
+    if (!access.ok) return res.status(403).json({ error: access.message, code: access.code });
+    next();
+  } catch (err) {
+    logger.error('Commercial approval check error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка проверки аккаунта' });
+  }
+}
 
 router.post('/avatar', avatarUpload.single('avatar'), async (req, res) => {
   try {
@@ -71,7 +84,7 @@ router.get('/dashboard', async (req, res) => {
   } catch (err) { logger.error('Seller dashboard error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-router.get('/referrals', async (req, res) => {
+router.get('/referrals', requireApprovedCommercial, async (req, res) => {
   try {
     const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
     if (!seller) return res.status(404).json({ error: 'Профиль продавца/фрилансера не найден' });
@@ -87,7 +100,7 @@ router.get('/referrals', async (req, res) => {
   } catch (err) { logger.error('Referrals page error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-router.post('/referrals/apply', async (req, res) => {
+router.post('/referrals/apply', requireApprovedCommercial, async (req, res) => {
   try {
     if (!canUseReferralProgram(req.user)) {
       const requirements = referralRequirements(req.user);
@@ -105,6 +118,8 @@ router.post('/referrals/apply', async (req, res) => {
     res.json({ message: 'Заявка отправлена на модерацию' });
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Referral apply error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
+
+router.use('/withdrawal', requireApprovedCommercial);
 
 const WITHDRAW_METHODS = { card: { label: 'Банковская карта', icon: '💳', placeholder: 'Номер карты' }, sbp: { label: 'СБП (Быстрые платежи)', icon: '⚡', placeholder: 'Номер телефона' }, paypal: { label: 'PayPal', icon: '🅿️', placeholder: 'Email PayPal' }, crypto: { label: 'Криптовалюта', icon: '₿', placeholder: 'Адрес кошелька' } };
 async function getUsdtRateRub(settings = {}) {
@@ -163,7 +178,7 @@ async function getWithdrawConfig(client = { query }, userId = null) {
   return config;
 }
 
-router.get('/withdrawal/config', async (req, res) => {
+router.get('/withdrawal/config', requireApprovedCommercial, async (req, res) => {
   try {
     res.json(await getWithdrawConfig({ query }, req.user.id));
   } catch (err) {
@@ -172,7 +187,60 @@ router.get('/withdrawal/config', async (req, res) => {
   }
 });
 
-router.put('/withdrawal/auto-payout', async (req, res) => {
+router.get('/commercial-status', async (req, res) => {
+  try {
+    const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
+    const access = describeCommercialAccess(req.user, seller);
+    res.json({
+      access,
+      seller: seller || null,
+      role: req.user.role,
+      requirements: {
+        terms: Boolean(seller?.commercial_terms_accepted_at),
+        approved: Boolean(seller?.verified && seller?.commercial_application_status === 'approved'),
+      },
+    });
+  } catch (err) {
+    logger.error('Commercial status error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.post('/commercial-terms', async (req, res) => {
+  try {
+    const result = await transaction(async (client) => {
+      const { rows: [terms] } = await client.query("SELECT value FROM settings WHERE key='commercial_terms_version' LIMIT 1");
+      const version = terms?.value || '2026-05-25';
+      const { rows: [seller] } = await client.query(
+        `UPDATE sellers
+         SET commercial_terms_accepted_at=COALESCE(commercial_terms_accepted_at,NOW()),
+             commercial_terms_version=$1,
+             commercial_application_status=CASE WHEN commercial_application_status='approved' THEN 'approved' ELSE 'pending' END,
+             commercial_requested_at=COALESCE(commercial_requested_at,NOW()),
+             commercial_reject_reason=NULL,
+             updated_at=NOW()
+         WHERE user_id=$2
+         RETURNING *`,
+        [version, req.user.id]
+      );
+      if (!seller) throw { status: 404, message: 'Коммерческий профиль не найден' };
+      return seller;
+    });
+    await notify.notifyAdmins(
+      'system',
+      'Заявка на коммерческий аккаунт',
+      `${req.user.username} принял дополнительные условия и ждет модерации`,
+      '/admin/users'
+    ).catch(() => {});
+    res.json({ seller: result, access: describeCommercialAccess(req.user, result) });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    logger.error('Commercial terms apply error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.put('/withdrawal/auto-payout', requireApprovedCommercial, async (req, res) => {
   const enabled = req.body?.enabled === true || req.body?.enabled === 'true';
   const method = String(req.body?.method || 'card');
   const threshold = parseFloat(req.body?.threshold || 0);

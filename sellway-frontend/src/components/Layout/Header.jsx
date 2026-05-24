@@ -104,7 +104,7 @@ export default function Header() {
   ];
   const isSellerRole = ['seller', 'freelancer', 'admin'].includes(user?.role);
   const mobilePanelBase = isMobile
-    ? { position: 'fixed', top: 54, right: 10, maxWidth: 'calc(100vw - 20px)', zIndex: 5000 }
+    ? { position: 'fixed', top: 101, right: 10, maxWidth: 'calc(100vw - 20px)', zIndex: 5000 }
     : { position: 'absolute', top: 42, right: 0, maxWidth: 'calc(100vw - 24px)', zIndex: 5000 };
   const notifPanelStyle = {
     ...mobilePanelBase,
@@ -125,18 +125,18 @@ export default function Header() {
     overflow: 'hidden',
   };
 
-  return <header style={{ background: '#0F0F18', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 4000 }}>
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 10px' : '0 20px', height: 58, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14 }}>
+  return <header className="site-header" style={{ background: '#0F0F18', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 4000 }}>
+    <div className="site-header-row" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 10px' : '0 20px', height: 58, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14 }}>
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
         <div style={{ width: 30, height: 30, background: `linear-gradient(135deg,${C.accent},#A78BFA)`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>S</div>
-        <span style={{ fontSize: 17, fontWeight: 900, color: C.t1 }}>SellWay</span>
+        <span className="site-brand-text" style={{ fontSize: 17, fontWeight: 900, color: C.t1 }}>SellWay</span>
       </Link>
 
-      <form onSubmit={handleSearch} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+      <form className="site-search" onSubmit={handleSearch} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск товаров и услуг..." style={{ width: '100%', boxSizing: 'border-box', background: '#141420', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', color: C.t1, fontSize: 14, outline: 'none', fontFamily: 'inherit' }} />
       </form>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+      <div className="site-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
         {user ? <>
           <div ref={notifsRef} style={{ position: 'relative' }}>
             <button type="button" onClick={toggleNotifs} aria-label="Уведомления" style={{ width: 34, height: 34, borderRadius: 9, background: showNotifs ? '#1A1A28' : 'transparent', border: `1px solid ${C.border}`, color: C.t2, fontSize: 15, cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -179,8 +179,8 @@ export default function Header() {
       </div>
     </div>
 
-    <div style={{ borderTop: `1px solid ${C.border}`, padding: isMobile ? '0 10px' : '0 20px' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 0, overflowX: 'auto' }}>
+    <div className="site-nav-wrap" style={{ borderTop: `1px solid ${C.border}`, padding: isMobile ? '0 10px' : '0 20px' }}>
+      <div className="site-nav" style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 0, overflowX: 'auto' }}>
         {navLinks.map(([to, label]) => {
           const target = new URLSearchParams(to.split('?')[1] || '');
           const current = new URLSearchParams(location.search);

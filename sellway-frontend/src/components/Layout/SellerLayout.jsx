@@ -23,9 +23,9 @@ export default function SellerLayout({ children }) {
   const nav = BASE_NAV.map(item => user?.role === 'freelancer' && item[0] === '/seller/products' ? ['/seller/products', '🧑‍💻', 'Услуги'] : item);
 
   return (
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: isMobile ? 'auto' : 'calc(100vh - 90px)', width: '100%', minWidth: 0 }}>
-      <aside style={{ width: isMobile ? '100%' : 220, background: '#0F0F18', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: isMobile ? 'stretch' : 'normal', overflow: 'hidden' }}>
-        <div style={{ padding: isMobile ? '12px 10px' : '20px 16px', borderBottom: isMobile ? 'none' : `1px solid ${C.border}`, borderRight: isMobile ? `1px solid ${C.border}` : 'none', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', gap: 10, minWidth: isMobile ? 155 : 'auto', maxWidth: isMobile ? 175 : 'none' }}>
+    <div className="seller-shell" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: isMobile ? 'auto' : 'calc(100vh - 90px)', width: '100%', minWidth: 0 }}>
+      <aside className="seller-sidebar" style={{ width: isMobile ? '100%' : 220, background: '#0F0F18', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'column', alignItems: 'stretch', overflow: 'hidden' }}>
+        <div className="seller-identity" style={{ padding: isMobile ? '12px 14px' : '20px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{ width: isMobile ? 40 : 58, height: isMobile ? 40 : 58, borderRadius: 14, background: `linear-gradient(135deg,${C.accent},#A78BFA)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 14 : 20, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
             {user?.username?.slice(0, 2).toUpperCase()}
           </div>
@@ -46,7 +46,7 @@ export default function SellerLayout({ children }) {
           </div>}
         </div>
 
-        <nav style={{ flex: 1, padding: isMobile ? '9px 10px' : '10px 8px', overflowY: isMobile ? 'hidden' : 'auto', overflowX: isMobile ? 'auto' : 'hidden', display: isMobile ? 'flex' : 'block', gap: isMobile ? 6 : 0, whiteSpace: isMobile ? 'nowrap' : 'normal' }}>
+        <nav className="seller-nav" style={{ flex: 1, padding: isMobile ? '9px 10px' : '10px 8px', overflowY: isMobile ? 'hidden' : 'auto', overflowX: isMobile ? 'auto' : 'hidden', display: isMobile ? 'flex' : 'block', gap: isMobile ? 6 : 0, whiteSpace: isMobile ? 'nowrap' : 'normal' }}>
           {nav.map(([to, icon, label]) => {
             const active = location.pathname === to || (to !== '/seller' && location.pathname.startsWith(to));
             return (

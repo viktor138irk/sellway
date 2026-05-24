@@ -28,6 +28,7 @@ const ENV_SETTINGS = {
   SMTP_SECURE: 'Использовать защищенное SMTP-соединение',
   SMTP_USER: 'SMTP-пользователь',
   SMTP_PASS: 'SMTP-пароль',
+  SMTP_FROM: 'Email отправителя писем',
   SMSPILOT_ENABLED: 'Включить SMSPilot',
   SMSPILOT_API_KEY: 'API-ключ SMSPilot',
   SMSPILOT_SENDER: 'Имя отправителя SMSPilot',

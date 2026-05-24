@@ -3,17 +3,35 @@ const logger = require('../config/logger');
 
 const BASE = process.env.FRONTEND_URL || 'https://sellway.pro';
 
+function smtpConfig() {
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '');
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  const secure = String(process.env.SMTP_SECURE || (port === 465 ? 'true' : 'false')).toLowerCase() === 'true';
+  if (!host) throw new Error('SMTP_HOST не указан');
+  if (!user) throw new Error('SMTP_USER не указан');
+  if (!pass) throw new Error('SMTP_PASS не указан');
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SMTP_PORT указан неверно');
+  return { host, user, pass, port, secure };
+}
+
 function createTransporter() {
+  const cfg = smtpConfig();
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT) || 465,
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+    tls: { servername: cfg.host },
   });
 }
 
 function mailFrom() {
-  return `"SellWay" <${process.env.SMTP_USER}>`;
+  return `"SellWay" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`;
 }
 
 async function sendVerifyEmail(email, username, token) {
@@ -45,12 +63,15 @@ async function sendGuestPasswordEmail(email, username, password) {
 }
 
 async function sendTestEmail(email) {
-  await createTransporter().sendMail({
+  const transporter = createTransporter();
+  await transporter.verify();
+  await transporter.sendMail({
     from: mailFrom(),
     to: email,
     subject: 'SellWay — тест SMTP',
     html: '<h2>SellWay</h2><p>SMTP настроен корректно. Это тестовое письмо из админ-панели.</p>',
   });
+  return { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, secure: process.env.SMTP_SECURE === 'true' };
 }
 
 module.exports = { sendVerifyEmail, sendResetEmail, sendGuestPasswordEmail, sendTestEmail };

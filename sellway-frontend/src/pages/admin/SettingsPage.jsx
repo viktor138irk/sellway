@@ -69,6 +69,7 @@ const PAGES = {
         ['SMTP_SECURE','Защищенное соединение','toggle','true','true для 465, false для 587'],
         ['SMTP_USER','SMTP пользователь','text','noreply@sellway.pro','Email отправителя'],
         ['SMTP_PASS','SMTP пароль','password','','Пароль приложения или почтового ящика'],
+        ['SMTP_FROM','Email отправителя','text','noreply@sellway.pro','Должен быть разрешен SMTP-провайдером'],
       ]},
       { title: 'SMSPilot', keys: [
         ['SMSPILOT_ENABLED','Включить SMSPilot','toggle','false','Отправка SMS-кодов подтверждения'],
@@ -96,7 +97,7 @@ const PAGES = {
 const RESTART_KEYS = new Set([
   'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_BOT_TOKEN', 'TELEGRAM_ADMIN_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID',
   'PROXY_ENABLED', 'PROXY_SCHEME', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_USERNAME', 'PROXY_PASSWORD',
-  'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS',
+  'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM',
   'SMSPILOT_ENABLED', 'SMSPILOT_API_KEY', 'SMSPILOT_SENDER', 'SMS_CODE_TEMPLATE',
 ]);
 

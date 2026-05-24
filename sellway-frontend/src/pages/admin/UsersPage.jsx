@@ -15,6 +15,7 @@ function UserModal({ user, onClose, onSave }) {
   const [role, setRole] = useState(user.role);
   const [status, setStatus] = useState(user.status);
   const [sellerSettings, setSellerSettings] = useState({
+    seller_verified: Boolean(user.seller_verified),
     custom_commission_rate: user.custom_commission_rate ?? '',
     referral_commission_rate: user.referral_commission_rate ?? '0.0100',
     referred_by: user.referred_by_email || user.referred_by_username || '',
@@ -28,6 +29,7 @@ function UserModal({ user, onClose, onSave }) {
     try {
       const payload = { role, status };
       if (isCommercial) {
+        payload.seller_verified = sellerSettings.seller_verified;
         payload.custom_commission_rate = sellerSettings.custom_commission_rate;
         payload.referral_commission_rate = sellerSettings.referral_commission_rate;
         payload.referred_by = sellerSettings.referred_by;
@@ -76,6 +78,10 @@ function UserModal({ user, onClose, onSave }) {
             <div style={{ fontSize: 14, fontWeight: 900, color: C.t1 }}>{role === 'freelancer' ? 'Фрилансер' : 'Продавец'}: комиссии и реферальная система</div>
             <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>Код создаётся автоматически для продавцов и фрилансеров.</div>
           </div>
+          <label style={{ display:'flex', gap:10, alignItems:'center', background:'#111119', border:`1px solid ${C.border}`, borderRadius:10, padding:'11px 12px', cursor:'pointer' }}>
+            <input type="checkbox" checked={sellerSettings.seller_verified} onChange={e => setSellerSettings(s => ({ ...s, seller_verified:e.target.checked }))} style={{ accentColor:C.accent }} />
+            <span style={{ color:C.t1, fontSize:13, fontWeight:700 }}>Аккаунт прошел модерацию и может публиковать {role === 'freelancer' ? 'услуги' : 'товары'}</span>
+          </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             <Input label="Персональная комиссия" type="number" step="0.0001" min="0" max="0.5" value={sellerSettings.custom_commission_rate} helper="Пусто = ставка по умолчанию. 0.07 = 7%" onChange={e => setSellerSettings(s => ({ ...s, custom_commission_rate: e.target.value }))} />
             <Input label="Реферальный процент" type="number" step="0.0001" min="0" max="0.5" value={sellerSettings.referral_commission_rate} helper="0.01 = 1% с оборота" onChange={e => setSellerSettings(s => ({ ...s, referral_commission_rate: e.target.value }))} />

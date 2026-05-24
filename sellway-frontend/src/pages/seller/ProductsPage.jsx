@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SellerLayout from '../../components/Layout/SellerLayout';
 import { C, Spinner, Btn, Input, Select, Textarea, Modal } from '../../components/UI';
 import { getProducts, getProduct, createProduct, updateProduct, deleteProduct, uploadImages, uploadProductFile, addKeys, getKeys, getCategories } from '../../api/products';
+import { getCommercialStatus, acceptCommercialTerms } from '../../api/seller';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -89,6 +90,43 @@ function CategoryIcon({ cat, size = 30 }) {
   return <span style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
     {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(11, size * .38), fontWeight: 900, color: C.t2 }}>{letter}</span>}
   </span>;
+}
+
+function CommercialAccessBlock({ service, status, onRefresh }) {
+  const toast = useToast();
+  const [loading, setLoading] = useState(false);
+  const access = status?.access || {};
+  const needsTerms = access.code === 'terms_required' || !status?.requirements?.terms;
+  const pending = access.code === 'moderation_required' || status?.seller?.commercial_application_status === 'pending';
+  const rejected = access.code === 'rejected' || status?.seller?.commercial_application_status === 'rejected';
+  async function accept() {
+    setLoading(true);
+    try {
+      await acceptCommercialTerms();
+      toast.success('Заявка отправлена на модерацию');
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось отправить заявку');
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <div style={{ background: C.card, border: `1px solid ${rejected ? C.red + '66' : C.border}`, borderRadius: 14, padding: 22, maxWidth: 720 }}>
+      <div style={{ fontSize: 18, fontWeight: 900, color: C.t1, marginBottom: 8 }}>
+        {service ? 'Публикация услуг недоступна' : 'Публикация товаров недоступна'}
+      </div>
+      <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.6 }}>
+        {needsTerms && 'Перед публикацией нужно принять дополнительные условия коммерческого аккаунта и отправить заявку на модерацию.'}
+        {pending && 'Коммерческий аккаунт ожидает одобрения администратора. После модерации здесь появится возможность публиковать.'}
+        {rejected && (status?.seller?.commercial_reject_reason || access.message || 'Заявка отклонена. Исправьте данные и отправьте повторно.')}
+        {!needsTerms && !pending && !rejected && (access.message || 'Коммерческий аккаунт пока не одобрен.')}
+      </div>
+      {(needsTerms || rejected) && <div style={{ marginTop: 16 }}>
+        <Btn loading={loading} onClick={accept}>Принять условия и отправить заявку</Btn>
+      </div>}
+    </div>
+  );
 }
 
 function ProductForm({ productId, onSave, onCancel, user }) {
@@ -229,11 +267,22 @@ export default function ProductsPage({ mode }) {
   const modeName = roleMode(user?.role);
   const service = isService(modeName);
   const [products, setProducts] = useState([]);
+  const [commercialStatus, setCommercialStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState(null);
   const isForm = mode === 'create' || mode === 'edit';
 
+  useEffect(() => { if (user?.id) loadCommercialStatus(); }, [user?.id]);
   useEffect(() => { if (!isForm && user?.id) loadProducts(); }, [isForm, user?.id]);
+
+  async function loadCommercialStatus() {
+    try {
+      const r = await getCommercialStatus();
+      setCommercialStatus(r.data);
+    } catch {
+      setCommercialStatus(null);
+    }
+  }
 
   async function loadProducts() {
     setLoading(true);
@@ -252,6 +301,7 @@ export default function ProductsPage({ mode }) {
 
   const STATUS_COLOR = { active: C.green, pending: C.amber, rejected: C.red, archived: C.t3, draft: C.t2 };
   const STATUS_LABEL = { active: 'Активен', pending: 'На проверке', rejected: 'Отклонён', archived: 'Архив', draft: 'Черновик' };
+  const canPublish = user?.role === 'admin' || commercialStatus?.access?.ok;
 
   if (isForm) return (
     <SellerLayout>
@@ -261,7 +311,9 @@ export default function ProductsPage({ mode }) {
           <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{mode === 'edit' ? (service ? 'Редактировать услугу' : 'Редактировать товар') : (service ? 'Новая услуга' : 'Новый товар')}</h1>
         </div>
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 'clamp(16px, 4vw, 24px)' }}>
-          <ProductForm productId={editId} user={user} onSave={() => navigate('/seller/products')} onCancel={() => navigate('/seller/products')} />
+          {canPublish
+            ? <ProductForm productId={editId} user={user} onSave={() => navigate('/seller/products')} onCancel={() => navigate('/seller/products')} />
+            : <CommercialAccessBlock service={service} status={commercialStatus} onRefresh={loadCommercialStatus} />}
         </div>
       </div>
     </SellerLayout>
@@ -275,8 +327,12 @@ export default function ProductsPage({ mode }) {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{service ? 'Мои услуги' : 'Мои товары'}</h1>
             <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{service ? 'Фриланс-услуги со сметой и поэтапной сделкой' : 'Готовые цифровые товары, ключи и файлы'}</div>
           </div>
-          <Btn onClick={() => navigate('/seller/products/new')} icon="+">{service ? 'Добавить услугу' : 'Добавить товар'}</Btn>
+          <Btn onClick={() => { if (canPublish) navigate('/seller/products/new'); }} icon="+" disabled={!canPublish}>{service ? 'Добавить услугу' : 'Добавить товар'}</Btn>
         </div>
+
+        {!canPublish && <div style={{ marginBottom: 18 }}>
+          <CommercialAccessBlock service={service} status={commercialStatus} onRefresh={loadCommercialStatus} />
+        </div>}
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
         : products.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 50, textAlign: 'center' }}>

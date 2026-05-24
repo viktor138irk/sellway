@@ -427,6 +427,11 @@ install_backend() {
         warn "Fix DATABASE_URL in ${APP_DIR}/sellway-backend/.env and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"
       fi
     fi
+    log "Applying database migrations"
+    for migration in db/migrations/*.sql; do
+      [[ -f "$migration" ]] || continue
+      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+    done
   else
     warn "Database schema was not applied. Set DATABASE_URL and run: psql \"\$DATABASE_URL\" -f ${APP_DIR}/sellway-backend/db/schema.sql"
   fi
