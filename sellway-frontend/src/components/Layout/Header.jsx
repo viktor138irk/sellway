@@ -186,7 +186,6 @@ export default function Header() {
           const current = new URLSearchParams(location.search);
           const active = location.pathname === '/catalog'
             && (target.get('kind') || 'products') === (current.get('kind') || 'products')
-            && (target.get('delivery') || '') === (current.get('delivery') || '')
             && (target.get('sort') || '') === (current.get('sort') || '');
           return <Link key={to} to={to} style={{ padding: '9px 16px', fontSize: 13, color: active ? C.accent : C.t2, textDecoration: 'none', fontWeight: 600, borderBottom: `2px solid ${active ? C.accent : 'transparent'}`, whiteSpace: 'nowrap' }}>{label}</Link>;
         })}

@@ -69,7 +69,8 @@ bash scripts/install.sh
 
 - `DATABASE_URL` — подключение к PostgreSQL.
 - `JWT_SECRET` и `JWT_REFRESH_SECRET` — установщик генерирует автоматически.
-- `TELEGRAM_BOT_TOKEN` — токен от `@BotFather`.
+- `TELEGRAM_BOT_TOKEN` и `TELEGRAM_BOT_USERNAME` — основной бот для пользователей.
+- `TELEGRAM_ADMIN_BOT_TOKEN` и `TELEGRAM_ADMIN_BOT_USERNAME` — отдельный бот для админов.
 - `TELEGRAM_ADMIN_CHAT_ID` — ID чата администратора.
 - `SMTP_*` — почта для уведомлений.
 - `YUKASSA_SHOP_ID` и `YUKASSA_SECRET_KEY` — ключи ЮKassa.
@@ -80,7 +81,7 @@ bash scripts/install.sh
 После изменения `.env` перезапусти процессы:
 
 ```bash
-pm2 restart sellway-api sellway-bot --update-env
+pm2 restart sellway-api sellway-bot sellway-admin-bot --update-env
 ```
 
 ## 4. Nginx и SSL
@@ -173,7 +174,7 @@ sudo bash scripts/update.sh
 - использует сохранённый `SITE_ROOT` из `deploy/install.env`;
 - если `deploy/install.env` ещё нет, пробует найти FastPanel document root автоматически;
 - ставит зависимости, собирает frontend и копирует `dist` в корень сайта;
-- перезапускает `sellway-api` и `sellway-bot` через PM2.
+- перезапускает `sellway-api`, `sellway-bot` и `sellway-admin-bot` через PM2.
 
 Если нужно отключить миграции:
 

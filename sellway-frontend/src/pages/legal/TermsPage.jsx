@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { C } from '../../components/UI';
+import client from '../../api/client';
 
 const rules = [
   ['Аккаунт', 'Один пользователь — один аккаунт. Запрещены мультиаккаунты, обход блокировок, фиктивные регистрации и передача аккаунта третьим лицам.'],
@@ -13,15 +15,21 @@ const rules = [
 ];
 
 export default function TermsPage() {
+  const [custom, setCustom] = useState(null);
+  useEffect(() => {
+    client.get('/settings/terms').then(r => setCustom(r.data)).catch(() => {});
+  }, []);
+  const customContent = String(custom?.content || '').trim();
   return <div style={{ maxWidth: 920, margin: '0 auto', padding: '28px 20px' }}>
     <Link to="/" style={{ color: C.accent, textDecoration: 'none', fontSize: 13 }}>← На главную</Link>
-    <h1 style={{ color: C.t1, fontSize: 28, fontWeight: 900, margin: '22px 0 8px' }}>Правила SellWay</h1>
+    <h1 style={{ color: C.t1, fontSize: 28, fontWeight: 900, margin: '22px 0 8px' }}>{custom?.title || 'Правила SellWay'}</h1>
     <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.6 }}>Регистрируясь на площадке, пользователь принимает правила аккаунта, сделок, выплат, модерации и реферальной программы.</p>
-    <div style={{ display: 'grid', gap: 14, marginTop: 22 }}>
+    {customContent && <section style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, marginTop: 22, whiteSpace:'pre-wrap', color:C.t2, fontSize:14, lineHeight:1.7 }}>{customContent}</section>}
+    {!customContent && <div style={{ display: 'grid', gap: 14, marginTop: 22 }}>
       {rules.map(([title, body]) => <section key={title} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
         <h2 style={{ color: C.t1, fontSize: 17, fontWeight: 900, marginBottom: 8 }}>{title}</h2>
         <p style={{ color: C.t2, fontSize: 14, lineHeight: 1.6, margin: 0 }}>{body}</p>
       </section>)}
-    </div>
+    </div>}
   </div>;
 }

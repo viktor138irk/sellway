@@ -355,11 +355,20 @@ router.put('/profile', require('../middleware/auth').auth, [
 // ── POST /auth/telegram-link ── Генерация ссылки привязки Telegram для любого пользователя ──
 router.post('/telegram-link', require('../middleware/auth').auth, async (req, res) => {
   try {
+    const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || '').trim().replace(/^@+/, '');
+    if (!botUsername || /^your_/i.test(botUsername) || botUsername === 'SellWayBot') {
+      return res.status(400).json({ error: 'Сначала укажите реальный TELEGRAM_BOT_USERNAME в админке' });
+    }
     const token = crypto.randomBytes(24).toString('hex');
     const expires = new Date(Date.now() + 10 * 60 * 1000);
     await query('UPDATE users SET telegram_link_token=$1, telegram_link_expires=$2 WHERE id=$3', [token, expires, req.user.id]);
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'SellWayBot';
-    res.json({ link: `https://t.me/${botUsername}?start=${token}`, token, expiresAt: expires });
+    res.json({
+      link: `https://t.me/${botUsername}?start=${token}`,
+      appLink: `tg://resolve?domain=${botUsername}&start=${token}`,
+      botUsername,
+      token,
+      expiresAt: expires,
+    });
   } catch (err) {
     logger.error('Telegram link error', { err: err.message, userId: req.user?.id });
     res.status(500).json({ error: 'Ошибка генерации ссылки Telegram' });

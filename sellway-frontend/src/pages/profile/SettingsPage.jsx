@@ -24,6 +24,7 @@ export default function SettingsPage() {
 
   // Telegram
   const [tgLink, setTgLink]   = useState(null);
+  const [tgAppLink, setTgAppLink] = useState(null);
   const [tgLoading, setTgLoading] = useState(false);
   const [showQR, setShowQR]   = useState(false);
 
@@ -116,9 +117,10 @@ export default function SettingsPage() {
     try {
       const { data } = await getTelegramLink();
       setTgLink(data.link);
+      setTgAppLink(data.appLink || data.link);
       toast.success('Ссылка сгенерирована');
-    } catch {
-      toast.error('Ошибка генерации ссылки');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка генерации ссылки');
     } finally {
       setTgLoading(false);
     }
@@ -278,7 +280,7 @@ export default function SettingsPage() {
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <Btn onClick={copyTgLink} size="sm" icon="📋">Скопировать</Btn>
-                  <a href={tgLink} target="_blank" rel="noopener noreferrer">
+                  <a href={tgAppLink || tgLink} target="_blank" rel="noopener noreferrer">
                     <Btn size="sm" variant="ghost" icon="✈️">Открыть в Telegram</Btn>
                   </a>
                 </div>

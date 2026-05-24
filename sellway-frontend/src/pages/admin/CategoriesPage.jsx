@@ -32,6 +32,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
   const [autoSlug, setAutoSlug] = useState(!initial?.id);
   const [imgFile, setImgFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const inheritedImage = !image ? (parent?.display_image_url || parent?.image_url || parent?.parent_image_url || '') : '';
 
   function onName(v) { setName(v); if (autoSlug) setSlug(toSlug(v)); }
   function pickImg(file) {
@@ -69,7 +70,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Иконка</div>
           <button type="button" onClick={() => ref.current.click()} style={{ width: 82, height: 82, borderRadius: 16, overflow: 'hidden', cursor: 'pointer', border: `2px dashed ${image ? C.accent : C.border}`, background: '#0A0A12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {image ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <span style={{ fontSize: 22, fontWeight: 900, color: C.t2 }}>{String(name || '?').trim().slice(0, 1).toUpperCase()}</span>}
+            {image ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : inheritedImage ? <img src={inheritedImage} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity:.78 }} alt="" /> : <span style={{ fontSize: 22, fontWeight: 900, color: C.t2 }}>{String(name || '?').trim().slice(0, 1).toUpperCase()}</span>}
           </button>
           <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => pickImg(e.target.files?.[0])} />
           {image && <button type="button" onClick={() => { setImage(null); setImgFile(null); }} style={{ background: 'transparent', border: 'none', color: C.red, fontSize: 11, cursor: 'pointer', marginTop: 6 }}>Убрать</button>}
@@ -226,7 +227,7 @@ export default function CategoriesPage({ type = 'product' }) {
       </div>
 
       {(modal === 'create' || modal === 'edit') && <Modal title={modal === 'edit' ? 'Редактировать категорию' : (editCat?.parent_id ? 'Новая подкатегория' : 'Новая категория')} onClose={() => setModal(null)}>
-        <CategoryForm initial={editCat?.id ? editCat : null} parent={editCat?.parent_id && !editCat?.id ? cats.find(c => c.id === editCat.parent_id) : null} categories={cats} categoryType={type} onSave={() => { setModal(null); load(); }} onCancel={() => setModal(null)} />
+        <CategoryForm initial={editCat?.id ? editCat : null} parent={editCat?.parent_id ? cats.find(c => c.id === editCat.parent_id) : null} categories={cats} categoryType={type} onSave={() => { setModal(null); load(); }} onCancel={() => setModal(null)} />
       </Modal>}
 
       {deleteCat && <Modal title="Скрыть категорию?" onClose={() => setDeleteCat(null)} width={420}>

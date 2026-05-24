@@ -17,7 +17,7 @@ function RatingPicker({ value, onChange, label = 'Оценка' }) {
   return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ fontSize:12, fontWeight:800, color:C.t2 }}>{label}</div>
     <div style={{ display:'flex', gap:6 }}>
-      {[1,2,3,4,5].map(n => <button key={n} type="button" onClick={()=>onChange(n)} aria-label={`${n} из 5`} style={{ width:38, height:38, borderRadius:9, border:`1px solid ${value >= n ? C.amber : C.border}`, background:value >= n ? C.amber + '22' : '#0A0A12', color:value >= n ? C.amber : C.t3, fontSize:24, cursor:'pointer', lineHeight:1 }}>★</button>)}
+      {[1,2,3,4,5].map(n => <button key={n} type="button" onClick={()=>onChange(n)} aria-label={`${n} из 5`} style={{ width:34, height:34, border:'none', background:'transparent', color:value >= n ? C.amber : C.t3, fontSize:28, cursor:'pointer', lineHeight:1, padding:0, filter:value >= n ? 'drop-shadow(0 0 7px rgba(245,158,11,.35))' : 'none' }}>★</button>)}
     </div>
   </div>;
 }

@@ -3,11 +3,19 @@ const logger = require('../config/logger');
 
 // Ленивый импорт бота чтобы избежать circular deps
 let bot = null;
+let adminBot = null;
 function getBot() {
   if (!bot) {
     try { bot = require('../telegram/bot'); } catch {}
   }
   return bot;
+}
+
+function getAdminBot() {
+  if (!adminBot) {
+    try { adminBot = require('../telegram/adminBot'); } catch {}
+  }
+  return adminBot;
 }
 
 // ── Создать in-app уведомление ───────────────────────
@@ -143,7 +151,7 @@ async function notifyAdmins(type, title, body, link) {
       await create(admin.id, type, title, body, link);
     }
     // Отдельно — Telegram admin chat
-    const tg = getBot();
+    const tg = getAdminBot();
     if (tg && process.env.TELEGRAM_ADMIN_CHAT_ID) {
       tg.sendToChat(process.env.TELEGRAM_ADMIN_CHAT_ID, `${title}\n\n${body}`).catch(() => {});
     }

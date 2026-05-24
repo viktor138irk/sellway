@@ -175,6 +175,11 @@ restart_services() {
   else
     pm2 start ecosystem.config.js --env production --only sellway-bot
   fi
+  if pm2 describe sellway-admin-bot >/dev/null 2>&1; then
+    pm2 restart sellway-admin-bot --update-env
+  else
+    pm2 start ecosystem.config.js --env production --only sellway-admin-bot
+  fi
   pm2 save
 }
 

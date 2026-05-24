@@ -620,7 +620,7 @@ Health: curl http://127.0.0.1:${API_PORT}/health
 Site: ${FRONTEND_URL}
 
 If you changed .env after install:
-  pm2 restart sellway-api sellway-bot --update-env
+  pm2 restart sellway-api sellway-bot sellway-admin-bot --update-env
 EOF
 }
 

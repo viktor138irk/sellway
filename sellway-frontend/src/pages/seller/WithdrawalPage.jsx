@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import SellerLayout from '../../components/Layout/SellerLayout';
-import { C, Card, Btn, Input } from '../../components/UI';
-import { requestWithdraw, getDashboard, getWithdrawConfig } from '../../api/seller';
+import { C, Card, Btn, Input, Toggle } from '../../components/UI';
+import { requestWithdraw, getDashboard, getWithdrawConfig, saveAutoPayout } from '../../api/seller';
 
 export default function WithdrawalPage() {
   const { user } = useAuth();
@@ -12,6 +12,9 @@ export default function WithdrawalPage() {
   const [method, setMethod]   = useState('card');
   const [methods, setMethods] = useState([]);
   const [limits, setLimits] = useState({ minAmount: 500, maxDaily: 100000 });
+  const [usdtRate, setUsdtRate] = useState(0);
+  const [autoPayout, setAutoPayout] = useState({ enabled: false, method: 'card', threshold: 500, requisites: { account: '' } });
+  const [autoSaving, setAutoSaving] = useState(false);
   const [amount, setAmount]   = useState('');
   const [account, setAccount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,6 +25,13 @@ export default function WithdrawalPage() {
       const available = (r.data.methods || []).filter(m => m.enabled);
       setMethods(available);
       setLimits({ minAmount: r.data.minAmount || 500, maxDaily: r.data.maxDaily || 100000 });
+      setUsdtRate(parseFloat(r.data.usdtRate || 0));
+      setAutoPayout({
+        enabled: Boolean(r.data.autoPayout?.enabled),
+        method: r.data.autoPayout?.method || available[0]?.id || 'card',
+        threshold: r.data.autoPayout?.threshold || r.data.autoPayoutMinBalance || r.data.minAmount || 500,
+        requisites: r.data.autoPayout?.requisites || { account: '' },
+      });
       if (available.length) setMethod(available[0].id);
     }).catch(()=>{});
   }, []);
@@ -30,6 +40,20 @@ export default function WithdrawalPage() {
   const feeRate = selectedMethod?.commission || 0;
   const fee     = amount ? Math.round(+amount * feeRate) : 0;
   const receive = amount ? +amount - fee : 0;
+  const toUsdt = (rub) => usdtRate > 0 ? (parseFloat(rub || 0) / usdtRate) : 0;
+  const payoutPreview = method === 'crypto' ? `${toUsdt(receive).toLocaleString('ru', { maximumFractionDigits: 2 })} USDT` : `${receive.toLocaleString('ru')} ₽`;
+
+  async function handleAutoSave() {
+    setAutoSaving(true);
+    try {
+      await saveAutoPayout(autoPayout);
+      toast.success('Настройки автовыплат сохранены');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка сохранения автовыплат');
+    } finally {
+      setAutoSaving(false);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -55,6 +79,10 @@ export default function WithdrawalPage() {
             <div style={{ marginBottom: 20, padding: '16px', background: '#0A0A12', borderRadius: 10, border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 11, color: C.t2, marginBottom: 4 }}>Доступно для вывода</div>
               <div style={{ fontSize: 28, fontWeight: 900, color: C.t1 }}>{balance.toLocaleString('ru')} ₽</div>
+              <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:10, fontSize:12, color:C.t2 }}>
+                <span>Баланс: <b style={{ color:C.accent }}>{toUsdt(balance).toLocaleString('ru', { maximumFractionDigits: 2 })} USDT</b></span>
+                <span>Будет выведено: <b style={{ color:C.green }}>{payoutPreview}</b></span>
+              </div>
             </div>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div>
@@ -96,7 +124,7 @@ export default function WithdrawalPage() {
               <div style={{ background: '#0A0A12', borderRadius: 9, padding: '14px 16px' }}>
                 {[['Сумма', amount ? `${parseFloat(amount).toLocaleString('ru')} ₽` : '—'],
                   [`Комиссия (${(feeRate*100).toFixed(0)}%)`, `${fee.toLocaleString('ru')} ₽`],
-                  ['К получению', `${receive.toLocaleString('ru')} ₽`]].map(([l, v], i) => (
+                  ['К получению', method === 'crypto' ? payoutPreview : `${receive.toLocaleString('ru')} ₽`]].map(([l, v], i) => (
                   <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
                     <span style={{ color: C.t2 }}>{l}</span>
                     <span style={{ color: i===2 ? C.accent : C.t1, fontWeight: i===2 ? 800 : 400 }}>{v}</span>
@@ -114,6 +142,29 @@ export default function WithdrawalPage() {
                   <span style={{ color: C.t2 }}>{l}</span><span style={{ color: C.t1, fontWeight: 600 }}>{v}</span>
                 </div>
               ))}
+            </Card>
+            <Card style={{ padding: 18 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:14 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>Автовыплаты</div>
+                  <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>Автоматическая заявка при достижении порога</div>
+                </div>
+                <Toggle value={autoPayout.enabled} onChange={v => setAutoPayout(p => ({ ...p, enabled:v }))} />
+              </div>
+              <div style={{ display:'grid', gap:12 }}>
+                <div>
+                  <div style={{ fontSize:11, color:C.t2, fontWeight:700, marginBottom:6 }}>Метод</div>
+                  <select value={autoPayout.method} onChange={e => setAutoPayout(p => ({ ...p, method:e.target.value }))} style={{ width:'100%', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:'10px 12px', color:C.t1, fontFamily:'inherit' }}>
+                    {methods.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </div>
+                <Input label="Порог (₽)" type="number" value={autoPayout.threshold} onChange={e => setAutoPayout(p => ({ ...p, threshold:e.target.value }))} />
+                <Input label="Реквизиты" value={autoPayout.requisites?.account || ''} onChange={e => setAutoPayout(p => ({ ...p, requisites:{ ...(p.requisites || {}), account:e.target.value } }))} placeholder="Карта, телефон или USDT TRC20" />
+                {autoPayout.method === 'crypto' && <div style={{ fontSize:12, color:C.t2, background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:10 }}>
+                  При текущем балансе будет доступно примерно <b style={{ color:C.accent }}>{toUsdt(balance).toLocaleString('ru', { maximumFractionDigits: 2 })} USDT</b>.
+                </div>}
+                <Btn size="sm" loading={autoSaving} onClick={handleAutoSave}>Сохранить автовыплаты</Btn>
+              </div>
             </Card>
           </div>
         </div>

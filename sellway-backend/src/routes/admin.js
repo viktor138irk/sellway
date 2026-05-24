@@ -8,11 +8,14 @@ const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
 const { paySellerReferral } = require('../services/referrals');
+const { sendTestEmail } = require('../services/mailer');
 
 const ENV_FILE = path.resolve(__dirname, '..', '..', '.env');
 const ENV_SETTINGS = {
   TELEGRAM_BOT_TOKEN: 'Токен Telegram-бота от @BotFather',
   TELEGRAM_BOT_USERNAME: 'Username Telegram-бота без @',
+  TELEGRAM_ADMIN_BOT_TOKEN: 'Токен отдельного Telegram-бота для админов',
+  TELEGRAM_ADMIN_BOT_USERNAME: 'Username отдельного админского Telegram-бота без @',
   TELEGRAM_ADMIN_CHAT_ID: 'Chat ID администратора для уведомлений',
   PROXY_ENABLED: 'Включить SOCKS5-прокси для Telegram',
   PROXY_HOST: 'Хост SOCKS5-прокси',
@@ -615,6 +618,34 @@ router.post('/settings/actions/auto-confirm-expired', requireRole('admin'), asyn
 });
 
 // ── GET /admin/logs ───────────────────────────────────
+
+router.post('/settings/actions/test-smtp', requireRole('admin'), async (req, res) => {
+  const email = String(req.body?.email || req.user.email || '').trim();
+  if (!email) return res.status(400).json({ error: 'Укажите email для тестового письма' });
+  try {
+    await sendTestEmail(email);
+    logger.info('SMTP test email sent', { adminId: req.user.id, email });
+    res.json({ message: `Тестовое письмо отправлено на ${email}` });
+  } catch (err) {
+    logger.error('SMTP test email error', { err: err.message, adminId: req.user.id });
+    res.status(500).json({ error: `Не удалось отправить тестовое письмо: ${err.message}` });
+  }
+});
+
+router.post('/settings/actions/test-telegram', requireRole('admin'), async (req, res) => {
+  const chatId = String(req.body?.chatId || process.env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
+  if (!chatId) return res.status(400).json({ error: 'Укажите TELEGRAM_ADMIN_CHAT_ID или chatId для теста' });
+  try {
+    delete require.cache[require.resolve('../telegram/adminBot')];
+    const bot = require('../telegram/adminBot');
+    await bot.sendToChat(chatId, 'SellWay Admin: тестовое сообщение отправлено успешно.');
+    logger.info('Telegram admin test message sent', { adminId: req.user.id, chatId });
+    res.json({ message: `Тестовое сообщение отправлено в Telegram chat ${chatId}` });
+  } catch (err) {
+    logger.error('Telegram admin test message error', { err: err.message, adminId: req.user.id });
+    res.status(500).json({ error: `Не удалось отправить Telegram-сообщение: ${err.message}` });
+  }
+});
 
 router.get('/logs', async (req, res) => {
   const { page = 1, limit = 100 } = req.query;

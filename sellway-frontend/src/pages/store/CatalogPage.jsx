@@ -67,7 +67,6 @@ export default function CatalogPage() {
   const category = params.get('category') || '';
   const search = params.get('search') || '';
   const sort = params.get('sort') || 'popular';
-  const delivery = kind === 'services' ? '' : (params.get('delivery') || '');
   const maxPrice = params.get('max_price') || '';
   const page = parseInt(params.get('page') || '1');
 
@@ -96,10 +95,10 @@ export default function CatalogPage() {
   }, [kind]);
   useEffect(() => {
     setLoading(true);
-    getProducts({ kind, category, search, sort, delivery, max_price: maxPrice || undefined, page, limit: 30 })
+    getProducts({ kind, category, search, sort, max_price: maxPrice || undefined, page, limit: 30 })
       .then(r => { setProducts(r.data.products || []); setPag(r.data.pagination); })
       .catch(console.error).finally(() => setLoading(false));
-  }, [kind, category, search, sort, delivery, page, maxPrice]);
+  }, [kind, category, search, sort, page, maxPrice]);
 
   const title = kind === 'services' ? 'Услуги фрилансеров' : 'Каталог товаров';
 
@@ -116,10 +115,6 @@ export default function CatalogPage() {
           </div>}
         </div>
 
-        {kind === 'products' && <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: 14, minWidth: isMobile ? 220 : 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: C.t3, marginBottom: 12 }}>Тип выдачи</div>
-          {[['', 'Любой'], ['auto', 'Авто-ключи'], ['file', 'Авто-файл'], ['manual', 'Ручная выдача']].map(([v, l]) => <div key={v} onClick={() => setParam('delivery', v)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', cursor: 'pointer', fontSize: 13, color: delivery === v ? C.t1 : C.t2 }}><div style={{ width: 15, height: 15, borderRadius: '50%', border: `2px solid ${delivery === v ? C.accent : '#3A3A50'}`, background: delivery === v ? C.accent : 'transparent', flexShrink: 0 }} />{l}</div>)}
-        </div>}
       </aside>
 
       <main style={{ flex: 1, minWidth: 0 }}>

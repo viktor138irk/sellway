@@ -41,6 +41,7 @@ app.use('/api/admin',          require('./routes/admin'));
 app.use('/api/notifications',  require('./routes/notifications'));
 app.use('/api/payments',       require('./routes/payments'));
 app.use('/api/seo',            require('./routes/seo'));
+app.use('/api/settings',       require('./routes/publicSettings'));
 
 app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.path} not found` }));
 app.use((err, req, res, next) => { logger.error('Error', { err: err.message }); res.status(err.status||500).json({ error: process.env.NODE_ENV==='production' ? 'Внутренняя ошибка' : err.message }); });

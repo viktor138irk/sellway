@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
-import { C, Spinner, Btn, Input, Toggle } from '../../components/UI';
+import { C, Spinner, Btn, Input, Toggle, Textarea } from '../../components/UI';
 import { getAdminSettings, saveSettings, runSettingsAction } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PAGES = {
   finance: {
@@ -16,6 +17,10 @@ const PAGES = {
         ['withdrawal_commission','Комиссия при выводе (доля)','number','0.02',''],
         ['min_withdrawal','Мин. сумма вывода (₽)','number','500',''],
         ['max_withdrawal_daily','Макс. вывод в день (₽)','number','100000',''],
+        ['auto_payouts_enabled','Автовыплаты включены','toggle','true','Глобально разрешить продавцам автовыплаты'],
+        ['auto_payout_min_balance','Мин. баланс для автовыплаты (₽)','number','500',''],
+        ['auto_payout_interval_hours','Интервал автовыплат (часов)','number','24',''],
+        ['usdt_rub_rate_fallback','Резервный курс USDT/RUB','number','90','Используется, если курс ЦБ недоступен'],
       ]},
       { title: 'Системы вывода средств', keys: [
         ['withdraw_method_card_enabled','Карты включены','toggle','true','Показывать вывод на банковские карты'],
@@ -40,6 +45,8 @@ const PAGES = {
       { title: 'Telegram', keys: [
         ['TELEGRAM_BOT_TOKEN','Токен бота','password','','Токен от @BotFather'],
         ['TELEGRAM_BOT_USERNAME','Username бота','text','SellWayBot','Без символа @'],
+        ['TELEGRAM_ADMIN_BOT_TOKEN','Токен админ-бота','password','','Отдельный бот для админских уведомлений'],
+        ['TELEGRAM_ADMIN_BOT_USERNAME','Username админ-бота','text','','Без символа @'],
         ['TELEGRAM_ADMIN_CHAT_ID','Chat ID админа','text','','Для системных уведомлений'],
       ]},
       { title: 'SOCKS5 для Telegram', keys: [
@@ -78,13 +85,15 @@ const PAGES = {
         ['maintenance_mode','Режим обслуживания','toggle','false','Закрыть сайт для пользователей'],
         ['new_seller_requires_verify','Верификация продавцов','toggle','true','Требовать проверку новых продавцов'],
         ['terms_version','Версия правил площадки','text','1.0','Показывается в согласии при регистрации'],
+        ['terms_title','Заголовок правил площадки','text','Правила SellWay',''],
+        ['terms_content','Текст правил площадки','textarea','','Если заполнено, публичная страница /terms покажет этот текст вместо стандартных блоков'],
       ]},
     ],
   },
 };
 
 const RESTART_KEYS = new Set([
-  'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID',
+  'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_BOT_TOKEN', 'TELEGRAM_ADMIN_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID',
   'PROXY_ENABLED', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_USERNAME', 'PROXY_PASSWORD',
   'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS',
   'SMSPILOT_ENABLED', 'SMSPILOT_API_KEY', 'SMSPILOT_SENDER', 'SMS_CODE_TEMPLATE',
@@ -116,7 +125,9 @@ function SettingField({ item, value, changed, onChange }) {
       <div style={{ flex:'0 1 320px', display:'flex', justifyContent:'flex-end' }}>
         {type === 'toggle'
           ? <Toggle value={val === 'true'} onChange={v => onChange(key, v)} />
-          : <Input type={type} value={val} onChange={e => onChange(key, e.target.value)} autoComplete="new-password" style={{ width:type === 'number' ? 130 : 300, textAlign:type === 'number' ? 'right' : 'left' }} />}
+          : type === 'textarea'
+            ? <Textarea rows={8} value={val} onChange={e => onChange(key, e.target.value)} style={{ width:300 }} />
+            : <Input type={type} value={val} onChange={e => onChange(key, e.target.value)} autoComplete="new-password" style={{ width:type === 'number' ? 130 : 300, textAlign:type === 'number' ? 'right' : 'left' }} />}
       </div>
     </div>
   );
@@ -151,11 +162,14 @@ function DangerZone({ onAction, loading }) {
 
 export default function SettingsPage({ page = 'finance' }) {
   const toast = useToast();
+  const { user } = useAuth();
   const config = PAGES[page] || PAGES.finance;
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
+  const [testEmail, setTestEmail] = useState('');
+  const [testChatId, setTestChatId] = useState('');
   const [changed, setChanged] = useState({});
 
   useEffect(() => {
@@ -193,12 +207,14 @@ export default function SettingsPage({ page = 'finance' }) {
     }
   }
 
-  async function handleAction(action) {
-    const confirmed = window.confirm('Выполнить действие? Операция применится сразу.');
-    if (!confirmed) return;
+  async function handleAction(action, payload = {}, confirm = true) {
+    if (confirm) {
+      const confirmed = window.confirm('Выполнить действие? Операция применится сразу.');
+      if (!confirmed) return;
+    }
     setActionLoading(action);
     try {
-      const { data } = await runSettingsAction(action);
+      const { data } = await runSettingsAction(action, payload);
       toast.success(data.message || 'Готово');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Ошибка выполнения');
@@ -235,9 +251,29 @@ export default function SettingsPage({ page = 'finance' }) {
             </div>
           ))}
 
+          {page === 'telegram' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:12 }}>Тест Telegram</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'end' }}>
+                <Input label="Chat ID" value={testChatId || settings.TELEGRAM_ADMIN_CHAT_ID || ''} onChange={e => setTestChatId(e.target.value)} placeholder="123456789" />
+                <Btn loading={actionLoading === 'test-telegram'} onClick={() => handleAction('test-telegram', { chatId: testChatId || settings.TELEGRAM_ADMIN_CHAT_ID }, false)}>Отправить тест</Btn>
+              </div>
+            </div>
+          )}
+
+          {page === 'notifications' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:12 }}>Тест SMTP</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'end' }}>
+                <Input label="Email для теста" value={testEmail || user?.email || ''} onChange={e => setTestEmail(e.target.value)} placeholder="admin@example.com" />
+                <Btn loading={actionLoading === 'test-smtp'} onClick={() => handleAction('test-smtp', { email: testEmail || user?.email }, false)}>Отправить тест</Btn>
+              </div>
+            </div>
+          )}
+
           {Object.keys(changed).some(key => RESTART_KEYS.has(key)) && (
             <div style={{ background:C.amber+'12', border:`1px solid ${C.amber}44`, borderRadius:12, padding:'14px 18px', color:C.amber, fontSize:12, fontWeight:700 }}>
-              После сохранения Telegram, SOCKS5, SMTP или SMSPilot выполни на сервере: pm2 restart sellway-api sellway-bot --update-env
+              После сохранения Telegram, SOCKS5, SMTP или SMSPilot выполни на сервере: pm2 restart sellway-api sellway-bot sellway-admin-bot --update-env
             </div>
           )}
 

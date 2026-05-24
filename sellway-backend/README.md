@@ -53,7 +53,8 @@ nano .env   # заполни все переменные
 - `DATABASE_URL` — строка подключения к БД из FastPanel
 - `JWT_SECRET` — длинная случайная строка (min 64 символа)
 - `JWT_REFRESH_SECRET` — другая длинная случайная строка
-- `TELEGRAM_BOT_TOKEN` — токен от @BotFather
+- `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` — основной бот для пользователей
+- `TELEGRAM_ADMIN_BOT_TOKEN` / `TELEGRAM_ADMIN_BOT_USERNAME` — отдельный бот для админов
 - `TELEGRAM_ADMIN_CHAT_ID` — ID чата для уведомлений админа
 
 Для SOCKS5 прокси (если нужен):
@@ -96,6 +97,7 @@ pm2 startup   # следуй инструкции в выводе
 pm2 status
 pm2 logs sellway-api
 pm2 logs sellway-bot
+pm2 logs sellway-admin-bot
 pm2 monit
 ```
 
@@ -202,7 +204,7 @@ tail -f logs/combined.log # все события
 
 ```bash
 psql $DATABASE_URL -f db/migrations/001_fix_audit.sql
-pm2 restart sellway-api sellway-bot
+pm2 restart sellway-api sellway-bot sellway-admin-bot
 ```
 
 См. `BUGS_FOUND.md` для деталей о фиксах.
