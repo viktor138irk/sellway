@@ -202,22 +202,22 @@ function ModerationCard({ product, filter, onSelect, onAction, published }) {
   const service = isService(product);
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ height: 156, background: C.media, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ height: published ? 106 : 156, background: C.media, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {product.main_image ? <img src={product.main_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize: 42 }}>{String(product.title || '?').trim().slice(0, 1).toUpperCase()}</span>}
         <span style={{ position: 'absolute', top: 10, left: 10, fontSize: 10, fontWeight: 900, padding: '4px 9px', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
         <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, fontWeight: 900, padding: '4px 9px', borderRadius: 20, background: service ? C.accent + '22' : C.green + '22', color: service ? C.accent : C.green }}>{service ? 'УСЛУГА' : 'ТОВАР'}</span>
       </div>
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+      <div style={{ padding: published ? 10 : 14, display: 'flex', flexDirection: 'column', gap: published ? 7 : 10, flex: 1 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 900, color: C.t1, lineHeight: 1.35 }}>{product.title}</div>
+          <div style={{ fontSize: published ? 13 : 14, fontWeight: 900, color: C.t1, lineHeight: 1.35 }}>{product.title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.t3, marginTop: 5 }}><CategoryIcon product={product} />{product.seller_name || '—'} · {product.category_name || 'Без категории'}</div>
-          <SellerMeta seller={product} compact />
+          {!published && <SellerMeta seller={product} compact />}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Цена</div><div style={{ fontSize: 14, fontWeight: 900, color: C.t1 }}>{service ? 'от ' : ''}{money(product.price)}</div></div>
           <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Тип</div><div style={{ fontSize: 12, fontWeight: 800, color: C.t2 }}>{deliveryLabel}</div></div>
         </div>
-        {product.short_desc && <div style={{ fontSize: 12, color: C.t2, lineHeight: 1.45, minHeight: 34 }}>{product.short_desc}</div>}
+        {!published && product.short_desc && <div style={{ fontSize: 12, color: C.t2, lineHeight: 1.45, minHeight: 34 }}>{product.short_desc}</div>}
         <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
           <Btn size="sm" full variant="ghost" onClick={() => onSelect(product)}>{published ? 'Редактировать' : 'Просмотр'}</Btn>
           {filter === 'pending' && <>
@@ -238,11 +238,12 @@ export default function ProductsModerationPage({ view = 'moderation' }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState(published ? 'active' : 'pending');
   const [kind, setKind] = useState('all');
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
 
   function loadProducts() {
     setLoading(true);
-    getPendingProducts({ status: filter, limit: 80 })
+    getPendingProducts({ status: filter, search: search.trim(), limit: 80 })
       .then(r => setProducts(r.data.products || []))
       .catch(() => toast.error('Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -254,7 +255,7 @@ export default function ProductsModerationPage({ view = 'moderation' }) {
 
   useEffect(() => {
     loadProducts();
-  }, [filter]);
+  }, [filter, search]);
 
   async function handleAction(type, id, reason) {
     try {
@@ -292,11 +293,12 @@ export default function ProductsModerationPage({ view = 'moderation' }) {
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
           {[['all', `Все · ${counts.all}`], ['products', `Товары · ${counts.products}`], ['services', `Услуги · ${counts.services}`]].map(([v, l]) => <button key={v} onClick={() => setKind(v)} style={{ background: kind === v ? C.infoBg : 'transparent', border: `1px solid ${kind === v ? C.accent + '66' : C.border}`, color: kind === v ? C.t1 : C.t2, borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>)}
+          {published && <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Поиск товара, услуги или продавца" style={{ flex:'1 1 280px', minWidth:200, background:C.card, border:`1px solid ${C.border}`, color:C.t1, borderRadius:8, padding:'8px 12px', fontSize:13, fontFamily:'inherit', outline:'none' }} />}
         </div>
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
         : visible.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 60, textAlign: 'center', color: C.t3 }}><div style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize: 24, marginBottom: 12 }}>Catalog</div><div style={{ fontSize: 15, color: C.t2 }}>Нет позиций в этом фильтре</div></div>
-        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
+        : <div style={{ display: 'grid', gridTemplateColumns: published ? 'repeat(auto-fill, minmax(215px, 1fr))' : 'repeat(auto-fill, minmax(290px, 1fr))', gap: published ? 10 : 14 }}>
             {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} published={published} />)}
           </div>}
       </div>

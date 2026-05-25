@@ -101,7 +101,8 @@ textarea {
   }
 
   table {
-    min-width: 580px;
+    min-width: 0;
+    width: 100%;
   }
 
   [style*="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))"],
@@ -160,6 +161,72 @@ textarea {
     border-left: 0 !important;
     padding: 9px 12px !important;
   }
+
+  .seller-sidebar .seller-nav[hidden],
+  .admin-sidebar .admin-nav[hidden] {
+    display: none !important;
+  }
+
+  .seller-sidebar .seller-nav:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    overflow: hidden !important;
+    white-space: normal !important;
+    gap: 6px !important;
+  }
+
+  .seller-sidebar .seller-nav a {
+    min-width: 0 !important;
+    white-space: normal !important;
+    flex: initial !important;
+  }
+
+  .admin-sidebar .admin-nav:not([hidden]) {
+    display: block !important;
+    overflow: hidden !important;
+    white-space: normal !important;
+  }
+
+  .admin-sidebar .admin-nav a {
+    flex: initial !important;
+    white-space: normal !important;
+  }
+
+  .profile-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .profile-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .profile-sms-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-sms-actions button {
+    width: 100%;
+  }
+
+  .admin-users-list-head {
+    display: none !important;
+  }
+
+  .admin-user-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "identity action"
+      "role status"
+      "balance balance";
+    gap: 9px !important;
+  }
+
+  .admin-user-row > :nth-child(1) { grid-area: identity; }
+  .admin-user-row > :nth-child(2) { grid-area: role; }
+  .admin-user-row > :nth-child(3) { grid-area: status; text-align: right; }
+  .admin-user-row > :nth-child(4) { grid-area: balance; }
+  .admin-user-row > :nth-child(5) { grid-area: action; }
 
   aside[style*="width: 220"] + main,
   aside[style*="width: 242"] + main,

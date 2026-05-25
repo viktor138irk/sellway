@@ -287,8 +287,9 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
 // ── GET /admin/products ── Модерация товаров ──────────
 
 router.get('/products', async (req, res) => {
-  const { status = 'pending', page = 1, limit = 30 } = req.query;
+  const { status = 'pending', page = 1, limit = 30, search = '' } = req.query;
   const offset = (page - 1) * limit;
+  const searchTerm = String(search).trim();
   try {
     const { rows } = await query(
       `SELECT p.*, c.name AS category_name, c.category_type, COALESCE(c.image_url, parent.image_url) AS category_image_url, c.emoji AS category_emoji,
@@ -310,8 +311,9 @@ router.get('/products', async (req, res) => {
            AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)
        ) seller_delivery ON TRUE
        WHERE p.status=$1
+         AND ($4 = '' OR p.title ILIKE '%' || $4 || '%' OR u.username ILIKE '%' || $4 || '%' OR c.name ILIKE '%' || $4 || '%')
        ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,
-      [status, limit, offset]
+      [status, limit, offset, searchTerm]
     );
     res.json({ products: rows });
   } catch (err) {

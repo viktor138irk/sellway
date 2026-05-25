@@ -260,7 +260,7 @@ export default function Header() {
                   <div style={{ fontSize:11, color:C.t2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.email}</div>
                 </div>
               </div>
-              {[[isSellerRole ? '/seller' : '/profile/purchases', isSellerRole ? 'Кабинет продавца' : 'Личный кабинет'], ['/profile/purchases', 'Покупки'], ['/profile/settings', 'Настройки'], ...(user.role === 'admin' ? [['/admin', 'Админ-панель']] : [])].map(([to, label]) => <Link key={to} to={to} style={{ display: 'block', padding: '10px 16px', fontSize: 13, color: C.t2, textDecoration: 'none', borderBottom: `1px solid ${C.border}` }}>{label}</Link>)}
+              {[[isSellerRole ? '/seller' : '/profile/purchases', isSellerRole ? 'Кабинет продавца' : 'Личный кабинет'], ['/profile/purchases', 'Покупки'], ['/profile/favorites', 'Избранное'], ['/profile/settings', 'Настройки'], ...(user.role === 'admin' ? [['/admin', 'Админ-панель']] : [])].map(([to, label]) => <Link key={to} to={to} style={{ display: 'block', padding: '10px 16px', fontSize: 13, color: C.t2, textDecoration: 'none', borderBottom: `1px solid ${C.border}` }}>{label}</Link>)}
               <button type="button" onClick={handleLogout} style={{ width: '100%', background: 'transparent', border: 'none', color: C.red, fontSize: 13, padding: '10px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>Выйти</button>
             </div>}
           </div>

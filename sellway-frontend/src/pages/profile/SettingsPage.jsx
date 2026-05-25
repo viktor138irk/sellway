@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { getTelegramLink, uploadSellerAvatar } from '../../api/seller';
@@ -171,10 +171,13 @@ export default function SettingsPage() {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 20px' }} className="fade-in">
-      <h1 style={{ fontSize: 30, fontWeight: 650, color: C.t1, marginBottom: 24 }}>Настройки профиля</h1>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap', marginBottom:24 }}>
+        <h1 style={{ fontSize: 30, fontWeight: 650, color: C.t1, margin:0 }}>Настройки профиля</h1>
+        <Link to="/profile/favorites"><Btn size="sm" variant="ghost">Избранное</Btn></Link>
+      </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${C.border}`, marginBottom: 28 }}>
+      <div className="profile-tabs" style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${C.border}`, marginBottom: 28 }}>
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => selectTab(key)}
             style={{ background: 'transparent', border: 'none', borderBottom: `2px solid ${tab === key ? C.accent : 'transparent'}`,
@@ -193,11 +196,7 @@ export default function SettingsPage() {
               <UserAvatar user={user} size={64} radius={8} background={C.accent} />
               <div style={{ flex: '1 1 220px' }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: C.t1 }}>{user?.username}</div>
-                <div style={{ fontSize: 12, color: C.t2 }}>{user?.email}</div>
-                <div style={{ fontSize: 11, color: user?.email_verified ? C.green : C.amber, marginTop: 3 }}>
-                  {user?.email_verified ? 'Email подтверждён' : 'Email не подтверждён'}
-                </div>
-                {!user?.email_verified && <div style={{ marginTop:8 }}><Btn type="button" size="sm" variant="ghost" loading={emailLoading} onClick={resendEmailVerification}>Отправить письмо повторно</Btn></div>}
+                <div style={{ fontSize: 12, color: C.t2, marginTop:3 }}>{user?.role === 'buyer' ? 'Покупатель' : user?.role === 'freelancer' ? 'Фрилансер' : 'Продавец'}</div>
               </div>
               <div>
                 <input ref={avatarRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleAvatar(e.target.files?.[0])} />
@@ -211,16 +210,22 @@ export default function SettingsPage() {
               <Input label="Телефон" value={profile.phone} placeholder="+7 999 123-45-67"
                 helper={user?.phone_verified ? 'Телефон подтверждён' : 'Нужен SMS-код подтверждения'}
                 onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:10, alignItems:'end' }}>
-                <Input label="Код из SMS" value={smsCode} placeholder="123456"
-                  onChange={e => setSmsCode(e.target.value)} />
+              <div className="profile-sms-actions" style={{ display:'grid', gridTemplateColumns:'minmax(180px, 1fr) auto auto', gap:10, alignItems:'end' }}>
+                <div style={{ minWidth:0 }}><Input label="Код из SMS" value={smsCode} placeholder="123456"
+                  onChange={e => setSmsCode(e.target.value)} /></div>
                 <Btn type="button" variant="ghost" loading={smsLoading} onClick={sendSmsCode}>Отправить код</Btn>
                 <Btn type="button" loading={smsLoading} onClick={verifySmsCode}>Подтвердить</Btn>
               </div>
             </div>
-            <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: '11px 13px' }}>
-              <div style={{ fontSize: 12, color: C.t3, marginBottom: 2 }}>Email (нельзя изменить)</div>
-              <div style={{ fontSize: 14, color: C.t2 }}>{user?.email}</div>
+            <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: '13px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize: 12, color: C.t3, marginBottom: 3 }}>Email (нельзя изменить)</div>
+                <div style={{ fontSize: 14, color: C.t1, wordBreak:'break-word' }}>{user?.email}</div>
+                <div style={{ fontSize: 11, color: user?.email_verified ? C.green : C.amber, marginTop: 4 }}>
+                  {user?.email_verified ? 'Email подтверждён' : 'Email не подтверждён'}
+                </div>
+              </div>
+              {!user?.email_verified && <Btn type="button" size="sm" variant="ghost" loading={emailLoading} onClick={resendEmailVerification}>Отправить письмо повторно</Btn>}
             </div>
             <Btn type="submit" loading={saving}>Сохранить изменения</Btn>
           </form>

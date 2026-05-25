@@ -157,11 +157,23 @@ export default function UsersPage() {
       <select value={role} onChange={e => setRole(e.target.value)} style={{ background: C.card, border: `1px solid ${C.border}`, color: C.t1, borderRadius: 9, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit' }}><option value="">Все роли</option><option value="buyer">Покупатели</option><option value="seller">Продавцы</option><option value="freelancer">Фрилансеры</option><option value="moderator">Модераторы</option><option value="admin">Администраторы</option></select>
       <select value={status} onChange={e => setStatus(e.target.value)} style={{ background: C.card, border: `1px solid ${C.border}`, color: C.t1, borderRadius: 9, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit' }}><option value="">Все статусы</option><option value="active">Активные</option><option value="banned">Заблокированные</option><option value="pending_verify">Ожидают</option></select>
     </div>
-    {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}><Spinner size={32} /></div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>{users.map(u => <div key={u.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', marginBottom: 12 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><UserAvatar user={u} size={36} radius={10} initialsLength={1} background={(ROLE_COLOR[u.role] || C.accent) + '33'} style={{ color:ROLE_COLOR[u.role] || C.accent }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 800, color: C.t1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.username}</div><div style={{ fontSize: 11, color: C.t3, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div></div></div><Badge color={ROLE_COLOR[u.role] || C.t2}>{ROLE_LABEL[u.role] || u.role}</Badge></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}><div style={{ background: C.field, borderRadius: 8, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Баланс</div><div style={{ color: C.t1, fontWeight: 800 }}>{money(u.balance)}</div></div><div style={{ background: C.field, borderRadius: 8, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Статус</div><div style={{ color: STATUS_COLOR[u.status] || C.t3, fontWeight: 800 }}>{STATUS_LABEL[u.status] || u.status}</div></div></div>
-      {COMMERCIAL_ROLES.includes(u.role) && <div style={{ background: C.infoBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10, marginBottom: 12 }}><SellerMeta seller={u} compact /><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}><span style={{ fontSize: 11, color: C.t3 }}>Реф. код</span><b style={{ color: C.accent, fontSize: 12 }}>{u.referral_code || '—'}</b></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}><div><div style={{ fontSize: 10, color: C.t3 }}>Доход</div><div style={{ color: C.green, fontWeight: 800, fontSize: 12 }}>{money(u.referral_earnings)}</div></div><div><div style={{ fontSize: 10, color: C.t3 }}>Приглашено</div><div style={{ color: C.t1, fontWeight: 800, fontSize: 12 }}>{u.referred_sellers_count || 0}</div></div></div></div>}
-      <Btn size="sm" full variant="ghost" onClick={() => setEditUser(u)}>Изменить</Btn>
-    </div>)}</div>}
+    {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}><Spinner size={32} /></div> : <div className="admin-users-list" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+      <div className="admin-users-list-head" style={{ display:'grid', gridTemplateColumns:'minmax(220px,1.6fr) 150px 140px 130px 100px', gap:14, alignItems:'center', padding:'11px 16px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
+        {['Пользователь', 'Тип', 'Статус', 'Баланс', ''].map(label => <div key={label} style={{ fontSize:10, color:C.t3, fontWeight:800, textTransform:'uppercase' }}>{label}</div>)}
+      </div>
+      {users.length === 0 ? <div style={{ padding:42, textAlign:'center', color:C.t2 }}>Пользователи не найдены</div> : users.map(u => <div key={u.id} className="admin-user-row" style={{ display:'grid', gridTemplateColumns:'minmax(220px,1.6fr) 150px 140px 130px 100px', gap:14, alignItems:'center', padding:'12px 16px', borderBottom:`1px solid ${C.border}`, minWidth:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+          <UserAvatar user={u} size={38} radius={10} initialsLength={1} background={(ROLE_COLOR[u.role] || C.accent) + '33'} style={{ color:ROLE_COLOR[u.role] || C.accent }} />
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:800, color:C.t1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.username}</div>
+            <div style={{ fontSize:11, color:C.t3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.email}</div>
+          </div>
+        </div>
+        <div><Badge color={ROLE_COLOR[u.role] || C.t2}>{ROLE_LABEL[u.role] || u.role}</Badge></div>
+        <div style={{ color:STATUS_COLOR[u.status] || C.t3, fontWeight:800, fontSize:12 }}>{STATUS_LABEL[u.status] || u.status}</div>
+        <div style={{ color:C.t1, fontWeight:800, fontSize:13 }}>{money(u.balance)}</div>
+        <Btn size="sm" variant="ghost" onClick={() => setEditUser(u)}>Открыть</Btn>
+      </div>)}
+    </div>}
   </div>{editUser && <UserModal user={editUser} onClose={() => setEditUser(null)} onSave={handleSave} />}</AdminLayout>;
 }

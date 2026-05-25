@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
@@ -8,6 +8,7 @@ import SupportWidget from './components/SupportWidget';
 import AnalyticsTags from './components/AnalyticsTags';
 import { C, Spinner } from './components/UI';
 import { syncPaymentReturn } from './api/payments';
+import { verifyEmail } from './api/auth';
 
 const HomePage       = lazy(() => import('./pages/store/HomePage'));
 const CatalogPage    = lazy(() => import('./pages/store/CatalogPage'));
@@ -27,6 +28,7 @@ const SellerPromotions = lazy(() => import('./pages/seller/PromotionsPage'));
 const SellerReviews    = lazy(() => import('./pages/seller/ReviewsPage'));
 const PurchasesPage = lazy(() => import('./pages/profile/PurchasesPage'));
 const SettingsPage = lazy(() => import('./pages/profile/SettingsPage'));
+const FavoritesPage = lazy(() => import('./pages/profile/FavoritesPage'));
 const AdminDashboard    = lazy(() => import('./pages/admin/DashboardPage'));
 const AdminUsers        = lazy(() => import('./pages/admin/UsersPage'));
 const AdminProducts     = lazy(() => import('./pages/admin/ProductsModerationPage'));
@@ -72,11 +74,13 @@ function AppRoutes() {
     <Route path="/product/:id" element={<ProductPage/>}/>
     <Route path="/login" element={<GuestOnly><LoginPage/></GuestOnly>}/>
     <Route path="/register" element={<GuestOnly><RegisterPage/></GuestOnly>}/>
+    <Route path="/verify-email/:token" element={<VerifyEmailPage/>}/>
     <Route path="/orders/:id" element={<Protected><OrderPage/></Protected>}/>
     <Route path="/seller/orders/:id" element={<Protected><LegacySellerOrderRedirect/></Protected>}/>
     <Route path="/terms" element={<TermsPage/>}/>
     <Route path="/profile" element={<Protected><Navigate to="/profile/purchases" replace/></Protected>}/>
     <Route path="/profile/purchases" element={<Protected><PurchasesPage/></Protected>}/>
+    <Route path="/profile/favorites" element={<Protected><FavoritesPage/></Protected>}/>
     <Route path="/seller" element={<Protected roles={SELLER_ROLES}><SellerDashboard/></Protected>}/>
     <Route path="/seller/products" element={<Protected roles={SELLER_ROLES}><ProductsPage/></Protected>}/>
     <Route path="/seller/products/new" element={<Protected roles={SELLER_ROLES}><ProductsPage mode="create"/></Protected>}/>
@@ -110,6 +114,37 @@ function AppRoutes() {
     <Route path="/payment/success" element={<PaymentSuccess/>}/>
     <Route path="*" element={<NotFound/>}/>
   </Routes></Suspense><SupportWidget/></>;
+}
+function VerifyEmailPage() {
+  const { token } = useParams();
+  const { user, refreshUser } = useAuth();
+  const [state, setState] = useState({ loading: true, ok: false, message: '' });
+
+  useEffect(() => {
+    let alive = true;
+    verifyEmail(token)
+      .then(({ data }) => {
+        if (!alive) return;
+        setState({ loading: false, ok: true, message: data.message || 'Email успешно подтверждён.' });
+        if (user) refreshUser().catch(() => {});
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setState({ loading: false, ok: false, message: err.response?.data?.error || 'Ссылка недействительна или уже использована.' });
+      });
+    return () => { alive = false; };
+  }, [token]);
+
+  return <div style={{ minHeight:'60vh', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+    <div style={{ width:'100%', maxWidth:470, textAlign:'center', background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'34px 24px' }}>
+      {state.loading ? <><Spinner size={34}/><h1 style={{ color:C.t1, fontSize:24, marginTop:20 }}>Подтверждаем email</h1><p style={{ color:C.t2, fontSize:14 }}>Проверяем ссылку из письма.</p></> : <>
+        <div style={{ width:48, height:48, borderRadius:'50%', margin:'0 auto 18px', display:'flex', alignItems:'center', justifyContent:'center', background:state.ok ? C.green + '18' : C.red + '16', color:state.ok ? C.green : C.red, fontSize:24, fontWeight:800 }}>{state.ok ? '✓' : '×'}</div>
+        <h1 style={{ color:C.t1, fontSize:25, margin:'0 0 10px' }}>{state.ok ? 'Почта подтверждена' : 'Не удалось подтвердить почту'}</h1>
+        <p style={{ color:C.t2, fontSize:14, lineHeight:1.6, margin:'0 0 22px' }}>{state.message}</p>
+        <Link to={user ? '/profile/settings' : '/login'} style={{ display:'inline-block', background:C.accent, color:'#fff', borderRadius:8, padding:'11px 20px', textDecoration:'none', fontWeight:700, fontSize:14 }}>{user ? 'В настройки профиля' : 'Войти'}</Link>
+      </>}
+    </div>
+  </div>;
 }
 function PaymentSuccess() {
   const { refreshUser } = useAuth();

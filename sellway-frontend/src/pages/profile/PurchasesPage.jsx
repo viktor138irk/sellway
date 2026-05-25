@@ -28,22 +28,25 @@ export default function PurchasesPage() {
           <h1 style={{ fontSize: 22, fontWeight: 900, color: C.t1 }}>Покупки</h1>
           <div style={{ fontSize: 13, color: C.t2, marginTop: 4 }}>Ваши заказы, ключи, файлы и услуги</div>
         </div>
-        <select value={status} onChange={e => setStatus(e.target.value)}
-          style={{ background: C.card, border: `1px solid ${C.border}`, color: C.t1, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>
-          <option value="">Все покупки</option>
-          <option value="paid">Оплаченные</option>
-          <option value="delivered">Переданные</option>
-          <option value="confirmed">Завершённые</option>
-          <option value="disputed">Споры</option>
-          <option value="cancelled">Отменённые</option>
-        </select>
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          <Link to="/profile/favorites"><Btn size="sm" variant="ghost">Избранное</Btn></Link>
+          <select value={status} onChange={e => setStatus(e.target.value)}
+            style={{ background: C.card, border: `1px solid ${C.border}`, color: C.t1, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>
+            <option value="">Все покупки</option>
+            <option value="paid">Оплаченные</option>
+            <option value="delivered">Переданные</option>
+            <option value="confirmed">Завершённые</option>
+            <option value="disputed">Споры</option>
+            <option value="cancelled">Отменённые</option>
+          </select>
+        </div>
       </div>
 
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
       ) : orders.length === 0 ? (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? 34 : 60, textAlign: 'center', color: C.t3 }}>
-          <div style={{ fontFamily:'var(--sw-serif)', fontSize: 34, color:C.accent, marginBottom: 12 }}>01</div>
+          <div style={{ width:38, height:38, borderRadius:'50%', background:C.infoBg, border:`1px solid ${C.border}`, margin:'0 auto 14px' }} />
           <div style={{ color: C.t2, fontSize: 14, marginBottom: 16 }}>Покупок пока нет</div>
           <Link to="/catalog?kind=products"><Btn size="sm">Открыть каталог</Btn></Link>
         </div>

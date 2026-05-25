@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../../api/products';
 import { C, Spinner, Stars } from '../../components/UI';
 import SellerMeta from '../../components/SellerMeta';
+import FavoriteButton from '../../components/FavoriteButton';
 import useMediaQuery from '../../hooks/useMediaQuery';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
@@ -16,7 +17,7 @@ function ProductCard({ p, compact }) {
   const imageSize = compact ? 132 : 154;
 
   return (
-    <button type="button" onClick={() => navigate(`/product/${p.id}`)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+    <div role="button" tabIndex={0} onClick={() => navigate(`/product/${p.id}`)} onKeyDown={event => event.key === 'Enter' && navigate(`/product/${p.id}`)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: hov ? C.cardHov : C.card, border: `1px solid ${hov ? C.accent + '55' : C.border}`, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', transition: 'all .18s', display: 'flex', flexDirection: 'column', textAlign: 'left', padding: 0, fontFamily: 'inherit', minWidth: 0, boxShadow: hov ? C.shadow : 'none' }}>
       <div style={{ position: 'relative', height: imageSize, background: C.media, overflow: 'hidden' }}>
         {img ? <img src={img} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .3s', transform: hov ? 'scale(1.04)' : 'scale(1)' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', gap:5, alignItems:'center', justifyContent:'center', color:C.t3 }}><span style={{ fontFamily:'var(--sw-serif)', fontSize:compact ? 27 : 32 }}>{String(p.title || 'S').slice(0,1)}</span><span style={{ fontSize:10, textTransform:'uppercase' }}>{service ? 'Услуга' : 'Товар'}</span></div>}
@@ -24,6 +25,7 @@ function ProductCard({ p, compact }) {
           {disc > 0 && <span style={{ background: C.red, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>-{disc}%</span>}
           {service && <span style={{ background: C.accent, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>Услуга</span>}
         </div>
+        <FavoriteButton productId={p.id} floating size={30} />
       </div>
       <div style={{ padding: compact ? '9px 10px' : '10px 11px', display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
@@ -39,7 +41,7 @@ function ProductCard({ p, compact }) {
         </div>
         <SellerMeta seller={p} compact />
       </div>
-    </button>
+    </div>
   );
 }
 

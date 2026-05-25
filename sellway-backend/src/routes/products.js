@@ -162,6 +162,77 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+router.get('/featured/overview', async (req, res) => {
+  try {
+    const [{ rows: [stats] }, { rows: stores }, { rows: freelancers }] = await Promise.all([
+      query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM products WHERE status='active') AS active_positions,
+           (SELECT COUNT(*)::int FROM orders WHERE status='confirmed') AS completed_orders,
+           (SELECT COUNT(DISTINCT seller_id)::int FROM products WHERE status='active') AS active_authors`
+      ),
+      query(
+        `SELECT u.id, u.username, u.avatar_url, s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
+                (s.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
+                COUNT(p.id)::int AS active_positions,
+                delivery.avg_delivery_time_min AS seller_delivery_time_min,
+                featured.id AS featured_product_id, featured.title AS featured_product_title, featured.main_image AS featured_product_image
+         FROM users u
+         JOIN sellers s ON s.user_id=u.id
+         JOIN products p ON p.seller_id=u.id AND p.status='active' AND p.delivery_type != 'service'
+         LEFT JOIN LATERAL (
+           SELECT p2.id, p2.title,
+                  (SELECT url FROM product_images WHERE product_id=p2.id AND is_main=TRUE LIMIT 1) AS main_image
+           FROM products p2
+           WHERE p2.seller_id=u.id AND p2.status='active' AND p2.delivery_type != 'service'
+           ORDER BY p2.sales_count DESC, p2.created_at DESC LIMIT 1
+         ) featured ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - COALESCE(o.paid_at, o.created_at))) / 60))::int AS avg_delivery_time_min
+           FROM orders o
+           WHERE o.seller_id=u.id AND o.delivered_at IS NOT NULL
+         ) delivery ON TRUE
+         WHERE u.role IN ('seller','admin')
+         GROUP BY u.id, u.username, u.avatar_url, s.verified, s.rating, s.total_sales, s.last_seen_at,
+                  delivery.avg_delivery_time_min, featured.id, featured.title, featured.main_image
+         ORDER BY COALESCE(s.rating,0) DESC, COALESCE(s.total_sales,0) DESC, COUNT(p.id) DESC
+         LIMIT 3`
+      ),
+      query(
+        `SELECT u.id, u.username, u.avatar_url, s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
+                (s.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
+                COUNT(p.id)::int AS active_positions,
+                delivery.avg_delivery_time_min AS seller_delivery_time_min,
+                featured.id AS featured_product_id, featured.title AS featured_product_title, featured.main_image AS featured_product_image
+         FROM users u
+         JOIN sellers s ON s.user_id=u.id
+         JOIN products p ON p.seller_id=u.id AND p.status='active' AND p.delivery_type='service'
+         LEFT JOIN LATERAL (
+           SELECT p2.id, p2.title,
+                  (SELECT url FROM product_images WHERE product_id=p2.id AND is_main=TRUE LIMIT 1) AS main_image
+           FROM products p2
+           WHERE p2.seller_id=u.id AND p2.status='active' AND p2.delivery_type='service'
+           ORDER BY p2.sales_count DESC, p2.created_at DESC LIMIT 1
+         ) featured ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - COALESCE(o.paid_at, o.created_at))) / 60))::int AS avg_delivery_time_min
+           FROM orders o
+           WHERE o.seller_id=u.id AND o.delivered_at IS NOT NULL
+         ) delivery ON TRUE
+         WHERE u.role='freelancer'
+         GROUP BY u.id, u.username, u.avatar_url, s.verified, s.rating, s.total_sales, s.last_seen_at,
+                  delivery.avg_delivery_time_min, featured.id, featured.title, featured.main_image
+         ORDER BY COALESCE(s.rating,0) DESC, COALESCE(s.total_sales,0) DESC, COUNT(p.id) DESC
+         LIMIT 3`
+      ),
+    ]);
+    res.json({ stats, stores, freelancers });
+  } catch (err) {
+    logger.error('Get featured overview error', { err: err.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { rows } = await query(

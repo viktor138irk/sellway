@@ -123,9 +123,9 @@ export function RegisterPage() {
   );
 
   const roleOptions = [
-    ['buyer', '01', 'Покупатель', 'Покупать товары и услуги'],
-    ['seller', '02', 'Продавец', 'Готовые цифровые товары'],
-    ['freelancer', '03', 'Фрилансер', 'Услуги и поэтапные сделки'],
+    ['buyer', 'Покупатель', 'Покупать товары и услуги'],
+    ['seller', 'Продавец', 'Готовые цифровые товары'],
+    ['freelancer', 'Фрилансер', 'Услуги и поэтапные сделки'],
   ];
 
   return (
@@ -134,10 +134,9 @@ export function RegisterPage() {
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Я хочу</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: 8 }}>
-            {roleOptions.map(([val, icon, label, hint]) => (
+            {roleOptions.map(([val, label, hint]) => (
               <button key={val} type="button" onClick={() => setForm(f => ({ ...f, role: val, commercialTermsAccepted: val === 'buyer' ? false : f.commercialTermsAccepted }))}
                 style={{ background: form.role === val ? C.infoBg : C.field, border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 8, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit' }}>
-                <div style={{ fontFamily:'var(--sw-serif)', fontSize: 17, color:C.accent, marginBottom: 4 }}>{icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: form.role === val ? C.accent : C.t1 }}>{label}</div>
                 <div style={{ fontSize: 10, color: C.t3, marginTop: 3, lineHeight: 1.3 }}>{hint}</div>
               </button>

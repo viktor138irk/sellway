@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { C, Spinner, Btn, Stars, Modal, Badge, Textarea, Input } from '../../components/UI';
 import SellerMeta from '../../components/SellerMeta';
+import FavoriteButton from '../../components/FavoriteButton';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import { BUYER_CHECKOUT_RULES_SHORT } from '../../content/platformRules';
 
@@ -205,7 +206,7 @@ export default function ProductPage() {
 
           <div style={{ display:'flex', gap:10, marginBottom:20 }}>
             <Btn full size="lg" loading={buyLoading} onClick={handleBuy} disabled={!canBuy}>{service ? 'Оплатить и заказать' : 'Купить сейчас'}</Btn>
-            <button style={{ width:46, height:46, borderRadius:9, background:C.card, border:`1px solid ${C.border}`, color:C.t2, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>♡</button>
+            <FavoriteButton productId={product.id} size={46} />
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:10, marginBottom:22 }}>
