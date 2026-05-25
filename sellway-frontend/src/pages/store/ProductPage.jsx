@@ -5,6 +5,7 @@ import { createCheckout } from '../../api/payments';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { C, Spinner, Btn, Stars, Modal, Badge, Textarea, Input } from '../../components/UI';
+import SellerMeta from '../../components/SellerMeta';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import { BUYER_CHECKOUT_RULES_SHORT } from '../../content/platformRules';
 
@@ -179,6 +180,7 @@ export default function ProductPage() {
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>{product.seller_name}</div>
                 {product.seller_rating > 0 && <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3 }}><Stars n={product.seller_rating} size={12}/><span style={{ fontSize:11, color:C.t2 }}>{parseFloat(product.seller_rating).toFixed(1)} · {product.seller_sales} продаж</span></div>}
+                <SellerMeta seller={product} />
               </div>
             </div>
           </div>

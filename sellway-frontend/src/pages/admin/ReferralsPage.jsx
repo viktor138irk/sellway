@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Input, Toggle, Select } from '../../components/UI';
 import { getAdminReferrals, saveReferralSettings, approveReferral, rejectReferral } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
+import SellerMeta from '../../components/SellerMeta';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const pct = v => `${(Number(v || 0) * 100).toFixed(2)}%`;
@@ -97,6 +98,7 @@ export default function AdminReferralsPage() {
           <div>
             <div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div>
             <div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · {pending ? 'ожидает' : 'отклонён'}</div>
+            <SellerMeta seller={u} compact />
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:7 }}>
               {[['Email', u.email_verified], ['Телефон', u.phone_verified], ['Telegram', u.telegram_verified]].map(([l, ok]) => <span key={l} style={{ fontSize:10, color:ok ? C.green : C.amber, background:(ok ? C.green : C.amber) + '18', borderRadius:999, padding:'2px 7px', fontWeight:800 }}>{l}: {ok ? 'OK' : 'нет'}</span>)}
             </div>
@@ -115,7 +117,7 @@ export default function AdminReferralsPage() {
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
         <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Топ рефереров</div>
         {top.length === 0 ? <div style={{ padding:34, textAlign:'center', color:C.t3 }}>Рефереров пока нет</div> : top.map(u => <div key={u.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:12, alignItems:'center', padding:'13px 18px', borderBottom:`1px solid ${C.border}` }}>
-          <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div><div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : u.role === 'seller' ? 'Продавец' : u.role}</div></div>
+          <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div><div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : u.role === 'seller' ? 'Продавец' : u.role}</div><SellerMeta seller={u} compact /></div>
           <div style={{ textAlign:'right' }}><div style={{ fontSize:10, color:C.t3 }}>Код</div><div style={{ fontSize:12, color:C.accent, fontWeight:900 }}>{u.referral_code}</div></div>
           <div style={{ textAlign:'right' }}><div style={{ fontSize:10, color:C.t3 }}>Приглашено</div><div style={{ fontSize:12, color:C.t1, fontWeight:900 }}>{u.referred_sellers_count || 0}</div></div>
           <div style={{ textAlign:'right' }}><div style={{ fontSize:10, color:C.t3 }}>Выплачено</div><div style={{ fontSize:12, color:C.green, fontWeight:900 }}>{money(u.paid_total || u.referral_earnings)}</div></div>
@@ -127,6 +129,7 @@ export default function AdminReferralsPage() {
         {payments.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.t3, fontSize:13 }}>Выплат пока нет</div> : payments.map(p => <div key={p.id} style={{ padding:'12px 16px', borderBottom:`1px solid ${C.border}` }}>
           <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}><div style={{ fontSize:13, color:C.green, fontWeight:900 }}>{money(p.amount)}</div><div style={{ fontSize:10, color:C.t3 }}>{new Date(p.created_at).toLocaleString('ru')}</div></div>
           <div style={{ fontSize:11, color:C.t2, marginTop:4 }}>{p.referrer_name} получил за {p.seller_name || 'автора'}</div>
+          {p.seller_name && <SellerMeta seller={p} compact />}
           <div style={{ fontSize:10, color:C.t3, marginTop:2 }}>{p.product_title || p.order_number || p.description}</div>
         </div>)}
       </div>
@@ -135,7 +138,7 @@ export default function AdminReferralsPage() {
     <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
       <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Приглашённые продавцы и фрилансеры</div>
       {invited.length === 0 ? <div style={{ padding:34, textAlign:'center', color:C.t3 }}>Приглашённых пока нет</div> : invited.map(u => <div key={u.user_id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto auto', gap:12, alignItems:'center', padding:'13px 18px', borderBottom:`1px solid ${C.border}` }}>
-        <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div><div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · приглашён: {u.referrer_name || '—'}</div></div>
+        <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div><div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · приглашён: {u.referrer_name || '—'}</div><SellerMeta seller={u} compact /></div>
         <div style={{ textAlign:'right' }}><div style={{ fontSize:10, color:C.t3 }}>Ставка</div><div style={{ fontSize:12, color:C.t1, fontWeight:800 }}>{pct(u.referral_commission_rate)}</div></div>
         <div style={{ textAlign:'right' }}><div style={{ fontSize:10, color:C.t3 }}>Оборот</div><div style={{ fontSize:12, color:C.amber, fontWeight:800 }}>{money(u.turnover)}</div></div>
         <div style={{ textAlign:'right' }}><div style={{ fontSize:10, color:C.t3 }}>Заказы</div><div style={{ fontSize:12, color:C.t1, fontWeight:800 }}>{u.confirmed_orders}</div></div>

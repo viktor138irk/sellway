@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../../api/products';
 import { C, Spinner, Stars } from '../../components/UI';
+import SellerMeta from '../../components/SellerMeta';
 import useMediaQuery from '../../hooks/useMediaQuery';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
@@ -36,6 +37,7 @@ function ProductCard({ p, compact }) {
           <span style={{ fontSize: 10, color: C.t2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.seller_name}</span>
           {Number(p.seller_rating) > 0 && <span style={{ fontSize: 10, color: C.amber, whiteSpace: 'nowrap' }}>★ {Number(p.seller_rating).toFixed(1)}</span>}
         </div>
+        <SellerMeta seller={p} compact />
       </div>
     </button>
   );

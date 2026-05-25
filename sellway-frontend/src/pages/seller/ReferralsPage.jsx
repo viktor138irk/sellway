@@ -3,6 +3,7 @@ import SellerLayout from '../../components/Layout/SellerLayout';
 import { C, Spinner, Btn, Textarea } from '../../components/UI';
 import { getReferrals, applyReferrals } from '../../api/seller';
 import { useToast } from '../../contexts/ToastContext';
+import SellerMeta from '../../components/SellerMeta';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const rate = v => `${(Number(v || 0) * 100).toFixed(2)}%`;
@@ -101,7 +102,7 @@ export default function ReferralsPage() {
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
         <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Приглашённые</div>
         {referred.length === 0 ? <div style={{ padding:36, textAlign:'center', color:C.t3 }}>Пока никто не зарегистрировался по вашей ссылке</div> : referred.map(r => <div key={r.user_id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:12, alignItems:'center', padding:'13px 18px', borderBottom:`1px solid ${C.border}` }}>
-          <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{r.username}</div><div style={{ fontSize:11, color:C.t3 }}>{r.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · {new Date(r.created_at).toLocaleDateString('ru')}</div></div>
+          <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{r.username}</div><div style={{ fontSize:11, color:C.t3 }}>{r.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · {new Date(r.created_at).toLocaleDateString('ru')}</div><SellerMeta seller={r} compact /></div>
           <div style={{ textAlign:'right' }}><div style={{ fontSize:12, color:C.t3 }}>Оборот</div><div style={{ fontSize:13, color:C.t1, fontWeight:800 }}>{money(r.turnover)}</div></div>
           <div style={{ textAlign:'right' }}><div style={{ fontSize:12, color:C.t3 }}>Заказы</div><div style={{ fontSize:13, color:C.t1, fontWeight:800 }}>{r.orders_count}</div></div>
           <div style={{ textAlign:'right' }}><div style={{ fontSize:12, color:C.t3 }}>Выплачено</div><div style={{ fontSize:13, color:C.green, fontWeight:800 }}>{money(r.paid_to_you)}</div></div>
@@ -113,7 +114,7 @@ export default function ReferralsPage() {
         {payments.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.t3, fontSize:13 }}>Выплат пока нет</div> : payments.map(p => <div key={p.id} style={{ padding:'12px 16px', borderBottom:`1px solid ${C.border}` }}>
           <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}><div style={{ fontSize:13, color:C.t1, fontWeight:800 }}>{money(p.amount)}</div><div style={{ fontSize:10, color:C.t3 }}>{new Date(p.created_at).toLocaleDateString('ru')}</div></div>
           <div style={{ fontSize:11, color:C.t2, marginTop:4 }}>{p.product_title || p.order_number || p.description}</div>
-          {p.seller_name && <div style={{ fontSize:10, color:C.t3, marginTop:2 }}>Автор: {p.seller_name}</div>}
+          {p.seller_name && <div style={{ fontSize:10, color:C.t3, marginTop:2 }}>Автор: {p.seller_name}<SellerMeta seller={p} compact /></div>}
         </div>)}
       </div>
     </div>

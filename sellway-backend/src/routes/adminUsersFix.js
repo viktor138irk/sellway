@@ -53,7 +53,7 @@ router.get('/stats', async (req, res) => {
              LEFT JOIN orders o ON o.status='confirmed' AND o.confirmed_at::date=d::date
              LEFT JOIN transactions rt ON rt.order_id=o.id AND rt.meta->>'source'='seller_referral'
              GROUP BY d::date ORDER BY d::date`),
-      query(`SELECT COUNT(*) AS online FROM users WHERE last_login_at > NOW()-INTERVAL '15 minutes'`),
+      query(`SELECT COUNT(*) AS online FROM sellers WHERE last_seen_at > NOW()-INTERVAL '5 minutes'`),
       query(`SELECT COUNT(*)::int AS open FROM support_threads WHERE status='open'`),
     ]);
 
@@ -86,44 +86,57 @@ router.get('/referrals', requireRole('admin'), async (req, res) => {
              LEFT JOIN transactions t ON t.user_id=s.user_id AND t.meta->>'source'='seller_referral'`),
       query(`SELECT u.id, u.username, u.email, u.role,
                     s.referral_code, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count,
+                    (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+                    seller_delivery.avg_delivery_time_min AS seller_delivery_time_min,
                     COALESCE(SUM(t.amount),0) AS paid_total,
                     COUNT(t.id)::int AS payments_count
              FROM sellers s
              JOIN users u ON u.id=s.user_id
+             LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=s.user_id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE
              LEFT JOIN transactions t ON t.user_id=s.user_id AND t.meta->>'source'='seller_referral'
              WHERE s.referred_sellers_count > 0 OR s.referral_earnings > 0
-             GROUP BY u.id, u.username, u.email, u.role, s.referral_code, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count
+             GROUP BY u.id, u.username, u.email, u.role, s.referral_code, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, s.last_seen_at, seller_delivery.avg_delivery_time_min
              ORDER BY paid_total DESC, s.referred_sellers_count DESC LIMIT 50`),
       query(`SELECT t.id, t.amount, t.description, t.created_at, t.order_id,
                     ref_u.username AS referrer_name, ref_u.email AS referrer_email,
                     seller_u.username AS seller_name, seller_u.email AS seller_email,
+                    (seller_profile.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+                    seller_delivery.avg_delivery_time_min AS seller_delivery_time_min,
                     o.order_number, p.title AS product_title
              FROM transactions t
              JOIN users ref_u ON ref_u.id=t.user_id
              LEFT JOIN orders o ON o.id=t.order_id
              LEFT JOIN users seller_u ON seller_u.id=o.seller_id
+             LEFT JOIN sellers seller_profile ON seller_profile.user_id=o.seller_id
+             LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=o.seller_id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE
              LEFT JOIN products p ON p.id=o.product_id
              WHERE t.meta->>'source'='seller_referral'
              ORDER BY t.created_at DESC LIMIT 100`),
       query(`SELECT child.user_id, child.created_at, child.referral_commission_rate,
                     u.username, u.email, u.role,
                     ref.username AS referrer_name, ref.email AS referrer_email,
+                    (child.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+                    seller_delivery.avg_delivery_time_min AS seller_delivery_time_min,
                     COALESCE(SUM(o.amount),0) AS turnover,
                     COUNT(o.id)::int AS confirmed_orders,
                     COALESCE(SUM(t.amount),0) AS referral_paid
              FROM sellers child
              JOIN users u ON u.id=child.user_id
              LEFT JOIN users ref ON ref.id=child.referred_by_seller_id
+             LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=child.user_id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE
              LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed'
              LEFT JOIN transactions t ON t.order_id=o.id AND t.meta->>'source'='seller_referral'
              WHERE child.referred_by_seller_id IS NOT NULL
-             GROUP BY child.user_id, child.created_at, child.referral_commission_rate, u.username, u.email, u.role, ref.username, ref.email
+             GROUP BY child.user_id, child.created_at, child.referral_commission_rate, child.last_seen_at, seller_delivery.avg_delivery_time_min, u.username, u.email, u.role, ref.username, ref.email
              ORDER BY child.created_at DESC LIMIT 100`),
       query(`SELECT s.user_id, s.referral_application_status, s.referral_requested_at, s.referral_reviewed_at,
                     s.referral_reject_reason, s.referral_moderation_note, s.referral_enabled,
-                    u.username, u.email, u.role, u.email_verified, u.phone_verified, u.telegram_verified
+                    u.username, u.email, u.role, u.email_verified, u.phone_verified, u.telegram_verified,
+                    (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+                    seller_delivery.avg_delivery_time_min AS seller_delivery_time_min
              FROM sellers s
              JOIN users u ON u.id=s.user_id
+             LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=s.user_id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE
              WHERE s.referral_application_status IN ('pending','rejected')
              ORDER BY s.referral_requested_at DESC NULLS LAST, s.created_at DESC
              LIMIT 100`),
@@ -179,7 +192,7 @@ router.get('/users', async (req, res) => {
   const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
   params.push(Number(limit), offset);
   try {
-    const { rows } = await query(`SELECT u.id, u.email, u.username, u.avatar_url, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
+    const { rows } = await query(`SELECT u.id, u.email, u.username, u.avatar_url, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online, seller_delivery.avg_delivery_time_min AS seller_delivery_time_min, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=u.id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
     res.json({ users: rows });
   } catch (err) { logger.error('Admin users list error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });

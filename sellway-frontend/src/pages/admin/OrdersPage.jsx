@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
 import { C, Spinner, StatusBadge } from '../../components/UI';
 import { getAdminOrders } from '../../api/admin';
+import SellerMeta from '../../components/SellerMeta';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -44,7 +45,7 @@ export default function AdminOrdersPage() {
                 onMouseEnter={e=>e.currentTarget.style.background=C.cardHov} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                 <div><div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{o.product_title?.slice(0,32)}</div><div style={{ fontSize:10, color:C.accent, fontFamily:'monospace', marginTop:2 }}>{o.order_number}</div><div style={{ fontSize:10, color:C.t3 }}>{new Date(o.created_at).toLocaleString('ru')}</div></div>
                 <div style={{ fontSize:12, color:C.t2 }}>{o.buyer_name}</div>
-                <div style={{ fontSize:12, color:C.t2 }}>{o.seller_name}</div>
+                <div style={{ fontSize:12, color:C.t2 }}>{o.seller_name}<SellerMeta seller={o} compact /></div>
                 <div style={{ fontSize:14, fontWeight:800, color:C.t1 }}>{parseFloat(o.amount).toLocaleString('ru')} ₽</div>
                 <StatusBadge status={o.status}/>
                 <Link to={`/orders/${o.id}`} style={{ fontSize:11, color:C.accent, textDecoration:'none', fontWeight:700 }}>Открыть →</Link>

@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Modal, StatusBadge } from '../../components/UI';
 import { getDisputes, resolveDispute } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
+import SellerMeta from '../../components/SellerMeta';
 
 function DisputeModal({ dispute, onClose, onResolve }) {
   const [winner, setWinner]       = useState('');
@@ -29,6 +30,7 @@ function DisputeModal({ dispute, onClose, onResolve }) {
                 borderRadius: 12, padding: '14px 16px', cursor: 'pointer', transition: 'all .15s', textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: C.t3, marginBottom: 4 }}>{role}</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: C.t1, marginBottom: 8 }}>{name}</div>
+              {val === 'seller' && <SellerMeta seller={dispute} compact />}
               <div style={{ fontSize: 11, color: winner===val ? (val==='buyer'?C.green:C.accent) : C.t3, fontWeight: 700 }}>
                 {winner===val ? '✓ Победитель' : 'Выбрать победителем'}
               </div>
@@ -140,6 +142,7 @@ export default function DisputesPage() {
                         <div style={{ fontSize: 12, color: C.t2 }}>
                           {d.buyer_name} (покупатель) vs {d.seller_name} (продавец) · Открыл: <strong style={{ color: C.t1 }}>{d.opener_name}</strong>
                         </div>
+                        <SellerMeta seller={d} compact />
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: C.t1 }}>{parseFloat(d.amount).toLocaleString('ru')} ₽</div>

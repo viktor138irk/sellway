@@ -112,11 +112,22 @@ router.get('/', auth, async (req, res) => {
     const { rows } = await query(
       `SELECT o.*, p.title AS product_title, p.delivery_type,
               (SELECT url FROM product_images WHERE product_id=p.id AND is_main=TRUE LIMIT 1) AS product_image,
-              buyer.username AS buyer_name, seller.username AS seller_name
+              buyer.username AS buyer_name, seller.username AS seller_name, seller.avatar_url AS seller_avatar,
+              seller_profile.rating AS seller_rating, seller_profile.total_sales AS seller_sales,
+              (seller_profile.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
+              seller_delivery.avg_delivery_time_min AS seller_delivery_time_min
        FROM orders o
        JOIN products p ON p.id = o.product_id
        JOIN users buyer ON buyer.id = o.buyer_id
        JOIN users seller ON seller.id = o.seller_id
+       LEFT JOIN sellers seller_profile ON seller_profile.user_id = o.seller_id
+       LEFT JOIN LATERAL (
+         SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min
+         FROM orders delivery
+         WHERE delivery.seller_id = o.seller_id
+           AND delivery.delivered_at IS NOT NULL
+           AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)
+       ) seller_delivery ON TRUE
        ${whereStr}
        ORDER BY o.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
@@ -133,6 +144,9 @@ router.get('/:id', auth, async (req, res) => {
               buyer.username AS buyer_name, buyer.avatar_url AS buyer_avatar,
               buyer.buyer_rating, buyer.buyer_reviews_count,
               seller.username AS seller_name, seller.avatar_url AS seller_avatar,
+              seller_profile.rating AS seller_rating, seller_profile.total_sales AS seller_sales,
+              (seller_profile.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
+              seller_delivery.avg_delivery_time_min AS seller_delivery_time_min,
               (SELECT json_build_object('rating', r.rating, 'comment', r.comment, 'created_at', r.created_at)
                FROM reviews r WHERE r.order_id=o.id LIMIT 1) AS seller_review,
               (SELECT json_build_object('rating', br.rating, 'comment', br.comment, 'created_at', br.created_at)
@@ -142,6 +156,14 @@ router.get('/:id', auth, async (req, res) => {
        LEFT JOIN product_keys pk ON pk.id = o.key_id
        JOIN users buyer ON buyer.id = o.buyer_id
        JOIN users seller ON seller.id = o.seller_id
+       LEFT JOIN sellers seller_profile ON seller_profile.user_id = o.seller_id
+       LEFT JOIN LATERAL (
+         SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min
+         FROM orders delivery
+         WHERE delivery.seller_id = o.seller_id
+           AND delivery.delivered_at IS NOT NULL
+           AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)
+       ) seller_delivery ON TRUE
        WHERE o.id=$1 AND (o.buyer_id=$2 OR o.seller_id=$2)`,
       [req.params.id, req.user.id]
     );

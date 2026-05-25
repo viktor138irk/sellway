@@ -5,6 +5,7 @@ import { C, Spinner, StatusBadge, Btn } from '../../components/UI';
 import { getDashboard } from '../../api/seller';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDeliveryTime } from '../../components/SellerMeta';
 
 function StatCard({ icon, label, value, sub, color = C.accent }) {
   return <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}><span style={{ fontSize: 22 }}>{icon}</span>{sub && <span style={{ fontSize: 11, color: C.t3 }}>{sub}</span>}</div><div style={{ fontSize: 24, fontWeight: 900, color, marginBottom: 4 }}>{value}</div><div style={{ fontSize: 12, color: C.t2 }}>{label}</div></div>;
@@ -68,6 +69,7 @@ export default function SellerDashboard() {
       <StatCard icon={isFreelancer ? '🧑‍💻' : '📦'} label={isFreelancer ? 'Услуг' : 'Товаров'} value={products.length} />
       <StatCard icon="🛒" label="Продаж всего" value={seller?.total_sales || 0} color={C.green} />
       <StatCard icon="⭐" label="Рейтинг" value={seller?.rating ? parseFloat(seller.rating).toFixed(1) : '—'} color={C.amber} />
+      <StatCard icon="⏱" label="Среднее время выдачи" value={formatDeliveryTime(seller?.seller_delivery_time_min)} color={C.accent} sub={seller?.seller_online ? 'Онлайн' : null} />
       <StatCard icon="💰" label="Заморожено" value={money(wallet?.held)} color={C.t2} />
     </div>
     <ReferralBlock referral={referral} role={role} />

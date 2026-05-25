@@ -4,6 +4,7 @@ import AdminLayout from './AdminLayout';
 import { C, Spinner, StatusBadge, Toggle } from '../../components/UI';
 import { getStats, getAdminOrders, getLogs, getAdminSettings, saveSettings } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
+import SellerMeta from '../../components/SellerMeta';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 
@@ -90,7 +91,7 @@ export default function AdminDashboard() {
       <StatCard label="Заказов всего" value={s.orders?.total || 0} sub={`сегодня: ${s.orders?.today || 0}`} />
       <StatCard label="Пользователей" value={s.users?.total || 0} sub={`продавцы: ${s.users?.sellers || 0}, фрилансеры: ${s.users?.freelancers || 0}`} />
       <StatCard label="Средняя выдача" value={`${s.avgDeliveryMin || 0} мин`} sub="за последние 7 дней" />
-      <StatCard label="Онлайн сейчас" value={s.online || 0} sub="активны за 15 минут" color={C.green} />
+      <StatCard label="Онлайн сейчас" value={s.online || 0} sub="активны за 5 минут" color={C.green} />
     </div>
 
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))', gap:12 }}>
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
     <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(300px,.7fr)', gap:16 }}>
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 18px', borderBottom:`1px solid ${C.border}` }}><span style={{ fontSize:14, fontWeight:800, color:C.t1 }}>Последние заказы</span><Link to="/admin/orders" style={{ fontSize:12, color:C.accent, textDecoration:'none' }}>Все</Link></div>
-        {orders.length === 0 ? <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>Нет заказов</div> : orders.map(o => <div key={o.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:12, padding:'12px 18px', borderBottom:`1px solid ${C.border}`, alignItems:'center' }}><div><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{o.product_title?.slice(0,45)}</div><div style={{ fontSize:10, color:C.accent, fontFamily:'monospace', marginTop:2 }}>{o.order_number}</div><div style={{ fontSize:10, color:C.t3 }}>{o.buyer_name} → {o.seller_name}</div></div><StatusBadge status={o.status}/><div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{money(o.amount)}</div></div>)}
+        {orders.length === 0 ? <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>Нет заказов</div> : orders.map(o => <div key={o.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:12, padding:'12px 18px', borderBottom:`1px solid ${C.border}`, alignItems:'center' }}><div><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{o.product_title?.slice(0,45)}</div><div style={{ fontSize:10, color:C.accent, fontFamily:'monospace', marginTop:2 }}>{o.order_number}</div><div style={{ fontSize:10, color:C.t3 }}>{o.buyer_name} → {o.seller_name}</div><SellerMeta seller={o} compact /></div><StatusBadge status={o.status}/><div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{money(o.amount)}</div></div>)}
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
         <QuickSettings settings={settings} onToggle={handleToggle} />

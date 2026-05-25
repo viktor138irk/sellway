@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Modal } from '../../components/UI';
 import { getPendingProducts, approveProduct, rejectProduct } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
+import SellerMeta from '../../components/SellerMeta';
 
 const STATUS_STYLE = {
   pending: { bg: C.amber + '22', color: C.amber, label: 'На проверке' },
@@ -59,6 +60,7 @@ function ProductDetail({ product, onClose, onAction }) {
               ['Статус', STATUS_STYLE[product.status]?.label || product.status],
             ].map(([l, v]) => <div key={l} style={{ background: '#111119', border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}><div style={{ color: C.t3, fontSize: 11, marginBottom: 3 }}>{l}</div><div style={{ color: C.t1, fontWeight: 700, fontSize: 12 }}>{v}</div></div>)}
           </div>
+          <SellerMeta seller={product} />
         </div>
 
         {product.description && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
@@ -115,6 +117,7 @@ function ModerationCard({ product, filter, onSelect, onAction }) {
         <div>
           <div style={{ fontSize: 14, fontWeight: 900, color: C.t1, lineHeight: 1.35 }}>{product.title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.t3, marginTop: 5 }}><CategoryIcon product={product} />{product.seller_name || '—'} · {product.category_name || 'Без категории'}</div>
+          <SellerMeta seller={product} compact />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Цена</div><div style={{ fontSize: 14, fontWeight: 900, color: C.t1 }}>{service ? 'от ' : ''}{money(product.price)}</div></div>

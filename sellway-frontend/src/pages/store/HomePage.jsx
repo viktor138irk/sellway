@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getProducts, getCategories } from '../../api/products';
 import { C, Spinner, Stars } from '../../components/UI';
+import SellerMeta from '../../components/SellerMeta';
 import useMediaQuery from '../../hooks/useMediaQuery';
 
 function ProductCard({ p }) {
@@ -29,6 +30,7 @@ function ProductCard({ p }) {
         {p.rating > 0 && <div style={{ display:'flex', alignItems:'center', gap:5 }}><Stars n={p.rating} size={11} /><span style={{ fontSize:11, color:C.t3 }}>{parseFloat(p.rating).toFixed(1)} ({p.reviews_count})</span></div>}
         <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>{p.tags?.slice(0,2).map(t=><span key={t} style={{ fontSize:10, background:'#1A1A28', color:C.t2, padding:'2px 7px', borderRadius:5 }}>{t}</span>)}</div>
         <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:'auto', paddingTop:8, borderTop:`1px solid ${C.border}` }}><SellerLogo seller={p} /><span style={{ fontSize:11, color:C.t2, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.seller_name}</span>{Number(p.seller_rating) > 0 && <span style={{ fontSize:10, color:C.amber, whiteSpace:'nowrap' }}>★ {Number(p.seller_rating).toFixed(1)}</span>}{p.seller_verified && <span style={{ fontSize:9, color:'#60A5FA', background:'#1A2E4A', padding:'1px 5px', borderRadius:4 }}>✓</span>}</div>
+        <SellerMeta seller={p} compact />
         <button onClick={e=>{ e.stopPropagation(); navigate(`/product/${p.id}`); }} style={{ background:hov?C.accent:'#1A1A28', border:`1px solid ${hov?'transparent':C.border}`, color:'#fff', borderRadius:8, padding:'8px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', transition:'all .2s', marginTop:2 }}>{service ? 'Обсудить' : hov ? 'Купить сейчас →' : 'Подробнее'}</button>
       </div>
     </div>

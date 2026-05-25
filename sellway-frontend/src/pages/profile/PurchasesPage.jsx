@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getOrders } from '../../api/orders';
 import { C, Spinner, StatusBadge, Btn } from '../../components/UI';
+import SellerMeta from '../../components/SellerMeta';
 import useMediaQuery from '../../hooks/useMediaQuery';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
@@ -60,6 +61,7 @@ export default function PurchasesPage() {
               <span>Продавец: {o.seller_name}</span>
               <b style={{ color: C.t1 }}>{money(o.amount)}</b>
             </div>
+            <SellerMeta seller={o} compact />
           </Link>)}
         </div>
       ) : (
@@ -73,7 +75,7 @@ export default function PurchasesPage() {
               <div style={{ fontSize: 11, color: C.t3, fontFamily: 'monospace', marginTop: 2 }}>{o.order_number}</div>
               <div style={{ fontSize: 10, color: C.t3 }}>{new Date(o.created_at).toLocaleString('ru')}</div>
             </div>
-            <div style={{ fontSize: 13, color: C.t2 }}>{o.seller_name}</div>
+            <div style={{ fontSize: 13, color: C.t2 }}>{o.seller_name}<SellerMeta seller={o} compact /></div>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.t1 }}>{money(o.amount)}</div>
             <StatusBadge status={o.status} />
             <Link to={`/orders/${o.id}`} style={{ fontSize: 11, color: C.accent, textDecoration: 'none', fontWeight: 700 }}>Открыть →</Link>

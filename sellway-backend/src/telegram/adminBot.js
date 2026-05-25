@@ -155,6 +155,17 @@ function yes(value) {
   return value === true || value === 'true' ? 'да' : 'нет';
 }
 
+function sellerMeta(item) {
+  const minutes = Number(item?.seller_delivery_time_min);
+  let delivery = 'выдач еще нет';
+  if (Number.isFinite(minutes) && minutes > 0) {
+    if (minutes < 60) delivery = `~${Math.max(1, Math.round(minutes))} мин`;
+    else if (minutes < 1440) delivery = `~${(minutes / 60).toFixed(1)} ч`;
+    else delivery = `~${(minutes / 1440).toFixed(1)} дн`;
+  }
+  return `Онлайн: ${yes(item?.seller_online)}; средняя выдача: ${delivery}`;
+}
+
 function settingValue(key, value) {
   if (SECRET_SETTINGS.has(key)) return value ? 'настроено (скрыто)' : 'не задано';
   if (key === 'terms_content') return value ? `заполнено, ${String(value).length} симв.` : 'не задано';
@@ -260,10 +271,14 @@ async function sendDashboard(chatId) {
 async function sendProducts(chatId, status = 'pending') {
   const { rows } = await query(
     `SELECT p.id, p.title, p.short_desc, p.price, p.delivery_type, p.created_at,
-            c.name category_name, u.username, u.email, u.role
+            c.name category_name, u.username, u.email, u.role,
+            (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+            delivery.avg_delivery_time_min AS seller_delivery_time_min
      FROM products p
      LEFT JOIN categories c ON c.id=p.category_id
      JOIN users u ON u.id=p.seller_id
+     LEFT JOIN sellers s ON s.user_id=p.seller_id
+     LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - COALESCE(o.paid_at, o.created_at))) / 60))::int AS avg_delivery_time_min FROM orders o WHERE o.seller_id=p.seller_id AND o.delivered_at IS NOT NULL AND o.delivered_at >= COALESCE(o.paid_at, o.created_at)) delivery ON TRUE
      WHERE p.status=$1 ORDER BY p.created_at DESC LIMIT 10`,
     [status]
   );
@@ -282,6 +297,7 @@ async function sendProducts(chatId, status = 'pending') {
       `${product.delivery_type === 'service' ? 'Услуга' : 'Товар'}: ${product.title}\n` +
       `Категория: ${product.category_name || 'не указана'}\n` +
       `Автор: ${product.username} (${product.role}), ${product.email}\n` +
+      `${sellerMeta(product)}\n` +
       `Цена: ${rub(product.price)}\nСоздан: ${date(product.created_at)}\nОписание: ${cut(product.short_desc)}`,
       controls.length ? buttons(controls) : {}
     );
@@ -291,8 +307,11 @@ async function sendProducts(chatId, status = 'pending') {
 async function sendCommercialApplications(chatId) {
   const { rows } = await query(
     `SELECT u.id, u.username, u.email, u.role, u.email_verified, u.phone_verified, u.telegram_verified,
-            s.commercial_application_status, s.commercial_requested_at
+            s.commercial_application_status, s.commercial_requested_at,
+            (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+            delivery.avg_delivery_time_min AS seller_delivery_time_min
      FROM sellers s JOIN users u ON u.id=s.user_id
+     LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - COALESCE(o.paid_at, o.created_at))) / 60))::int AS avg_delivery_time_min FROM orders o WHERE o.seller_id=s.user_id AND o.delivered_at IS NOT NULL AND o.delivered_at >= COALESCE(o.paid_at, o.created_at)) delivery ON TRUE
      WHERE u.role IN ('seller','freelancer') AND s.commercial_terms_accepted_at IS NOT NULL
        AND COALESCE(s.commercial_application_status,'not_requested')='pending'
      ORDER BY s.commercial_requested_at ASC NULLS LAST LIMIT 10`
@@ -302,6 +321,7 @@ async function sendCommercialApplications(chatId) {
     await bot.sendMessage(chatId,
       `Коммерческий аккаунт: ${user.username}\nРоль: ${user.role}\nEmail: ${user.email}\n` +
       `Email подтвержден: ${yes(user.email_verified)}\nТелефон: ${yes(user.phone_verified)}\nTelegram: ${yes(user.telegram_verified)}\n` +
+      `${sellerMeta(user)}\n` +
       `Подан: ${date(user.commercial_requested_at)}`,
       buttons([[
         { text: 'Одобрить', callback_data: `commercial:approve:${user.id}` },
@@ -315,8 +335,11 @@ async function sendUsers(chatId, role = 'all') {
   const where = role === 'all' ? '' : 'WHERE u.role=$1';
   const args = role === 'all' ? [] : [role];
   const { rows } = await query(
-    `SELECT u.id, u.username, u.email, u.role, u.status, w.balance, s.verified, s.rating
+    `SELECT u.id, u.username, u.email, u.role, u.status, w.balance, s.verified, s.rating,
+            (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+            delivery.avg_delivery_time_min AS seller_delivery_time_min
      FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id
+     LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - COALESCE(o.paid_at, o.created_at))) / 60))::int AS avg_delivery_time_min FROM orders o WHERE o.seller_id=u.id AND o.delivered_at IS NOT NULL AND o.delivered_at >= COALESCE(o.paid_at, o.created_at)) delivery ON TRUE
      ${where} ORDER BY u.created_at DESC LIMIT 10`,
     args
   );
@@ -326,7 +349,7 @@ async function sendUsers(chatId, role = 'all') {
   ]));
   for (const user of rows) {
     await bot.sendMessage(chatId,
-      `${user.username} (${user.role})\n${user.email}\nСтатус: ${user.status}; баланс: ${rub(user.balance)}; рейтинг: ${user.rating || 0}`,
+      `${user.username} (${user.role})\n${user.email}\nСтатус: ${user.status}; баланс: ${rub(user.balance)}; рейтинг: ${user.rating || 0}\n${sellerMeta(user)}`,
       buttons([[{ text: 'Открыть и управлять', callback_data: `user:view:${user.id}` }]])
     );
   }
@@ -349,8 +372,12 @@ async function sendUserSearch(chatId, search) {
 async function sendUserCard(chatId, userId) {
   const { rows: [user] } = await query(
     `SELECT u.*, w.balance, w.held, s.verified, s.custom_commission_rate, s.referral_commission_rate,
-            s.referral_code, s.referral_earnings, s.commercial_application_status
-     FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id WHERE u.id=$1`,
+            s.referral_code, s.referral_earnings, s.commercial_application_status,
+            (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+            delivery.avg_delivery_time_min AS seller_delivery_time_min
+     FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id
+     LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - COALESCE(o.paid_at, o.created_at))) / 60))::int AS avg_delivery_time_min FROM orders o WHERE o.seller_id=u.id AND o.delivered_at IS NOT NULL AND o.delivered_at >= COALESCE(o.paid_at, o.created_at)) delivery ON TRUE
+     WHERE u.id=$1`,
     [userId]
   );
   if (!user) throw new Error('Пользователь не найден');
@@ -359,6 +386,7 @@ async function sendUserCard(chatId, userId) {
     `Email/телефон/Telegram: ${yes(user.email_verified)} / ${yes(user.phone_verified)} / ${yes(user.telegram_verified)}\n` +
     `Баланс: ${rub(user.balance)}, удержано: ${rub(user.held)}\n` +
     `Магазин одобрен: ${yes(user.verified)} (${user.commercial_application_status || 'нет заявки'})\n` +
+    `${sellerMeta(user)}\n` +
     `Комиссия продавца: ${user.custom_commission_rate ?? 'по умолчанию'}; реферальная: ${user.referral_commission_rate ?? 'по умолчанию'}\n` +
     `Код реферала: ${user.referral_code || 'нет'}; доход: ${rub(user.referral_earnings)}`,
     buttons([
@@ -378,9 +406,13 @@ async function sendOrders(chatId, status = 'all') {
   const args = status === 'all' ? [] : [status];
   const { rows } = await query(
     `SELECT o.id, o.order_number, o.status, o.amount, o.created_at, p.title,
-            buyer.username buyer_name, seller.username seller_name
+            buyer.username buyer_name, seller.username seller_name,
+            (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+            delivery.avg_delivery_time_min AS seller_delivery_time_min
      FROM orders o JOIN products p ON p.id=o.product_id
      JOIN users buyer ON buyer.id=o.buyer_id JOIN users seller ON seller.id=o.seller_id
+     LEFT JOIN sellers s ON s.user_id=o.seller_id
+     LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (completed.delivered_at - COALESCE(completed.paid_at, completed.created_at))) / 60))::int AS avg_delivery_time_min FROM orders completed WHERE completed.seller_id=o.seller_id AND completed.delivered_at IS NOT NULL AND completed.delivered_at >= COALESCE(completed.paid_at, completed.created_at)) delivery ON TRUE
      ${clause} ORDER BY o.created_at DESC LIMIT 10`,
     args
   );
@@ -391,7 +423,7 @@ async function sendOrders(chatId, status = 'all') {
   const base = String(process.env.FRONTEND_URL || 'https://sellway.pro').replace(/\/$/, '');
   for (const order of rows) {
     await bot.sendMessage(chatId,
-      `${order.order_number}: ${order.title}\n${order.buyer_name} -> ${order.seller_name}\n${rub(order.amount)}, ${order.status}, ${date(order.created_at)}`,
+      `${order.order_number}: ${order.title}\n${order.buyer_name} -> ${order.seller_name}\n${sellerMeta(order)}\n${rub(order.amount)}, ${order.status}, ${date(order.created_at)}`,
       buttons([[{ text: 'Открыть сделку', url: `${base}/orders/${order.id}` }]])
     );
   }
@@ -400,9 +432,13 @@ async function sendOrders(chatId, status = 'all') {
 async function sendDisputes(chatId, status = 'open') {
   const { rows } = await query(
     `SELECT d.id, d.status, d.reason, d.created_at, o.order_number, o.amount,
-            buyer.username buyer_name, seller.username seller_name, opener.username opener_name
+            buyer.username buyer_name, seller.username seller_name, opener.username opener_name,
+            (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online,
+            delivery.avg_delivery_time_min AS seller_delivery_time_min
      FROM disputes d JOIN orders o ON o.id=d.order_id
      JOIN users buyer ON buyer.id=o.buyer_id JOIN users seller ON seller.id=o.seller_id
+     LEFT JOIN sellers s ON s.user_id=o.seller_id
+     LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (completed.delivered_at - COALESCE(completed.paid_at, completed.created_at))) / 60))::int AS avg_delivery_time_min FROM orders completed WHERE completed.seller_id=o.seller_id AND completed.delivered_at IS NOT NULL AND completed.delivered_at >= COALESCE(completed.paid_at, completed.created_at)) delivery ON TRUE
      JOIN users opener ON opener.id=d.opener_id WHERE d.status=$1 ORDER BY d.created_at ASC LIMIT 10`,
     [status]
   );
@@ -418,6 +454,7 @@ async function sendDisputes(chatId, status = 'open') {
     ]] : [];
     await bot.sendMessage(chatId,
       `Спор по ${dispute.order_number}, ${rub(dispute.amount)}\nПокупатель: ${dispute.buyer_name}; продавец: ${dispute.seller_name}\n` +
+      `${sellerMeta(dispute)}\n` +
       `Открыл: ${dispute.opener_name}; ${date(dispute.created_at)}\nПричина: ${cut(dispute.reason, 500)}`,
       controls.length ? buttons(controls) : {}
     );

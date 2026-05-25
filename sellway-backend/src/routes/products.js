@@ -108,6 +108,8 @@ router.get('/', optionalAuth, async (req, res) => {
               parent.id AS parent_category_id, parent.name AS parent_category_name, parent.slug AS parent_category_slug,
               u.username AS seller_name, u.avatar_url AS seller_avatar, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
+              (s.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
+              seller_delivery.avg_delivery_time_min AS seller_delivery_time_min,
               (SELECT url FROM product_images WHERE product_id=p.id AND is_main=TRUE LIMIT 1) AS main_image,
               (SELECT COALESCE(json_agg(url ORDER BY sort_order), '[]'::json) FROM product_images WHERE product_id=p.id) AS images,
               (SELECT COUNT(*)::int FROM product_files WHERE product_id=p.id) AS files_count
@@ -116,6 +118,13 @@ router.get('/', optionalAuth, async (req, res) => {
        LEFT JOIN categories parent ON parent.id = c.parent_id
        LEFT JOIN users u ON u.id = p.seller_id
        LEFT JOIN sellers s ON s.user_id = p.seller_id
+       LEFT JOIN LATERAL (
+         SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min
+         FROM orders delivery
+         WHERE delivery.seller_id = p.seller_id
+           AND delivery.delivered_at IS NOT NULL
+           AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)
+       ) seller_delivery ON TRUE
        ${whereStr}
        ORDER BY ${orderBy}
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -144,7 +153,10 @@ router.get('/:id', optionalAuth, async (req, res) => {
       `SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.category_type, COALESCE(c.image_url, parent.image_url) AS category_image_url, c.emoji AS category_emoji, c.parent_id AS parent_category_id,
               u.username AS seller_name, u.avatar_url AS seller_avatar, u.role AS seller_role,
               s.verified AS seller_verified, s.rating AS seller_rating, s.total_sales AS seller_sales,
-              s.response_time_min, s.description AS seller_description, s.is_online AS seller_online,
+              seller_delivery.avg_delivery_time_min AS seller_delivery_time_min,
+              seller_delivery.avg_delivery_time_min AS response_time_min,
+              s.description AS seller_description,
+              (s.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
               (SELECT COALESCE(json_agg(url ORDER BY sort_order), '[]'::json) FROM product_images WHERE product_id=p.id) AS images,
               (SELECT COALESCE(json_agg(json_build_object('id', id, 'url', url, 'filename', filename, 'size_bytes', size_bytes) ORDER BY created_at DESC), '[]'::json) FROM product_files WHERE product_id=p.id) AS files,
               (SELECT COUNT(*)::int FROM product_files WHERE product_id=p.id) AS files_count
@@ -153,6 +165,13 @@ router.get('/:id', optionalAuth, async (req, res) => {
        LEFT JOIN categories parent ON parent.id = c.parent_id
        LEFT JOIN users u ON u.id = p.seller_id
        LEFT JOIN sellers s ON s.user_id = p.seller_id
+       LEFT JOIN LATERAL (
+         SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min
+         FROM orders delivery
+         WHERE delivery.seller_id = p.seller_id
+           AND delivery.delivered_at IS NOT NULL
+           AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)
+       ) seller_delivery ON TRUE
        WHERE p.id = $1 AND (p.status = 'active' OR p.seller_id = $2)`,
       [req.params.id, req.user?.id || null]
     );

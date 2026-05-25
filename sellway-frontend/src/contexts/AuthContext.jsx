@@ -20,6 +20,20 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!user || !['seller', 'freelancer', 'admin'].includes(user.role)) return undefined;
+    const touchPresence = () => {
+      if (document.visibilityState === 'visible') getMe().catch(() => {});
+    };
+    touchPresence();
+    const timer = window.setInterval(touchPresence, 2 * 60 * 1000);
+    document.addEventListener('visibilitychange', touchPresence);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', touchPresence);
+    };
+  }, [user?.id, user?.role]);
+
   const login = useCallback(async (email, password) => {
     const { data } = await apiLogin({ email, password });
     localStorage.setItem('accessToken', data.accessToken);
