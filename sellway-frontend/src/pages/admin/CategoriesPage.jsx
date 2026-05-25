@@ -7,6 +7,21 @@ import client from '../../api/client';
 
 const TRANSLIT = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sch',ы:'y',э:'e',ю:'yu',я:'ya',ь:'',ъ:'' };
 const toSlug = s => String(s || '').toLowerCase().trim().split('').map(ch => TRANSLIT[ch] ?? ch).join('').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 78);
+const byOrder = (a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name);
+
+function nestedRows(categories, parentId = null, level = 0, excludedId = '') {
+  return categories
+    .filter(cat => (cat.parent_id || null) === parentId && cat.id !== excludedId)
+    .sort(byOrder)
+    .flatMap(cat => [{ cat, level }, ...nestedRows(categories, cat.id, level + 1, excludedId)]);
+}
+
+function descendantsOf(categories, id, level = 1) {
+  return categories
+    .filter(cat => cat.parent_id === id)
+    .sort(byOrder)
+    .flatMap(cat => [{ cat, level }, ...descendantsOf(categories, cat.id, level + 1)]);
+}
 
 function CategoryAvatar({ cat, size = 42 }) {
   const img = cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
@@ -80,7 +95,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
       <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?kind=${categoryType === 'service' ? 'services' : 'products'}&category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
       <Select label="Родительская категория" value={parentId} onChange={e => setParentId(e.target.value)}>
         <option value="">Нет, это основная категория</option>
-        {categories.filter(c => !c.parent_id && c.id !== initial?.id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        {nestedRows(categories, null, 0, initial?.id).map(({ cat, level }) => <option key={cat.id} value={cat.id}>{`${'  '.repeat(level)}${level ? '- ' : ''}${cat.name}`}</option>)}
       </Select>
       <Input label="Порядок сортировки" type="number" value={sortOrder} onChange={e => setSortOrder(e.target.value)} />
       <Textarea label="Описание" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
@@ -111,9 +126,9 @@ export default function CategoriesPage({ type = 'product' }) {
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
 
-  const roots = cats.filter(c => !c.parent_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
+  const roots = cats.filter(c => !c.parent_id).sort(byOrder);
   const selected = roots.find(c => c.id === selectedId) || roots[0];
-  const children = selected ? cats.filter(c => c.parent_id === selected.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name)) : [];
+  const descendants = selected ? descendantsOf(cats, selected.id) : [];
 
   function load() {
     setLoading(true);
@@ -142,7 +157,7 @@ export default function CategoriesPage({ type = 'product' }) {
     setImporting(true);
     try {
       const { data } = await bulkImportCategories({ type, text: importText });
-      toast.success(`Импортировано: ${data.createdRoots} групп, ${data.createdChildren} подгрупп`);
+      toast.success(`Импортировано: ${data.createdNodes} новых разделов (${data.parsed} корневых)`);
       setImportText('');
       setModal(null);
       load();
@@ -176,13 +191,13 @@ export default function CategoriesPage({ type = 'product' }) {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {roots.map(cat => {
                   const active = selected?.id === cat.id;
-                  const count = cats.filter(c => c.parent_id === cat.id).length;
+                  const count = descendantsOf(cats, cat.id).length;
                   return (
                     <button key={cat.id} type="button" onClick={() => setSelectedId(cat.id)} style={{ display: 'grid', gridTemplateColumns: '46px 1fr auto', gap: 10, alignItems: 'center', padding: '12px 14px', border: 'none', borderBottom: `1px solid ${C.border}`, background: active ? C.accent + '18' : 'transparent', color: C.t1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
                       <CategoryAvatar cat={cat} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</div>
-                        <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>{cat.slug} · {count} подкат.</div>
+                        <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>{cat.slug} · {count} вложенных</div>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: cat.is_active ? C.green + '22' : C.t3 + '22', color: cat.is_active ? C.green : C.t3 }}>{cat.is_active ? 'ON' : 'OFF'}</span>
                     </button>
@@ -204,33 +219,34 @@ export default function CategoriesPage({ type = 'product' }) {
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <Btn size="sm" variant="ghost" onClick={() => openEdit(selected)}>Редактировать</Btn>
-                    <Btn size="sm" onClick={() => openCreate(selected)}>+ Подкатегория</Btn>
+                    <Btn size="sm" onClick={() => openCreate(selected)}>+ Вложенный раздел</Btn>
                   </div>
                 </div>
                 <div style={{ padding: 16, borderBottom: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{children.length}</div><div style={{ fontSize: 11, color: C.t3 }}>Подкатегорий</div></div>
-                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{Number(selected.product_count || 0).toLocaleString('ru')}</div><div style={{ fontSize: 11, color: C.t3 }}>{labels.products}</div></div>
+                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{descendants.length}</div><div style={{ fontSize: 11, color: C.t3 }}>Вложенных разделов</div></div>
+                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{Number(selected.subtree_product_count || selected.product_count || 0).toLocaleString('ru')}</div><div style={{ fontSize: 11, color: C.t3 }}>{labels.products}</div></div>
                   <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: selected.is_active ? C.green : C.t3 }}>{selected.is_active ? 'Активна' : 'Скрыта'}</div><div style={{ fontSize: 11, color: C.t3 }}>Статус</div></div>
                 </div>
                 <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
-                  {children.map(cat => <div key={cat.id} style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                  {descendants.map(({ cat, level }) => <div key={cat.id} style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, marginLeft: Math.min(level - 1, 2) * 8 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
                       <CategoryAvatar cat={cat} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 800, color: C.t1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</div>
-                        <div style={{ fontSize: 11, color: C.t3, fontFamily: 'monospace' }}>/{cat.slug}</div>
+                        <div style={{ fontSize: 11, color: C.t3, fontFamily: 'monospace' }}>Уровень {level + 1} · /{cat.slug}</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div style={{ fontSize: 12, color: C.t2 }}>{Number(cat.product_count || 0).toLocaleString('ru')} {isService ? 'услуг' : 'товаров'}</div>
                       <Toggle value={cat.is_active} onChange={v => toggle(cat, v)} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Btn size="sm" variant="ghost" onClick={() => openCreate(cat)}>+ Вложить</Btn>
                       <Btn size="sm" full variant="ghost" onClick={() => openEdit(cat)}>Редактировать</Btn>
                       <Btn size="sm" variant="danger" onClick={() => setDeleteCat(cat)}>×</Btn>
                     </div>
                   </div>)}
-                  {children.length === 0 && <div style={{ gridColumn: '1/-1', padding: 42, textAlign: 'center', color: C.t3 }}>У этой категории пока нет подкатегорий</div>}
+                  {descendants.length === 0 && <div style={{ gridColumn: '1/-1', padding: 42, textAlign: 'center', color: C.t3 }}>У этой категории пока нет вложенных разделов</div>}
                 </div>
               </> : <div style={{ padding: 50, textAlign: 'center', color: C.t3 }}>Выберите категорию слева</div>}
             </div>
@@ -243,8 +259,8 @@ export default function CategoriesPage({ type = 'product' }) {
 
       {modal === 'import' && <Modal title={`Импорт: ${labels.root}`} onClose={() => setModal(null)} width={700}>
         <div style={{ display:'grid', gap:14 }}>
-          <p style={{ color:C.t2, fontSize:13, lineHeight:1.6, margin:0 }}>Вставьте блоки: первая строка - название группы, следующая строка - подгруппы. Для составных названий точнее всего разделять подгруппы символом <b>;</b>. Повторный импорт не создаёт дубликаты.</p>
-          <Textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={14} placeholder={'ChatGPT\nАккаунты; Подписка; Прочее\nClaude\nАккаунты; Токены; Услуги; Подписка'} />
+          <p style={{ color:C.t2, fontSize:13, lineHeight:1.6, margin:0 }}>Для новой витрины используйте дерево: каждый уровень задаётся двумя пробелами. Повторный импорт обновляет порядок и не создаёт дубликаты. Готовые файлы лежат в <b>docs/catalog-products.txt</b> и <b>docs/catalog-services.txt</b>.</p>
+          <Textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={14} placeholder={'Игры\n  Шутеры\n    Counter-Strike 2\n      Аккаунты\n      Ключи\n      Скины\nAI и нейросети\n  AI подписки\n    ChatGPT\n      Подписка'} />
           <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}><Btn variant="ghost" onClick={()=>setModal(null)}>Отмена</Btn><Btn loading={importing} onClick={importCatalog}>Импортировать</Btn></div>
         </div>
       </Modal>}

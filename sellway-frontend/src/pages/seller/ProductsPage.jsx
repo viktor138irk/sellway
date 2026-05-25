@@ -93,6 +93,16 @@ function CategoryIcon({ cat, size = 30 }) {
   </span>;
 }
 
+function categoryPathFor(categories, id) {
+  const path = [];
+  let current = categories.find(cat => cat.id === id);
+  while (current) {
+    path.unshift(current.id);
+    current = categories.find(cat => cat.id === current.parent_id);
+  }
+  return path;
+}
+
 function CommercialAccessBlock({ service, status, onRefresh }) {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
@@ -142,15 +152,22 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
   const [existingFile, setExistingFile] = useState(null);
   const [keysText, setKeysText] = useState('');
   const [existingKeys, setExistingKeys] = useState([]);
-  const [parentCategoryId, setParentCategoryId] = useState('');
+  const [categoryPath, setCategoryPath] = useState([]);
   const [serviceSteps, setServiceSteps] = useState([]);
   const [form, setForm] = useState({ title: '', short_desc: '', description: '', price: '', old_price: '', category_id: '', delivery_type: service ? 'service' : 'auto', guarantee_days: 0, tags: '', auto_delivery_message: '' });
   const [publicationRulesAccepted, setPublicationRulesAccepted] = useState(false);
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
   const setFromInput = k => e => set(k)(e.target.value);
-  const rootCats = cats.filter(c => !c.parent_id);
-  const subCats = cats.filter(c => c.parent_id === parentCategoryId);
-  const selectedCategory = cats.find(c => c.id === form.category_id) || cats.find(c => c.id === parentCategoryId);
+  const selectedCategory = cats.find(c => c.id === (form.category_id || categoryPath[categoryPath.length - 1]));
+  const categoryLevels = [];
+  let levelParent = null;
+  for (let level = 0; level === 0 || categoryPath[level - 1]; level += 1) {
+    const options = cats.filter(cat => (cat.parent_id || null) === levelParent);
+    if (!options.length) break;
+    categoryLevels.push({ options, value: categoryPath[level] || '', level });
+    levelParent = categoryPath[level] || null;
+    if (!levelParent) break;
+  }
   const commissionRate = Number.isFinite(Number(commercialStatus?.saleCommissionRate)) ? Number(commercialStatus.saleCommissionRate) : 0.07;
   const estimatedIncome = form.price ? (Number(form.price) * (1 - commissionRate)).toFixed(2).replace(/\.00$/, '') : '—';
   const availableKeys = existingKeys.filter(key => !key.is_sold);
@@ -165,7 +182,6 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
         .then(([pr, kr]) => {
           const p = pr.data;
           setForm({ title: p.title || '', short_desc: p.short_desc || '', description: p.description || '', price: p.price || '', old_price: p.old_price || '', category_id: p.category_id || '', delivery_type: p.delivery_type || (service ? 'service' : 'auto'), guarantee_days: p.guarantee_days || 0, tags: (p.tags || []).join(', '), auto_delivery_message: p.meta?.auto_delivery_message || '' });
-          setParentCategoryId(p.parent_category_id || p.category_id || '');
           setImages((p.images || []).map(url => ({ preview: url })));
           setExistingFile((p.files || [])[0] || null);
           setServiceSteps(p.meta?.service_steps || []);
@@ -174,6 +190,17 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
         .finally(() => setLoading(false));
     }
   }, [productId, service]);
+
+  useEffect(() => {
+    if (cats.length && form.category_id) setCategoryPath(categoryPathFor(cats, form.category_id));
+  }, [cats.length, form.category_id]);
+
+  function chooseCategory(level, id) {
+    const nextPath = categoryPath.slice(0, level);
+    if (id) nextPath.push(id);
+    setCategoryPath(nextPath);
+    set('category_id')(id && !cats.some(cat => cat.parent_id === id) ? id : '');
+  }
 
   async function handleSave() {
     if (!form.title || !form.price || !form.category_id) return toast.warn('Заполните обязательные поля');
@@ -214,14 +241,10 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
       <ImageUpload images={images} onChange={setImages} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         <div style={{ gridColumn: '1/-1' }}><Input label={service ? 'Название услуги *' : 'Название товара *'} value={form.title} onChange={setFromInput('title')} placeholder={service ? 'Разработка лендинга под ключ' : 'CS2 Аккаунт | Prime Status'} /></div>
-        <Select label="Категория *" value={parentCategoryId} onChange={e => { const id = e.target.value; setParentCategoryId(id); set('category_id')(cats.some(c => c.parent_id === id) ? '' : id); }}>
-          <option value="">Выберите категорию</option>
-          {rootCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
-        <Select label="Подкатегория" value={form.category_id} onChange={e => set('category_id')(e.target.value)} disabled={!parentCategoryId || subCats.length === 0}>
-          <option value={subCats.length ? '' : parentCategoryId}>{subCats.length ? 'Выберите подкатегорию' : 'Без подкатегории'}</option>
-          {subCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
+        {categoryLevels.map(({ options, value, level }) => <Select key={level} label={level === 0 ? 'Раздел *' : level === 1 ? 'Группа *' : level === 2 ? 'Игра / сервис *' : 'Тип товара *'} value={value} onChange={e => chooseCategory(level, e.target.value)}>
+          <option value="">Выберите</option>
+          {options.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select>)}
         {selectedCategory && <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', alignSelf: 'end' }}>
           <CategoryIcon cat={selectedCategory} />
           <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, color: C.t3 }}>Выбрана категория</div><div style={{ fontSize: 13, color: C.t1, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCategory.name}</div></div>

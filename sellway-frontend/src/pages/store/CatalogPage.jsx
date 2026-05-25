@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../../api/products';
 import { C, Spinner, Stars } from '../../components/UI';
@@ -43,20 +43,7 @@ function ProductCard({ p, compact }) {
   );
 }
 
-const categoryImage = cat => cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
-const categoryInitial = cat => String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
 const SellerLogo = ({ seller, service }) => <div style={{ width: 17, height: 17, borderRadius: '50%', background: service ? C.accent : C.green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#fff', overflow:'hidden', flexShrink: 0 }}>{seller.seller_avatar ? <img src={seller.seller_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : seller.seller_name?.[0]?.toUpperCase()}</div>;
-
-function CategoryRow({ cat, active, onClick, indent = 0 }) {
-  const img = categoryImage(cat);
-  return <button type="button" onClick={onClick} style={{ width: '100%', padding: `8px 10px 8px ${10 + indent}px`, borderRadius: 7, cursor: 'pointer', fontSize: 13, marginBottom: 2, background: active ? C.infoBg : 'transparent', border: 'none', borderLeft: `3px solid ${active ? C.accent : 'transparent'}`, color: active ? C.accentL : C.t2, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', textAlign: 'left', fontFamily: 'inherit' }}>
-    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-      {img ? <img src={img} style={{ width: 16, height: 16, borderRadius: 4, objectFit: 'cover' }} alt="" /> : <span style={{ width: 16, height: 16, borderRadius: 4, background: C.soft, color: C.t2, fontSize: 10, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{categoryInitial(cat)}</span>}
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
-    </span>
-    <span style={{ fontSize: 10, color: C.t3 }}>{(cat.product_count || 0).toLocaleString('ru')}</span>
-  </button>;
-}
 
 export default function CatalogPage() {
   const [params, setParams] = useSearchParams();
@@ -73,10 +60,13 @@ export default function CatalogPage() {
   const maxPrice = params.get('max_price') || '';
   const page = parseInt(params.get('page') || '1');
 
-  const rootCats = useMemo(() => cats.filter(c => !c.parent_id), [cats]);
   const selectedCat = cats.find(c => c.slug === category) || null;
-  const selectedRoot = selectedCat?.parent_id ? cats.find(c => c.id === selectedCat.parent_id) : selectedCat;
-  const visibleChildren = selectedRoot ? cats.filter(c => c.parent_id === selectedRoot.id) : [];
+  const breadcrumb = [];
+  let breadcrumbItem = selectedCat;
+  while (breadcrumbItem) {
+    breadcrumb.unshift(breadcrumbItem);
+    breadcrumbItem = cats.find(c => c.id === breadcrumbItem.parent_id);
+  }
 
   const setParam = (k, v) => {
     const p = new URLSearchParams(params);
@@ -85,7 +75,6 @@ export default function CatalogPage() {
       p.delete('category');
       p.delete('delivery');
     }
-    if (k === 'category' && v && cats.find(c => c.slug === v && !c.parent_id)) p.delete('subcategory');
     p.set('page', '1');
     setParams(p);
   };
@@ -106,21 +95,12 @@ export default function CatalogPage() {
   const title = kind === 'services' ? 'Услуги фрилансеров' : 'Каталог товаров';
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 20px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 14 : 22, width: '100%', boxSizing: 'border-box' }} className="fade-in">
-      <aside style={{ width: isMobile ? '100%' : 230, flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 12, overflowX: isMobile ? 'auto' : 'visible', alignItems: isMobile ? 'stretch' : 'normal' }}>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, minWidth: isMobile ? 280 : 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: C.t3, marginBottom: 12 }}>Категории</div>
-          <CategoryRow cat={{ name: kind === 'services' ? 'Все услуги' : 'Все товары' }} active={!category} onClick={() => setParam('category', '')} />
-          {rootCats.map(c => <CategoryRow key={c.id} cat={c} active={selectedRoot?.id === c.id && selectedCat?.id === c.id} onClick={() => setParam('category', c.slug)} />)}
-          {selectedRoot && visibleChildren.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 11, color: C.t3, margin: '0 0 7px 10px' }}>Подкатегории</div>
-            {visibleChildren.map(c => <CategoryRow key={c.id} cat={c} indent={12} active={selectedCat?.id === c.id} onClick={() => setParam('category', c.slug)} />)}
-          </div>}
-        </div>
-
-      </aside>
-
-      <main style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 20px', width: '100%', boxSizing: 'border-box' }} className="fade-in">
+      <main style={{ minWidth: 0 }}>
+        {breadcrumb.length > 0 && <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:7, marginBottom:16, fontSize:12, color:C.t2 }}>
+          <button type="button" onClick={() => setParam('category', '')} style={{ background:'transparent', border:'none', padding:0, color:C.accent, fontFamily:'inherit', cursor:'pointer' }}>{kind === 'services' ? 'Все услуги' : 'Все товары'}</button>
+          {breadcrumb.map(cat => <span key={cat.id} style={{ display:'flex', gap:7, alignItems:'center' }}><span style={{ color:C.t3 }}>/</span><button type="button" onClick={() => setParam('category', cat.slug)} style={{ background:'transparent', border:'none', padding:0, fontFamily:'inherit', cursor:'pointer', color:cat.id === selectedCat?.id ? C.t1 : C.accent, fontWeight:cat.id === selectedCat?.id ? 700 : 500 }}>{cat.name}</button></span>)}
+        </div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
           <div><h1 style={{ fontSize: 21, color: C.t1, fontWeight: 900, marginBottom: 3 }}>{title}</h1><div style={{ fontSize: 13, color: C.t2 }}>{search && <span>Поиск: <strong style={{ color: C.t1 }}>{search}</strong> · </span>}Найдено: <span style={{ color: C.t1, fontWeight: 700 }}>{pagination?.total?.toLocaleString('ru') || '...'}</span></div></div>
           <select value={sort} onChange={e => setParam('sort', e.target.value)} style={{ background: C.card, border: `1px solid ${C.border}`, color: C.t1, borderRadius: 8, padding: '7px 12px', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}><option value="popular">По популярности</option><option value="newest">Новинки</option><option value="price_asc">Цена вверх</option><option value="price_desc">Цена вниз</option><option value="rating">По рейтингу</option></select>

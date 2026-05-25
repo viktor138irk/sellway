@@ -91,7 +91,17 @@ router.get('/', optionalAuth, async (req, res) => {
       where.push("p.status = 'active'");
     }
 
-    if (category) { params.push(category); where.push(`(c.slug = $${params.length} OR parent.slug = $${params.length})`); }
+    if (category) {
+      params.push(category);
+      where.push(`p.category_id IN (
+        WITH RECURSIVE branch AS (
+          SELECT id FROM categories WHERE slug=$${params.length}
+          UNION ALL
+          SELECT child.id FROM categories child JOIN branch ON child.parent_id=branch.id
+        )
+        SELECT id FROM branch
+      )`);
+    }
     if (search) { params.push(`%${search}%`); where.push(`(p.title ILIKE $${params.length} OR p.short_desc ILIKE $${params.length})`); }
     if (min_price) { params.push(parseFloat(min_price)); where.push(`p.price >= $${params.length}`); }
     if (max_price) { params.push(parseFloat(max_price)); where.push(`p.price <= $${params.length}`); }
