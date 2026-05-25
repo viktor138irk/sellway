@@ -207,6 +207,47 @@ router.post('/bulk-import', auth, requireRole('admin'), async (req, res) => {
   }
 });
 
+router.post('/bulk-delete', auth, requireRole('admin'), async (req, res) => {
+  const ids = [...new Set(Array.isArray(req.body.ids) ? req.body.ids.filter(id => /^[0-9a-f-]{36}$/i.test(String(id))) : [])];
+  if (!ids.length) return res.status(400).json({ error: 'Выберите категории для удаления' });
+  if (ids.length > 500) return res.status(400).json({ error: 'За один раз можно удалить до 500 веток' });
+  try {
+    const { rows: blocked } = await query(
+      `WITH RECURSIVE branches AS (
+         SELECT selected.id AS root_id, selected.id
+         FROM categories selected WHERE selected.id=ANY($1::uuid[])
+         UNION ALL
+         SELECT branches.root_id, child.id
+         FROM categories child JOIN branches ON child.parent_id=branches.id
+       )
+       SELECT DISTINCT root.id, root.name
+       FROM categories root
+       JOIN branches ON branches.root_id=root.id
+       JOIN products p ON p.category_id=branches.id
+       ORDER BY root.name`,
+      [ids]
+    );
+    const blockedIds = new Set(blocked.map(item => item.id));
+    const deletableIds = ids.filter(id => !blockedIds.has(id));
+    let deleted = 0;
+    if (deletableIds.length) {
+      const result = await query(
+        `WITH RECURSIVE branches AS (
+           SELECT id FROM categories WHERE id=ANY($1::uuid[])
+           UNION ALL
+           SELECT child.id FROM categories child JOIN branches ON child.parent_id=branches.id
+         )
+         DELETE FROM categories WHERE id IN (SELECT id FROM branches)`,
+        [deletableIds]
+      );
+      deleted = result.rowCount;
+    }
+    res.json({ deleted, blocked });
+  } catch (err) {
+    res.status(500).json({ error: `Не удалось удалить категории: ${err.message}` });
+  }
+});
+
 router.put('/:id', auth, requireRole('admin'), async (req, res) => {
   const { name, slug, emoji, image_url, description, is_active, sort_order, parent_id } = req.body;
   if (parent_id === req.params.id) return res.status(400).json({ error: 'Категория не может быть родителем самой себе' });

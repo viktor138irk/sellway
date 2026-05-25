@@ -14,3 +14,4 @@ export const createCategory = (data) => client.post('/categories', data);
 export const updateCategory = (id, data) => client.put(`/categories/${id}`, data);
 export const deleteCategory = (id) => client.delete(`/categories/${id}`);
 export const bulkImportCategories = (data) => client.post('/categories/bulk-import', data);
+export const bulkDeleteCategories = (ids) => client.post('/categories/bulk-delete', { ids });

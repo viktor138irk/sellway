@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Input, Modal, Toggle, Select, Textarea } from '../../components/UI';
-import { getCategories, createCategory, updateCategory, deleteCategory, bulkImportCategories } from '../../api/products';
+import { getCategories, createCategory, updateCategory, deleteCategory, bulkImportCategories, bulkDeleteCategories } from '../../api/products';
 import { useToast } from '../../contexts/ToastContext';
 import client from '../../api/client';
 
@@ -125,6 +125,8 @@ export default function CategoriesPage({ type = 'product' }) {
   const [deleteCat, setDeleteCat] = useState(null);
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [checkedRootIds, setCheckedRootIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const roots = cats.filter(c => !c.parent_id).sort(byOrder);
   const selected = roots.find(c => c.id === selectedId) || roots[0];
@@ -137,6 +139,7 @@ export default function CategoriesPage({ type = 'product' }) {
       setCats(list);
       const roots = list.filter(c => !c.parent_id);
       if (!roots.some(c => c.id === selectedId)) setSelectedId(roots[0]?.id || '');
+      setCheckedRootIds(previous => previous.filter(id => roots.some(root => root.id === id)));
     }).catch(() => toast.error('Ошибка загрузки категорий')).finally(() => setLoading(false));
   }
   useEffect(load, [type]);
@@ -152,6 +155,29 @@ export default function CategoriesPage({ type = 'product' }) {
 
   function openCreate(parent = null) { setEditCat(parent ? { parent_id: parent.id } : null); setModal('create'); }
   function openEdit(cat) { setEditCat(cat); setModal('edit'); }
+  function toggleRootChecked(id) {
+    setCheckedRootIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  }
+  function selectEmptyRoots() {
+    setCheckedRootIds(roots.filter(root => Number(root.subtree_product_count || root.product_count || 0) === 0).map(root => root.id));
+  }
+  async function removeSelectedRoots() {
+    setBulkDeleting(true);
+    try {
+      const { data } = await bulkDeleteCategories(checkedRootIds);
+      const blocked = data.blocked || [];
+      if (data.deleted) toast.success(`Удалено категорий: ${data.deleted}`);
+      if (blocked.length) toast.warn(`Не удалены ветки с товарами: ${blocked.map(item => item.name).join(', ')}`);
+      if (!data.deleted && !blocked.length) toast.warn('Категории для удаления не найдены');
+      setCheckedRootIds([]);
+      setModal(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось удалить категории');
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
   async function importCatalog() {
     if (!importText.trim()) return toast.warn('Вставьте список категорий');
     setImporting(true);
@@ -178,29 +204,34 @@ export default function CategoriesPage({ type = 'product' }) {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{labels.title}</h1>
             <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{labels.hint}</div>
           </div>
-          <div style={{ display:'flex', gap:8 }}><Btn variant="ghost" onClick={() => setModal('import')}>Импорт списком</Btn><Btn onClick={() => openCreate(null)}>{labels.addRoot}</Btn></div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {checkedRootIds.length > 0 && <Btn variant="danger" onClick={() => setModal('bulkDelete')}>Удалить выбранные ({checkedRootIds.length})</Btn>}
+            <Btn variant="ghost" onClick={() => setModal('import')}>Импорт списком</Btn>
+            <Btn onClick={() => openCreate(null)}>{labels.addRoot}</Btn>
+          </div>
         </div>
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320 }}><Spinner size={36} /></div>
         : <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 390px) 1fr', gap: 16 }}>
             <div style={{ ...card, overflow: 'hidden' }}>
-              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: C.t1 }}>{labels.root}</div>
-                <span style={{ fontSize: 11, color: C.t3 }}>{roots.length} шт.</span>
+                <button type="button" onClick={selectEmptyRoots} style={{ background:'transparent', border:'none', color:C.accent, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:700 }}>Выбрать пустые</button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {roots.map(cat => {
                   const active = selected?.id === cat.id;
                   const count = descendantsOf(cats, cat.id).length;
                   return (
-                    <button key={cat.id} type="button" onClick={() => setSelectedId(cat.id)} style={{ display: 'grid', gridTemplateColumns: '46px 1fr auto', gap: 10, alignItems: 'center', padding: '12px 14px', border: 'none', borderBottom: `1px solid ${C.border}`, background: active ? C.accent + '18' : 'transparent', color: C.t1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                    <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ display: 'grid', gridTemplateColumns: '18px 46px 1fr auto', gap: 10, alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, background: active ? C.accent + '18' : 'transparent', color: C.t1, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                      <input type="checkbox" checked={checkedRootIds.includes(cat.id)} onClick={event => event.stopPropagation()} onChange={() => toggleRootChecked(cat.id)} aria-label={`Выбрать ${cat.name} для удаления`} style={{ accentColor:C.accent, cursor:'pointer' }} />
                       <CategoryAvatar cat={cat} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</div>
                         <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>{cat.slug} · {count} вложенных</div>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: cat.is_active ? C.green + '22' : C.t3 + '22', color: cat.is_active ? C.green : C.t3 }}>{cat.is_active ? 'ON' : 'OFF'}</span>
-                    </button>
+                    </div>
                   );
                 })}
                 {roots.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: C.t3 }}>{labels.empty}</div>}
@@ -230,6 +261,7 @@ export default function CategoriesPage({ type = 'product' }) {
                 <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
                   {descendants.map(({ cat, level }) => <div key={cat.id} style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, marginLeft: Math.min(level - 1, 2) * 8 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                      <input type="checkbox" checked={checkedRootIds.includes(cat.id)} onChange={() => toggleRootChecked(cat.id)} aria-label={`Выбрать ${cat.name} для удаления`} style={{ accentColor:C.accent, cursor:'pointer' }} />
                       <CategoryAvatar cat={cat} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 800, color: C.t1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</div>
@@ -262,6 +294,17 @@ export default function CategoriesPage({ type = 'product' }) {
           <p style={{ color:C.t2, fontSize:13, lineHeight:1.6, margin:0 }}>Для новой витрины используйте дерево: каждый уровень задаётся двумя пробелами. Повторный импорт обновляет порядок и не создаёт дубликаты. Готовые файлы лежат в <b>docs/catalog-products.txt</b> и <b>docs/catalog-services.txt</b>.</p>
           <Textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={14} placeholder={'Игры\n  Шутеры\n    Counter-Strike 2\n      Аккаунты\n      Ключи\n      Скины\nAI и нейросети\n  AI подписки\n    ChatGPT\n      Подписка'} />
           <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}><Btn variant="ghost" onClick={()=>setModal(null)}>Отмена</Btn><Btn loading={importing} onClick={importCatalog}>Импортировать</Btn></div>
+        </div>
+      </Modal>}
+
+      {modal === 'bulkDelete' && <Modal title="Удалить выбранные категории?" onClose={() => setModal(null)} width={470}>
+        <div style={{ display:'grid', gap:16 }}>
+          <p style={{ fontSize:13, color:C.t2, lineHeight:1.65, margin:0 }}>Будут навсегда удалены выбранные пустые ветки вместе со всеми вложенными категориями. Ветки, где есть товары или услуги, система оставит без изменений.</p>
+          <div style={{ background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:'12px 14px', color:C.t1, fontSize:13, fontWeight:700 }}>Выбрано веток: {checkedRootIds.length}</div>
+          <div style={{ display:'flex', gap:10 }}>
+            <Btn full variant="ghost" onClick={() => setModal(null)}>Отмена</Btn>
+            <Btn full variant="danger" loading={bulkDeleting} onClick={removeSelectedRoots}>Удалить навсегда</Btn>
+          </div>
         </div>
       </Modal>}
 
