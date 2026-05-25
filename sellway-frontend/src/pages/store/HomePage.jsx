@@ -6,7 +6,7 @@ import SellerMeta from '../../components/SellerMeta';
 import FavoriteButton from '../../components/FavoriteButton';
 import useMediaQuery from '../../hooks/useMediaQuery';
 
-function ProductCard({ p }) {
+function ProductCard({ p, compact = false }) {
   const [imgIdx, setImgIdx] = useState(0);
   const [hov, setHov] = useState(false);
   const navigate = useNavigate();
@@ -15,8 +15,8 @@ function ProductCard({ p }) {
   const disc = p.old_price ? Math.round((1 - p.price / p.old_price) * 100) : 0;
   return (
     <div onClick={() => navigate(`/product/${p.id}`)} onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setImgIdx(0); }} style={{ background: C.card, border: `1px solid ${hov ? C.accent+'55' : C.border}`, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', transition: 'all .2s', display: 'flex', flexDirection: 'column', boxShadow: hov ? C.shadow : 'none' }}>
-      <div style={{ position: 'relative', height: 148, background: C.media, overflow: 'hidden' }}>
-        {images.length > 0 ? <img src={images[imgIdx]} alt={p.title} style={{ width:'100%', height:'100%', objectFit:'cover', transition:'transform .3s', transform: hov?'scale(1.04)':'scale(1)' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', gap:5, alignItems:'center', justifyContent:'center', color:C.t3 }}><span style={{ fontFamily:'var(--sw-serif)', fontSize:32 }}>{String(p.title || 'S').slice(0,1)}</span><span style={{ fontSize:10, textTransform:'uppercase' }}>{service ? 'Услуга' : 'Товар'}</span></div>}
+      <div style={{ position: 'relative', height: compact ? 128 : 148, background: C.media, overflow: 'hidden' }}>
+        {images.length > 0 ? <img src={images[imgIdx]} alt={p.title} style={{ width:'100%', height:'100%', objectFit:'cover', transition:'transform .3s', transform: hov?'scale(1.04)':'scale(1)' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', gap:5, alignItems:'center', justifyContent:'center', color:C.t3 }}><span style={{ fontFamily:'var(--sw-serif)', fontSize:compact ? 27 : 32 }}>{String(p.title || 'S').slice(0,1)}</span><span style={{ fontSize:10, textTransform:'uppercase' }}>{service ? 'Услуга' : 'Товар'}</span></div>}
         <div style={{ position:'absolute', top:8, left:8, display:'flex', flexDirection:'column', gap:4 }}>
           {disc > 0 && <span style={{ background:C.red, color:'#fff', fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>−{disc}%</span>}
           {service && <span style={{ background:C.accent, color:'#fff', fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:6 }}>Услуга</span>}
@@ -24,8 +24,8 @@ function ProductCard({ p }) {
         <FavoriteButton productId={p.id} floating size={30} />
         {images.length > 1 && <><div style={{ position:'absolute', inset:0, display:'flex' }}>{images.map((_,i)=><div key={i} style={{ flex:1 }} onMouseEnter={()=>setImgIdx(i)} />)}</div><div style={{ position:'absolute', bottom:8, left:0, right:0, display:'flex', justifyContent:'center', gap:4 }}>{images.map((_,i)=><div key={i} style={{ width:i===imgIdx?14:5, height:5, borderRadius:3, background:i===imgIdx?'#fff':'rgba(255,255,255,.4)', transition:'all .2s' }} />)}</div></>}
       </div>
-      <div style={{ padding:'10px 11px', display:'flex', flexDirection:'column', gap:5, flex:1 }}>
-        <div style={{ display:'flex', alignItems:'baseline', gap:7 }}><span style={{ fontSize:16, fontWeight:900, color:C.t1 }}>{service ? 'от ' : ''}{parseFloat(p.price).toLocaleString('ru')} ₽</span>{p.old_price && <span style={{ fontSize:11, color:C.t3, textDecoration:'line-through' }}>{parseFloat(p.old_price).toLocaleString('ru')} ₽</span>}</div>
+      <div style={{ padding:compact ? '8px 9px' : '10px 11px', display:'flex', flexDirection:'column', gap:5, flex:1, minWidth:0 }}>
+        <div style={{ display:'flex', alignItems:'baseline', gap:7, minWidth:0 }}><span style={{ fontSize:compact ? 15 : 16, fontWeight:900, color:C.t1, whiteSpace:'nowrap' }}>{service ? 'от ' : ''}{parseFloat(p.price).toLocaleString('ru')} ₽</span>{p.old_price && <span style={{ fontSize:11, color:C.t3, textDecoration:'line-through', overflow:'hidden', textOverflow:'ellipsis' }}>{parseFloat(p.old_price).toLocaleString('ru')} ₽</span>}</div>
         <div style={{ fontSize:12, color:C.t1, lineHeight:1.35, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight:33 }}>{p.title}</div>
         {p.rating > 0 && <div style={{ display:'flex', alignItems:'center', gap:5 }}><Stars n={p.rating} size={11} /><span style={{ fontSize:11, color:C.t3 }}>{parseFloat(p.rating).toFixed(1)} ({p.reviews_count})</span></div>}
         <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>{p.tags?.slice(0,2).map(t=><span key={t} style={{ fontSize:10, background:C.soft, color:C.t2, padding:'2px 7px', borderRadius:5 }}>{t}</span>)}</div>
@@ -72,8 +72,8 @@ export default function HomePage() {
       <FeaturedCreators title="Топ фрилансеров" empty="Фрилансеры появятся после публикации услуг." people={overview?.freelancers || []} />
     </section>
 
-    {popular.length > 0 && <section><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:24, fontWeight:650, color:C.t1 }}>Популярное</h2><Link to="/catalog?kind=products&sort=popular" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Смотреть все</Link></div><div style={{ display:'grid', gridTemplateColumns:isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(170px,1fr))', gap:isMobile ? 10 : 13 }}>{popular.map(p=><ProductCard key={p.id} p={p}/>)}</div></section>}
-    {newest.length > 0 && <section><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:24, fontWeight:650, color:C.t1 }}>Новые поступления</h2><Link to="/catalog?kind=products&sort=newest" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Смотреть все</Link></div><div style={{ display:'grid', gridTemplateColumns:isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(170px,1fr))', gap:isMobile ? 10 : 13 }}>{newest.map(p=><ProductCard key={p.id} p={p}/>)}</div></section>}
+    {popular.length > 0 && <section><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:24, fontWeight:650, color:C.t1 }}>Популярное</h2><Link to="/catalog?kind=products&sort=popular" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Смотреть все</Link></div><div style={{ display:'grid', gridTemplateColumns:isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(170px,1fr))', gap:isMobile ? 10 : 13 }}>{popular.map(p=><ProductCard key={p.id} p={p} compact={isMobile}/>)}</div></section>}
+    {newest.length > 0 && <section><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:24, fontWeight:650, color:C.t1 }}>Новые поступления</h2><Link to="/catalog?kind=products&sort=newest" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Смотреть все</Link></div><div style={{ display:'grid', gridTemplateColumns:isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(170px,1fr))', gap:isMobile ? 10 : 13 }}>{newest.map(p=><ProductCard key={p.id} p={p} compact={isMobile}/>)}</div></section>}
 
     <section aria-label="О площадке SellWay" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'clamp(20px,4vw,30px)', display:'grid', gap:16 }}>
       <h1 style={{ fontSize:'clamp(20px,3vw,25px)', fontWeight:900, color:C.t1, margin:0 }}>SellWay.pro - маркетплейс цифровых товаров и услуг</h1>

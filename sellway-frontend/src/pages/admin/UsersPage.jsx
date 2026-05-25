@@ -13,6 +13,35 @@ const STATUS_COLOR = { active: C.green, banned: C.red, pending_verify: C.amber }
 const STATUS_LABEL = { active: 'Активен', banned: 'Заблокирован', pending_verify: 'Ожидает' };
 const COMMERCIAL_ROLES = ['seller', 'freelancer', 'admin'];
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
+const referralActive = user => Boolean(user.referral_enabled && user.referral_application_status === 'approved');
+
+function QuickMessageModal({ user, onClose }) {
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const toast = useToast();
+
+  async function send() {
+    if (!message.trim()) return toast.warn('Введите сообщение');
+    setSending(true);
+    try {
+      await sendAdminUserMessage(user.id, message.trim());
+      toast.success(`Сообщение отправлено: ${user.username}`);
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка отправки сообщения');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return <Modal title={`Написать: ${user.username}`} onClose={onClose} width={500}>
+    <div style={{ display:'grid', gap:12 }}>
+      <div style={{ fontSize:12, color:C.t2 }}>{user.email}</div>
+      <Textarea rows={5} value={message} onChange={event => setMessage(event.target.value)} placeholder="Сообщение появится в поддержке и уведомлениях пользователя" />
+      <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}><Btn variant="ghost" onClick={onClose}>Отмена</Btn><Btn loading={sending} onClick={send}>Отправить</Btn></div>
+    </div>
+  </Modal>;
+}
 
 function UserModal({ user, onClose, onSave }) {
   const [role, setRole] = useState(user.role);
@@ -142,6 +171,7 @@ export default function UsersPage() {
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [editUser, setEditUser] = useState(null);
+  const [messageUser, setMessageUser] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -158,10 +188,10 @@ export default function UsersPage() {
       <select value={status} onChange={e => setStatus(e.target.value)} style={{ background: C.card, border: `1px solid ${C.border}`, color: C.t1, borderRadius: 9, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit' }}><option value="">Все статусы</option><option value="active">Активные</option><option value="banned">Заблокированные</option><option value="pending_verify">Ожидают</option></select>
     </div>
     {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}><Spinner size={32} /></div> : <div className="admin-users-list" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
-      <div className="admin-users-list-head" style={{ display:'grid', gridTemplateColumns:'minmax(220px,1.6fr) 150px 140px 130px 100px', gap:14, alignItems:'center', padding:'11px 16px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
-        {['Пользователь', 'Тип', 'Статус', 'Баланс', ''].map(label => <div key={label} style={{ fontSize:10, color:C.t3, fontWeight:800, textTransform:'uppercase' }}>{label}</div>)}
+      <div className="admin-users-list-head" style={{ display:'grid', gridTemplateColumns:'minmax(205px,1.45fr) 112px 112px 120px 118px 184px', gap:12, alignItems:'center', padding:'11px 16px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
+        {['Пользователь', 'Тип', 'Статус', 'Рефералы', 'Баланс', 'Действия'].map(label => <div key={label} style={{ fontSize:10, color:C.t3, fontWeight:800, textTransform:'uppercase' }}>{label}</div>)}
       </div>
-      {users.length === 0 ? <div style={{ padding:42, textAlign:'center', color:C.t2 }}>Пользователи не найдены</div> : users.map(u => <div key={u.id} className="admin-user-row" style={{ display:'grid', gridTemplateColumns:'minmax(220px,1.6fr) 150px 140px 130px 100px', gap:14, alignItems:'center', padding:'12px 16px', borderBottom:`1px solid ${C.border}`, minWidth:0 }}>
+      {users.length === 0 ? <div style={{ padding:42, textAlign:'center', color:C.t2 }}>Пользователи не найдены</div> : users.map(u => <div key={u.id} className="admin-user-row" style={{ display:'grid', gridTemplateColumns:'minmax(205px,1.45fr) 112px 112px 120px 118px 184px', gap:12, alignItems:'center', padding:'12px 16px', borderBottom:`1px solid ${C.border}`, minWidth:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
           <UserAvatar user={u} size={38} radius={10} initialsLength={1} background={(ROLE_COLOR[u.role] || C.accent) + '33'} style={{ color:ROLE_COLOR[u.role] || C.accent }} />
           <div style={{ minWidth:0 }}>
@@ -171,9 +201,10 @@ export default function UsersPage() {
         </div>
         <div><Badge color={ROLE_COLOR[u.role] || C.t2}>{ROLE_LABEL[u.role] || u.role}</Badge></div>
         <div style={{ color:STATUS_COLOR[u.status] || C.t3, fontWeight:800, fontSize:12 }}>{STATUS_LABEL[u.status] || u.status}</div>
+        <div style={{ color:referralActive(u) ? C.green : C.t3, fontWeight:800, fontSize:12 }}>{referralActive(u) ? 'Активна' : 'Не активна'}</div>
         <div style={{ color:C.t1, fontWeight:800, fontSize:13 }}>{money(u.balance)}</div>
-        <Btn size="sm" variant="ghost" onClick={() => setEditUser(u)}>Открыть</Btn>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><Btn size="sm" onClick={() => setMessageUser(u)}>Написать</Btn><Btn size="sm" variant="ghost" onClick={() => setEditUser(u)}>Открыть</Btn></div>
       </div>)}
     </div>}
-  </div>{editUser && <UserModal user={editUser} onClose={() => setEditUser(null)} onSave={handleSave} />}</AdminLayout>;
+  </div>{editUser && <UserModal user={editUser} onClose={() => setEditUser(null)} onSave={handleSave} />}{messageUser && <QuickMessageModal user={messageUser} onClose={() => setMessageUser(null)} />}</AdminLayout>;
 }

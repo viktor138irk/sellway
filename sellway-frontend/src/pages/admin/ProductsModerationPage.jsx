@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Modal, Input, Textarea } from '../../components/UI';
 import { getPendingProducts, approveProduct, rejectProduct } from '../../api/admin';
-import { updateProduct, deleteProduct, addKeys, getKeys, deleteKey } from '../../api/products';
+import { updateProduct, deleteProduct, addKeys, getKeys, deleteKey, getCategories } from '../../api/products';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import SellerMeta from '../../components/SellerMeta';
@@ -22,6 +22,22 @@ const DELIVERY = {
 
 function money(v) { return Number(v || 0).toLocaleString('ru') + ' ₽'; }
 function isService(p) { return p.delivery_type === 'service'; }
+function flatCategoryOptions(categories) {
+  const byParent = new Map();
+  categories.forEach(category => {
+    const parent = category.parent_id || '';
+    byParent.set(parent, [...(byParent.get(parent) || []), category]);
+  });
+  const result = [];
+  function walk(parentId = '', depth = 0) {
+    (byParent.get(parentId) || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name)).forEach(category => {
+      result.push({ ...category, depth });
+      walk(category.id, depth + 1);
+    });
+  }
+  walk();
+  return result;
+}
 function CategoryIcon({ product, size = 20 }) {
   return <span style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', background: C.media, border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
     {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(10, size * .45), fontWeight: 900, color: C.t2 }}>{String(product.category_name || '?').trim().slice(0, 1).toUpperCase()}</span>}
@@ -36,10 +52,11 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
   const [editing, setEditing] = useState(startEditing);
   const [keys, setKeys] = useState([]);
   const [keysText, setKeysText] = useState('');
+  const [categories, setCategories] = useState([]);
   const [draft, setDraft] = useState({
     title: product.title || '', short_desc: product.short_desc || '', description: product.description || '',
     price: product.price || '', old_price: product.old_price || '', guarantee_days: product.guarantee_days || 0,
-    auto_delivery_message: product.meta?.auto_delivery_message || '',
+    auto_delivery_message: product.meta?.auto_delivery_message || '', category_id: product.category_id || '',
   });
   const images = product.images?.filter(Boolean) || (product.main_image ? [product.main_image] : []);
   const [, deliveryLabel] = DELIVERY[product.delivery_type] || ['Товар', product.delivery_type || '—'];
@@ -48,6 +65,13 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
   useEffect(() => {
     if (canManage && product.delivery_type === 'auto') getKeys(product.id).then(r => setKeys(r.data || [])).catch(() => {});
   }, [canManage, product.id, product.delivery_type]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    getCategories({ type: isService(product) ? 'service' : 'product' })
+      .then(response => setCategories(flatCategoryOptions(response.data || [])))
+      .catch(() => setCategories([]));
+  }, [canManage, product.delivery_type]);
 
   async function handleApprove() { setLoading('approve'); await onAction('approve', product.id); setLoading(''); onClose(); }
   async function handleReject() { if (!reason.trim()) return; setLoading('reject'); await onAction('reject', product.id, reason); setLoading(''); onClose(); }
@@ -58,14 +82,15 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
         ...draft,
         price: Number(draft.price),
         old_price: draft.old_price ? Number(draft.old_price) : null,
-        category_id: product.category_id,
+        category_id: draft.category_id,
         delivery_type: product.delivery_type,
         tags: product.tags || [],
         service_steps: steps,
       });
       toast.success('Позиция обновлена без снятия с публикации');
       setEditing(false);
-      onChanged(data);
+      const category = categories.find(item => item.id === draft.category_id);
+      onChanged({ ...data, category_name: category?.name || data.category_name || 'Без категории' });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Не удалось изменить позицию');
     } finally {
@@ -155,6 +180,13 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
         {canManage && editing && <div style={{ background:C.infoBg, border:`1px solid ${C.border}`, borderRadius:8, padding:14, display:'grid', gap:12 }}>
           <div style={{ fontWeight:900, color:C.t1, fontSize:13 }}>Редактирование опубликованной позиции</div>
           <Input label="Название" value={draft.title} onChange={e => setDraft(d => ({ ...d, title:e.target.value }))} />
+          <label style={{ display:'grid', gap:6 }}>
+            <span style={{ fontSize:12, fontWeight:700, color:C.t2 }}>Категория</span>
+            <select value={draft.category_id} onChange={event => setDraft(d => ({ ...d, category_id:event.target.value }))} style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 12px', color:C.t1, fontFamily:'inherit', fontSize:13 }}>
+              <option value="">Без категории</option>
+              {categories.map(category => <option key={category.id} value={category.id}>{`${'  '.repeat(category.depth)}${category.name}`}</option>)}
+            </select>
+          </label>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <Input label="Цена (₽)" type="number" value={draft.price} onChange={e => setDraft(d => ({ ...d, price:e.target.value }))} />
             <Input label="Старая цена (₽)" type="number" value={draft.old_price} onChange={e => setDraft(d => ({ ...d, old_price:e.target.value }))} />
@@ -298,11 +330,35 @@ export default function ProductsModerationPage({ view = 'moderation' }) {
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
         : visible.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 60, textAlign: 'center', color: C.t3 }}><div style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize: 24, marginBottom: 12 }}>Catalog</div><div style={{ fontSize: 15, color: C.t2 }}>Нет позиций в этом фильтре</div></div>
-        : <div style={{ display: 'grid', gridTemplateColumns: published ? 'repeat(auto-fill, minmax(215px, 1fr))' : 'repeat(auto-fill, minmax(290px, 1fr))', gap: published ? 10 : 14 }}>
-            {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} published={published} />)}
+        : published ? <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+            <div className="admin-published-head" style={{ display:'grid', gridTemplateColumns:'minmax(250px,1.55fr) minmax(170px,1fr) 150px 110px 118px', gap:12, padding:'10px 14px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
+              {['Позиция', 'Категория', 'Автор', 'Цена', ''].map(label => <div key={label} style={{ fontSize:10, fontWeight:800, color:C.t3, textTransform:'uppercase' }}>{label}</div>)}
+            </div>
+            {visible.map(product => <PublishedProductRow key={product.id} product={product} onSelect={setSelected} />)}
+          </div>
+        : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(290px, 1fr))', gap:14 }}>
+            {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} published={false} />)}
           </div>}
       </div>
       {selected && <ProductDetail product={selected} onClose={() => setSelected(null)} onAction={handleAction} onChanged={handleChanged} canManage={user?.role === 'admin'} startEditing={published} />}
     </AdminLayout>
   );
+}
+
+function PublishedProductRow({ product, onSelect }) {
+  return <div className="admin-published-row" style={{ display:'grid', gridTemplateColumns:'minmax(250px,1.55fr) minmax(170px,1fr) 150px 110px 118px', gap:12, alignItems:'center', padding:'11px 14px', borderBottom:`1px solid ${C.border}`, minWidth:0 }}>
+    <div style={{ display:'flex', gap:10, alignItems:'center', minWidth:0 }}>
+      <div style={{ width:42, height:42, flexShrink:0, borderRadius:7, overflow:'hidden', background:C.media, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        {product.main_image ? <img src={product.main_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <CategoryIcon product={product} size={32} />}
+      </div>
+      <div style={{ minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:800, color:C.t1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{product.title}</div>
+        <div style={{ fontSize:11, color:C.t3 }}>{isService(product) ? 'Услуга' : 'Товар'}</div>
+      </div>
+    </div>
+    <div style={{ display:'flex', alignItems:'center', gap:7, minWidth:0, fontSize:12, color:C.t2 }}><CategoryIcon product={product} size={25} /><span style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{product.category_name || 'Без категории'}</span></div>
+    <div style={{ minWidth:0, fontSize:12, color:C.t2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{product.seller_name || '—'}</div>
+    <div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{isService(product) ? 'от ' : ''}{money(product.price)}</div>
+    <Btn size="sm" variant="ghost" onClick={() => onSelect(product)}>Редактировать</Btn>
+  </div>;
 }

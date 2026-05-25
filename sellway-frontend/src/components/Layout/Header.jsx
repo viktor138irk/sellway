@@ -216,7 +216,7 @@ export default function Header() {
   };
 
   return <header className="site-header" style={{ background: C.header, borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 4000, boxShadow: '0 3px 14px rgba(61,41,25,.05)' }}>
-    <div className="site-header-row" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 10px' : '0 20px', height: 58, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14 }}>
+    <div className="site-header-row" style={{ width:'100%', boxSizing:'border-box', padding: isMobile ? '0 10px' : '0 24px', height: 58, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14 }}>
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
         <img className="site-brand-logo" src="/brand-logo.png" alt="SellWay" style={{ display:'block', width:isMobile ? 112 : 130, height:40, objectFit:'contain' }} />
       </Link>
@@ -272,12 +272,12 @@ export default function Header() {
     </div>
 
     <div ref={navRef} className="site-nav-wrap" style={{ borderTop: `1px solid ${C.border}`, padding: isMobile ? '0 10px' : '0 20px', position:'relative' }}>
-      <div className="site-nav" style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 0, overflowX: 'auto' }}>
+      <div className="site-nav" style={{ width:'100%', display: 'flex', gap: 0, overflowX: 'auto' }}>
         {[['products', 'Каталог'], ['services', 'Услуги']].map(([value, label]) => {
           const active = location.pathname === '/catalog' && (new URLSearchParams(location.search).get('kind') || 'products') === value;
-          return <button key={value} type="button" onMouseEnter={() => !isMobile && setMenuKind(value)} onClick={() => setMenuKind(old => old === value ? '' : value)} style={{ padding:'9px 16px', fontSize:13, color:active || menuKind === value ? C.accent : C.t2, background:'transparent', border:'none', borderBottom:`2px solid ${active || menuKind === value ? C.accent : 'transparent'}`, fontFamily:'inherit', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', display:'flex', gap:7, alignItems:'center' }}>{label}<span style={{ fontSize:11 }}>⌄</span></button>;
+          return <button key={value} type="button" onMouseEnter={() => !isMobile && setMenuKind(value)} onClick={() => setMenuKind(old => old === value ? '' : value)} style={{ padding:'9px 16px', fontSize:13, color:active || menuKind === value ? C.accent : C.t2, background:'transparent', border:'none', borderBottom:`2px solid ${active || menuKind === value ? C.accent : 'transparent'}`, fontFamily:'inherit', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', display:'flex', gap:7, alignItems:'center' }}>{value === 'products' ? '🛍️' : '🧰'} {label}<span style={{ fontSize:11 }}>⌄</span></button>;
         })}
-        <Link to="/catalog?kind=products&sort=newest" onClick={() => setMenuKind('')} style={{ padding:'9px 16px', fontSize:13, color:C.t2, textDecoration:'none', fontWeight:600, borderBottom:'2px solid transparent', whiteSpace:'nowrap' }}>Новинки</Link>
+        <Link to="/catalog?kind=products&sort=newest" onClick={() => setMenuKind('')} style={{ padding:'9px 16px', fontSize:13, color:C.t2, textDecoration:'none', fontWeight:600, borderBottom:'2px solid transparent', whiteSpace:'nowrap' }}>✨ Новинки</Link>
         {isSellerRole && <Link to="/seller/products/new" style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: 13, color: C.accent, textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>{user.role === 'freelancer' ? '+ Услуга' : '+ Продать'}</Link>}
       </div>
       {menuKind && <div style={{ position:'absolute', left:isMobile ? 10 : 20, right:isMobile ? 10 : 20, top:'100%', maxWidth:1160, margin:'0 auto', zIndex:5000 }}>

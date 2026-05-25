@@ -9,6 +9,7 @@ const fs       = require('fs');
 const logger   = require('./config/logger');
 const { pool } = require('./config/db');
 const wsServer = require('./ws/server');
+const { runAutoPayouts } = require('./services/autoPayouts');
 
 const app    = express();
 const server = http.createServer(app);
@@ -68,8 +69,10 @@ server.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 SellWay запущен на порту ${PORT}`);
   logger.info(`   WebSocket: /ws/orders/:id`);
   logger.info(`   ЮKassa webhook: /api/payments/webhook`);
+  setTimeout(() => runAutoPayouts(), 30 * 1000);
 });
 
-process.on('SIGTERM', async () => { server.close(() => pool.end().finally(() => process.exit(0))); });
+const autoPayoutTimer = setInterval(() => runAutoPayouts(), 60 * 60 * 1000);
+process.on('SIGTERM', async () => { clearInterval(autoPayoutTimer); server.close(() => pool.end().finally(() => process.exit(0))); });
 process.on('unhandledRejection', (r) => logger.error('Unhandled rejection', { reason: String(r) }));
 module.exports = { app, server };

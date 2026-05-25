@@ -6,16 +6,16 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 import UserAvatar from '../UserAvatar';
 
 const BASE_NAV = [
-  ['/seller', 'Обзор'],
-  ['/seller/products', 'Товары'],
-  ['/seller/orders', 'Заказы'],
-  ['/seller/finances', 'Финансы'],
-  ['/seller/referrals', 'Рефералы'],
-  ['/seller/withdrawal', 'Вывод средств'],
-  ['/seller/reviews', 'Отзывы'],
-  ['/seller/promo', 'Акции'],
-  ['/profile/favorites', 'Избранное'],
-  ['/seller/settings', 'Настройки'],
+  ['/seller', '📊 Обзор'],
+  ['/seller/products', '📦 Товары'],
+  ['/seller/orders', '🧾 Заказы'],
+  ['/seller/finances', '💰 Финансы'],
+  ['/seller/referrals', '🤝 Рефералы'],
+  ['/seller/withdrawal', '💳 Вывод средств'],
+  ['/seller/reviews', '⭐ Отзывы'],
+  ['/seller/promo', '🏷️ Акции'],
+  ['/profile/favorites', '❤️ Избранное'],
+  ['/seller/settings', '⚙️ Настройки'],
 ];
 
 function MenuIcon({ open }) {
@@ -30,7 +30,8 @@ export default function SellerLayout({ children }) {
   const isMobile = useMediaQuery('(max-width: 760px)');
   const [menuOpen, setMenuOpen] = useState(false);
   const roleLabel = user?.role === 'freelancer' ? 'Фрилансер' : user?.role === 'admin' ? 'Администратор' : 'Продавец';
-  const nav = BASE_NAV.map(([path, label]) => user?.role === 'freelancer' && path === '/seller/products' ? [path, 'Услуги'] : [path, label]);
+  const nav = BASE_NAV.map(([path, label]) => user?.role === 'freelancer' && path === '/seller/products' ? [path, '🧰 Услуги'] : [path, label]);
+  const rating = Number(user?.rating || 0);
 
   useEffect(() => {
     if (isMobile) setMenuOpen(false);
@@ -46,10 +47,10 @@ export default function SellerLayout({ children }) {
             <div style={{ fontSize:11, color:C.navMuted || C.t2, marginTop:2 }}>{roleLabel}</div>
           </div>
           {isMobile && <button type="button" className="cabinet-menu-toggle" aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)} style={{ marginLeft:'auto', width:40, height:40, borderRadius:8, border:`1px solid ${C.border}`, color:C.navText || C.t1, background:'transparent', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}><MenuIcon open={menuOpen} /></button>}
-          {!isMobile && user?.rating > 0 && <Stars n={user.rating} size={13} />}
+          {!isMobile && rating > 0 && <Stars n={rating} size={13} />}
           {!isMobile && <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, width:'100%', marginTop:4 }}>
             <div style={{ textAlign:'center', background:'rgba(255,253,249,.06)', borderRadius:6, padding:8 }}><div style={{ fontSize:15, fontWeight:800, color:C.navText || C.t1 }}>{user?.total_sales || 0}</div><div style={{ fontSize:9, color:C.navMuted || C.t3, textTransform:'uppercase' }}>Продаж</div></div>
-            <div style={{ textAlign:'center', background:'rgba(255,253,249,.06)', borderRadius:6, padding:8 }}><div style={{ fontSize:15, fontWeight:800, color:C.navText || C.t1 }}>{user?.rating?.toFixed?.(1) || '—'}</div><div style={{ fontSize:9, color:C.navMuted || C.t3, textTransform:'uppercase' }}>Рейтинг</div></div>
+            <div style={{ textAlign:'center', background:'rgba(255,253,249,.06)', borderRadius:6, padding:8 }}><div style={{ fontSize:15, fontWeight:800, color:C.navText || C.t1 }}>{rating > 0 ? rating.toFixed(1) : 'Новый'}</div><div style={{ fontSize:9, color:C.navMuted || C.t3, textTransform:'uppercase' }}>Рейтинг</div></div>
           </div>}
         </div>
 

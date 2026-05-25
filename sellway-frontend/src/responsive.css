@@ -370,15 +370,35 @@ textarea {
     grid-template-areas:
       "identity action"
       "role status"
-      "balance balance";
+      "referral balance";
     gap: 9px !important;
   }
 
   .admin-user-row > :nth-child(1) { grid-area: identity; }
   .admin-user-row > :nth-child(2) { grid-area: role; }
   .admin-user-row > :nth-child(3) { grid-area: status; text-align: right; }
-  .admin-user-row > :nth-child(4) { grid-area: balance; }
-  .admin-user-row > :nth-child(5) { grid-area: action; }
+  .admin-user-row > :nth-child(4) { grid-area: referral; }
+  .admin-user-row > :nth-child(5) { grid-area: balance; text-align: right; }
+  .admin-user-row > :nth-child(6) { grid-area: action; }
+
+  .admin-published-head {
+    display: none !important;
+  }
+
+  .admin-published-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "position action"
+      "seller price"
+      "category category";
+    gap: 9px !important;
+  }
+
+  .admin-published-row > :nth-child(1) { grid-area: position; }
+  .admin-published-row > :nth-child(2) { grid-area: category; }
+  .admin-published-row > :nth-child(3) { grid-area: seller; }
+  .admin-published-row > :nth-child(4) { grid-area: price; text-align: right; }
+  .admin-published-row > :nth-child(5) { grid-area: action; }
 
   .category-admin-layout {
     grid-template-columns: 1fr !important;

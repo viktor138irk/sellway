@@ -57,6 +57,7 @@ export default function SellerDashboard() {
   if (loading) return <SellerLayout><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 400 }}><Spinner size={40} /></div></SellerLayout>;
 
   const { wallet, seller, referral, recentOrders = [], products = [] } = data || {};
+  const rating = Number(seller?.rating || 0);
   return <SellerLayout><div style={{ padding: 'clamp(16px,4vw,28px)', display: 'flex', flexDirection: 'column', gap: 24 }} className="fade-in">
     <div><h1 style={{ fontSize: 22, fontWeight: 900, color: C.t1, marginBottom: 4 }}>{isFreelancer ? 'Кабинет фрилансера' : 'Кабинет продавца'}</h1><p style={{ fontSize: 13, color: C.t2 }}>{new Date().toLocaleDateString('ru', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
@@ -64,11 +65,11 @@ export default function SellerDashboard() {
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 22 }}><div style={{ fontSize: 12, color: C.t2, marginBottom: 8 }}>Средства в сделках</div><div style={{ fontSize: 30, fontWeight: 900, color: C.t1, marginBottom: 12 }}>{money(wallet?.held)}</div><div style={{ fontSize:12, color:C.t2, lineHeight:1.55 }}>Сумма перейдёт на доступный баланс после подтверждения заказов покупателями.</div></div>
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-      <StatCard marker="01" label={isFreelancer ? 'Услуг' : 'Товаров'} value={products.length} />
-      <StatCard marker="02" label="Продаж всего" value={seller?.total_sales || 0} color={C.green} />
-      <StatCard marker="03" label="Рейтинг" value={seller?.rating ? parseFloat(seller.rating).toFixed(1) : '—'} color={C.amber} />
-      <StatCard marker="04" label="Среднее время выдачи" value={formatDeliveryTime(seller?.seller_delivery_time_min)} color={C.accent} sub={seller?.seller_online ? 'Онлайн' : null} />
-      <StatCard marker="05" label="Заморожено" value={money(wallet?.held)} color={C.t2} />
+      <StatCard marker="📦" label={isFreelancer ? 'Услуг' : 'Товаров'} value={products.length} />
+      <StatCard marker="🛒" label="Продаж всего" value={seller?.total_sales || 0} color={C.green} />
+      <StatCard marker="⭐" label="Рейтинг" value={rating > 0 ? rating.toFixed(1) : 'Новый'} color={C.amber} />
+      <StatCard marker="⏱️" label="Среднее время выдачи" value={formatDeliveryTime(seller?.seller_delivery_time_min)} color={C.accent} sub={seller?.seller_online ? 'Онлайн' : null} />
+      <StatCard marker="🔒" label="Заморожено" value={money(wallet?.held)} color={C.t2} />
     </div>
     <ReferralBlock referral={referral} role={role} />
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${C.border}` }}><span style={{ fontSize: 15, fontWeight: 800, color: C.t1 }}>Последние заказы</span><Link to="/seller/orders" style={{ fontSize: 12, color: C.accent, textDecoration: 'none' }}>Все заказы</Link></div>{recentOrders.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: C.t3 }}><div style={{ fontSize: 14, color: C.t2, marginBottom: 16 }}>Пока нет продаж</div><Link to="/seller/products/new"><Btn size="sm">{isFreelancer ? 'Добавить услугу' : 'Добавить товар'}</Btn></Link></div> : <div>{recentOrders.map(o => <Link key={o.id} to={`/orders/${o.id}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: `1px solid ${C.border}`, textDecoration: 'none' }}><div><div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{o.product_title}</div><div style={{ fontSize: 11, color: C.t3, fontFamily: 'monospace', marginTop: 2 }}>{o.order_number}</div></div><StatusBadge status={o.status} /><div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{money(o.seller_amount)}</div></Link>)}</div>}</div>
