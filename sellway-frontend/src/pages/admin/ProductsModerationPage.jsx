@@ -28,12 +28,12 @@ function CategoryIcon({ product, size = 20 }) {
   </span>;
 }
 
-function ProductDetail({ product, onClose, onAction, onChanged, canManage }) {
+function ProductDetail({ product, onClose, onAction, onChanged, canManage, startEditing = false }) {
   const toast = useToast();
   const [reason, setReason] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [loading, setLoading] = useState('');
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [keys, setKeys] = useState([]);
   const [keysText, setKeysText] = useState('');
   const [draft, setDraft] = useState({
@@ -108,7 +108,7 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage }) {
   }
 
   return (
-    <Modal title={isService(product) ? 'Модерация услуги' : 'Модерация товара'} onClose={onClose} width={760}>
+    <Modal title={startEditing ? (isService(product) ? 'Редактировать услугу' : 'Редактировать товар') : (isService(product) ? 'Модерация услуги' : 'Модерация товара')} onClose={onClose} width={760}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {images.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
           {images.map((url, i) => <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 12, objectFit: 'cover', border: `1px solid ${C.border}` }} />)}
@@ -196,7 +196,7 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage }) {
   );
 }
 
-function ModerationCard({ product, filter, onSelect, onAction }) {
+function ModerationCard({ product, filter, onSelect, onAction, published }) {
   const st = STATUS_STYLE[product.status] || STATUS_STYLE.pending;
   const [, deliveryLabel] = DELIVERY[product.delivery_type] || ['Товар', product.delivery_type || '—'];
   const service = isService(product);
@@ -219,7 +219,7 @@ function ModerationCard({ product, filter, onSelect, onAction }) {
         </div>
         {product.short_desc && <div style={{ fontSize: 12, color: C.t2, lineHeight: 1.45, minHeight: 34 }}>{product.short_desc}</div>}
         <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
-          <Btn size="sm" full variant="ghost" onClick={() => onSelect(product)}>Просмотр</Btn>
+          <Btn size="sm" full variant="ghost" onClick={() => onSelect(product)}>{published ? 'Редактировать' : 'Просмотр'}</Btn>
           {filter === 'pending' && <>
             <Btn size="sm" variant="danger" onClick={() => onSelect(product)}>Откл.</Btn>
             <Btn size="sm" variant="green" onClick={() => onAction('approve', product.id)}>ОК</Btn>
@@ -230,12 +230,13 @@ function ModerationCard({ product, filter, onSelect, onAction }) {
   );
 }
 
-export default function ProductsModerationPage() {
+export default function ProductsModerationPage({ view = 'moderation' }) {
   const toast = useToast();
   const { user } = useAuth();
+  const published = view === 'published';
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('pending');
+  const [filter, setFilter] = useState(published ? 'active' : 'pending');
   const [kind, setKind] = useState('all');
   const [selected, setSelected] = useState(null);
 
@@ -246,6 +247,10 @@ export default function ProductsModerationPage() {
       .catch(() => toast.error('Ошибка загрузки'))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    setFilter(published ? 'active' : 'pending');
+  }, [published]);
 
   useEffect(() => {
     loadProducts();
@@ -277,12 +282,12 @@ export default function ProductsModerationPage() {
       <div style={{ padding: 'clamp(16px, 4vw, 28px)' }} className="fade-in">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 22, gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>📦 Модерация товаров и услуг</h1>
-            <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Карточки с ключевыми данными, быстрым одобрением и детальным просмотром.</div>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{published ? '📦 Опубликованные товары и услуги' : '📥 Модерация товаров и услуг'}</h1>
+            <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{published ? 'Редактируйте действующие позиции, управляйте ключами или снимайте публикации.' : 'Проверяйте новые и повторно отправленные на модерацию позиции.'}</div>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {!published && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {[['pending', 'На проверке'], ['active', 'Активные'], ['rejected', 'Отклоненные']].map(([v, l]) => <button key={v} onClick={() => setFilter(v)} style={{ background: filter === v ? C.accent : 'transparent', border: `1px solid ${filter === v ? 'transparent' : C.border}`, color: filter === v ? '#fff' : C.t2, borderRadius: 9, padding: '8px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>)}
-          </div>
+          </div>}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -292,10 +297,10 @@ export default function ProductsModerationPage() {
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
         : visible.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 60, textAlign: 'center', color: C.t3 }}><div style={{ fontSize: 40, marginBottom: 12 }}>✅</div><div style={{ fontSize: 15, color: C.t2 }}>Нет позиций в этом фильтре</div></div>
         : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
-            {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} />)}
+            {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} published={published} />)}
           </div>}
       </div>
-      {selected && <ProductDetail product={selected} onClose={() => setSelected(null)} onAction={handleAction} onChanged={handleChanged} canManage={user?.role === 'admin'} />}
+      {selected && <ProductDetail product={selected} onClose={() => setSelected(null)} onAction={handleAction} onChanged={handleChanged} canManage={user?.role === 'admin'} startEditing={published} />}
     </AdminLayout>
   );
 }

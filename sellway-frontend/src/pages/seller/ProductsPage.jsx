@@ -142,7 +142,6 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
   const [existingFile, setExistingFile] = useState(null);
   const [keysText, setKeysText] = useState('');
   const [existingKeys, setExistingKeys] = useState([]);
-  const [inventorySaving, setInventorySaving] = useState(false);
   const [parentCategoryId, setParentCategoryId] = useState('');
   const [serviceSteps, setServiceSteps] = useState([]);
   const [form, setForm] = useState({ title: '', short_desc: '', description: '', price: '', old_price: '', category_id: '', delivery_type: service ? 'service' : 'auto', guarantee_days: 0, tags: '', auto_delivery_message: '' });
@@ -175,42 +174,6 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
         .finally(() => setLoading(false));
     }
   }, [productId, service]);
-
-  async function reloadKeys() {
-    if (!productId) return;
-    const { data } = await getKeys(productId);
-    setExistingKeys(data || []);
-  }
-
-  async function addInventory() {
-    const keys = keysText.split('\n').map(value => value.trim()).filter(Boolean);
-    if (!keys.length) return toast.warn('Введите хотя бы один ключ');
-    setInventorySaving(true);
-    try {
-      const { data } = await addKeys(productId, keys);
-      await reloadKeys();
-      setKeysText('');
-      toast.success(`${data.added || 0} ключей добавлено в остаток без повторной модерации`);
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Не удалось добавить ключи');
-    } finally {
-      setInventorySaving(false);
-    }
-  }
-
-  async function removeInventoryKey(keyId) {
-    if (!window.confirm('Удалить этот не проданный ключ из остатка?')) return;
-    setInventorySaving(true);
-    try {
-      await deleteKey(productId, keyId);
-      await reloadKeys();
-      toast.success('Ключ удалён из остатка');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Проданный ключ удалить нельзя');
-    } finally {
-      setInventorySaving(false);
-    }
-  }
 
   async function handleSave() {
     if (!form.title || !form.price || !form.category_id) return toast.warn('Заполните обязательные поля');
@@ -281,19 +244,9 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
 
       {!service && form.delivery_type === 'auto' && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>🔑 Ключи / коды</div>
-        <Textarea label={productId ? 'Пополнить остаток (по одному ключу на строку)' : 'Ключи для первой публикации (по одному на строку)'} value={keysText} onChange={e => setKeysText(e.target.value)} rows={5} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} />
-        {productId && <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginTop:10, flexWrap:'wrap' }}>
-          <div style={{ color:C.t3, fontSize:11 }}>Пополнение и удаление непроданных ключей не отправляет карточку на модерацию.</div>
-          <Btn size="sm" variant="green" loading={inventorySaving} onClick={addInventory}>Добавить в остаток</Btn>
-        </div>}
-        {productId && <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:12 }}>
-          <div style={{ fontSize:12, fontWeight:800, color:C.t2, marginBottom:9 }}>Доступно для продажи: {availableKeys.length}</div>
-          {availableKeys.length === 0 ? <div style={{ color:C.t3, fontSize:12 }}>Свободных ключей нет.</div> :
-            <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:210, overflowY:'auto' }}>{availableKeys.map(key => <div key={key.id} style={{ display:'flex', alignItems:'center', gap:10, background:'#111119', border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 10px' }}>
-              <code style={{ flex:1, color:C.t1, fontSize:12, overflow:'hidden', textOverflow:'ellipsis' }}>{key.key_value}</code>
-              <Btn size="sm" variant="danger" disabled={inventorySaving} onClick={() => removeInventoryKey(key.id)}>Удалить</Btn>
-            </div>)}</div>}
-        </div>}
+        {!productId
+          ? <Textarea label="Ключи для первой публикации (по одному на строку)" value={keysText} onChange={e => setKeysText(e.target.value)} rows={5} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} />
+          : <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'11px 13px', color:C.t2, fontSize:12, lineHeight:1.55 }}>Доступно ключей: <b style={{ color:C.t1 }}>{availableKeys.length}</b>. Пополнение и удаление остатка вынесены в кнопку <b style={{ color:C.accent }}>Ключи</b> на странице товаров и не требуют повторной модерации.</div>}
         <div style={{ marginTop:16 }}><Textarea label="Сообщение покупателю после получения ключа" value={form.auto_delivery_message} onChange={e => set('auto_delivery_message')(e.target.value)} rows={4} placeholder="Например: откройте Steam, выберите «Активировать продукт» и вставьте ключ..." style={{ width:'100%' }} /></div>
       </div>}
 
@@ -323,6 +276,81 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
   );
 }
 
+function KeyInventoryModal({ product, onClose }) {
+  const toast = useToast();
+  const [keys, setKeys] = useState([]);
+  const [newKeys, setNewKeys] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const availableKeys = keys.filter(key => !key.is_sold);
+
+  async function loadKeys() {
+    setLoading(true);
+    try {
+      const { data } = await getKeys(product.id);
+      setKeys(data || []);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось загрузить ключи');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadKeys(); }, [product.id]);
+
+  async function addInventory() {
+    const values = newKeys.split('\n').map(value => value.trim()).filter(Boolean);
+    if (!values.length) return toast.warn('Введите хотя бы один ключ');
+    setSaving(true);
+    try {
+      const { data } = await addKeys(product.id, values);
+      setNewKeys('');
+      await loadKeys();
+      toast.success(`${data.added || 0} ключей добавлено. Статус публикации не изменен.`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось добавить ключи');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeInventoryKey(keyId) {
+    if (!window.confirm('Удалить этот непроданный ключ?')) return;
+    setSaving(true);
+    try {
+      await deleteKey(product.id, keyId);
+      setKeys(current => current.filter(key => key.id !== keyId));
+      toast.success('Ключ удален. Статус публикации не изменен.');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Проданный ключ удалить нельзя');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={`Ключи: ${product.title}`} onClose={onClose} width={600}>
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'10px 13px', color:C.t2, fontSize:12 }}>Изменения остатка ключей применяются сразу и не отправляют товар на повторную модерацию.</div>
+        <Textarea label="Добавить ключи (по одному на строку)" value={newKeys} onChange={e => setNewKeys(e.target.value)} rows={4} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ fontFamily:'monospace' }} />
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+          <div style={{ color:C.t2, fontSize:12, fontWeight:800 }}>Доступно для продажи: {availableKeys.length}</div>
+          <Btn size="sm" variant="green" loading={saving} onClick={addInventory}>Добавить</Btn>
+        </div>
+        {loading ? <div style={{ display:'flex', justifyContent:'center', padding:20 }}><Spinner size={28}/></div>
+          : availableKeys.length === 0 ? <div style={{ color:C.t3, fontSize:12, padding:'14px 0' }}>Свободных ключей нет.</div>
+          : <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:260, overflowY:'auto' }}>
+              {availableKeys.map(key => <div key={key.id} style={{ display:'flex', alignItems:'center', gap:10, background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 10px' }}>
+                <code style={{ flex:1, color:C.t1, fontSize:12, overflow:'hidden', textOverflow:'ellipsis' }}>{key.key_value}</code>
+                <Btn size="sm" variant="danger" disabled={saving} onClick={() => removeInventoryKey(key.id)}>Удалить</Btn>
+              </div>)}
+            </div>}
+        <div style={{ display:'flex', justifyContent:'flex-end' }}><Btn variant="ghost" onClick={onClose}>Закрыть</Btn></div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function ProductsPage({ mode }) {
   const navigate = useNavigate();
   const { id: editId } = useParams();
@@ -334,6 +362,7 @@ export default function ProductsPage({ mode }) {
   const [commercialStatus, setCommercialStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState(null);
+  const [inventoryProduct, setInventoryProduct] = useState(null);
   const isForm = mode === 'create' || mode === 'edit';
 
   useEffect(() => { if (user?.id) loadCommercialStatus(); }, [user?.id]);
@@ -426,8 +455,9 @@ export default function ProductsPage({ mode }) {
                     <div style={{ fontSize: 16, fontWeight: 900, color: C.t1 }}>{service ? 'от ' : ''}{parseFloat(p.price).toLocaleString('ru')} ₽</div>
                     <div style={{ fontSize: 11, color: C.t3 }}>{service ? 'поэтапная сделка' : `${p.sales_count || 0} продаж`}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <Btn size="sm" full variant="ghost" onClick={() => navigate(`/seller/products/${p.id}`)}>Редактировать</Btn>
+                  <div style={{ display: 'flex', gap: 8, flexWrap:'wrap' }}>
+                    <Btn size="sm" variant="ghost" onClick={() => navigate(`/seller/products/${p.id}`)}>Редактировать</Btn>
+                    {!service && p.delivery_type === 'auto' && <Btn size="sm" variant="ghost" onClick={() => setInventoryProduct(p)}>Ключи</Btn>}
                     <Btn size="sm" variant="danger" onClick={() => setDeleteId(p.id)}>×</Btn>
                   </div>
                 </div>
@@ -445,6 +475,7 @@ export default function ProductsPage({ mode }) {
           </div>
         </div>
       </Modal>}
+      {inventoryProduct && <KeyInventoryModal product={inventoryProduct} onClose={() => setInventoryProduct(null)} />}
     </SellerLayout>
   );
 }
