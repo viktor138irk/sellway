@@ -159,6 +159,17 @@ EOF
     mkdir -p "$SITE_ROOT"
     cp -a "${APP_DIR}/sellway-frontend/dist"/. "$SITE_ROOT"/
   fi
+
+  local built_index="${APP_DIR}/sellway-frontend/dist/index.html"
+  local published_index="${SITE_ROOT}/index.html"
+  local built_bundle
+  local published_bundle
+  [[ -f "$published_index" ]] || fail "Frontend index was not published to SITE_ROOT: ${published_index}"
+  built_bundle="$(grep -oE '/assets/index-[^"]+\.js' "$built_index" | head -n 1 || true)"
+  published_bundle="$(grep -oE '/assets/index-[^"]+\.js' "$published_index" | head -n 1 || true)"
+  [[ -n "$built_bundle" ]] || fail "Built frontend bundle cannot be identified in ${built_index}"
+  [[ "$built_bundle" == "$published_bundle" ]] || fail "SITE_ROOT still contains an old frontend build. Built ${built_bundle}, published ${published_bundle:-missing}."
+  printf 'Frontend published bundle: %s\n' "$published_bundle"
 }
 
 restart_services() {
@@ -203,6 +214,23 @@ post_update_healthcheck() {
   warn "Recent API logs:"
   pm2 logs sellway-api --lines 80 --nostream || true
   fail "Update finished but API is not healthy. Check .env, database and PM2 logs."
+}
+
+check_public_frontend() {
+  local expected_index="${SITE_ROOT}/index.html"
+  local expected_bundle
+  local public_bundle
+  local public_html="/tmp/sellway-public-index.html"
+  local check_url="${FRONTEND_URL%/}/?deploy_check=$(date +%s)"
+
+  log "Checking published frontend on public domain"
+  expected_bundle="$(grep -oE '/assets/index-[^"]+\.js' "$expected_index" | head -n 1 || true)"
+  if ! curl -fsS -H 'Cache-Control: no-cache' "$check_url" -o "$public_html"; then
+    fail "Cannot request public frontend at ${FRONTEND_URL}"
+  fi
+  public_bundle="$(grep -oE '/assets/index-[^"]+\.js' "$public_html" | head -n 1 || true)"
+  [[ "$expected_bundle" == "$public_bundle" ]] || fail "FastPanel serves a different frontend build. SITE_ROOT has ${expected_bundle:-missing}, public site has ${public_bundle:-missing}. Check SITE_ROOT/document root."
+  printf 'Public frontend bundle: OK - %s\n' "$public_bundle"
 }
 
 publish_sitemap() {
@@ -255,6 +283,7 @@ run_migrations
 update_frontend
 restart_services
 post_update_healthcheck
+check_public_frontend
 publish_sitemap
 check_public_sitemap
 finish
