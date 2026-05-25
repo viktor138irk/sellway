@@ -41,6 +41,7 @@ const SellerLogo = ({ seller }) => <div style={{ width:18, height:18, borderRadi
 
 export default function HomePage() {
   const [overview, setOverview] = useState(null);
+  const [overviewReady, setOverviewReady] = useState(false);
   const [popular, setPopular] = useState([]);
   const [newest, setNewest] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.all([getFeaturedOverview().catch(() => ({ data:null })), getProducts({ kind:'products', sort:'popular', limit:8 }), getProducts({ kind:'products', sort:'newest', limit:4 })])
-      .then(([o,p,n]) => { setOverview(o.data); setPopular(p.data.products || []); setNewest(n.data.products || []); })
+      .then(([o,p,n]) => { setOverview(o.data); setOverviewReady(Boolean(o.data)); setPopular(p.data.products || []); setNewest(n.data.products || []); })
       .catch(console.error).finally(()=>setLoading(false));
   }, []);
 
@@ -56,20 +57,20 @@ export default function HomePage() {
 
   return <div style={{ maxWidth:1200, margin:'0 auto', padding:'28px 20px', display:'flex', flexDirection:'column', gap:48, width:'100%', boxSizing:'border-box' }} className="fade-in">
 
-    {overview && <section style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'minmax(245px,.84fr) minmax(270px,1fr) minmax(270px,1fr)', gap:12 }}>
+    <section style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'minmax(245px,.84fr) minmax(270px,1fr) minmax(270px,1fr)', gap:12 }}>
       <div style={{ background:C.infoBg, border:`1px solid ${C.border}`, borderRadius:8, padding:20, display:'flex', flexDirection:'column', gap:18 }}>
         <div>
           <div style={{ color:C.t3, fontSize:11, fontWeight:800, textTransform:'uppercase', marginBottom:8 }}>SellWay сейчас</div>
           <div style={{ fontFamily:'var(--sw-serif)', color:C.t1, fontSize:25, lineHeight:1.25 }}>Живая витрина цифровых товаров и услуг</div>
         </div>
         <div style={{ display:'grid', gap:10 }}>
-          {[['Опубликовано', overview.stats?.active_positions || 0], ['Сделок завершено', overview.stats?.completed_orders || 0], ['Активных авторов', overview.stats?.active_authors || 0]].map(([label, value]) => <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, paddingBottom:9, borderBottom:`1px solid ${C.border}` }}><span style={{ color:C.t2, fontSize:12 }}>{label}</span><b style={{ color:C.t1, fontSize:20 }}>{Number(value).toLocaleString('ru')}</b></div>)}
+          {[['Опубликовано', overview?.stats?.active_positions], ['Сделок завершено', overview?.stats?.completed_orders], ['Активных авторов', overview?.stats?.active_authors]].map(([label, value]) => <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, paddingBottom:9, borderBottom:`1px solid ${C.border}` }}><span style={{ color:C.t2, fontSize:12 }}>{label}</span><b style={{ color:C.t1, fontSize:20 }}>{overviewReady ? Number(value || 0).toLocaleString('ru') : '—'}</b></div>)}
         </div>
         <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}><Link to="/catalog?kind=products" style={{ color:C.accent, fontSize:13, fontWeight:700, textDecoration:'none' }}>Каталог</Link><Link to="/catalog?kind=services" style={{ color:C.accent, fontSize:13, fontWeight:700, textDecoration:'none' }}>Услуги</Link></div>
       </div>
-      <FeaturedCreators title="Топ магазинов" empty="Магазины появятся после публикации товаров." people={overview.stores || []} />
-      <FeaturedCreators title="Топ фрилансеров" empty="Фрилансеры появятся после публикации услуг." people={overview.freelancers || []} />
-    </section>}
+      <FeaturedCreators title="Топ магазинов" empty="Магазины появятся после публикации товаров." people={overview?.stores || []} />
+      <FeaturedCreators title="Топ фрилансеров" empty="Фрилансеры появятся после публикации услуг." people={overview?.freelancers || []} />
+    </section>
 
     {popular.length > 0 && <section><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:24, fontWeight:650, color:C.t1 }}>Популярное</h2><Link to="/catalog?kind=products&sort=popular" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Смотреть все</Link></div><div style={{ display:'grid', gridTemplateColumns:isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(170px,1fr))', gap:isMobile ? 10 : 13 }}>{popular.map(p=><ProductCard key={p.id} p={p}/>)}</div></section>}
     {newest.length > 0 && <section><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:24, fontWeight:650, color:C.t1 }}>Новые поступления</h2><Link to="/catalog?kind=products&sort=newest" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Смотреть все</Link></div><div style={{ display:'grid', gridTemplateColumns:isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(170px,1fr))', gap:isMobile ? 10 : 13 }}>{newest.map(p=><ProductCard key={p.id} p={p}/>)}</div></section>}
