@@ -13,7 +13,11 @@ export const approveWithdraw  = (id)        => client.post(`/admin/withdrawals/$
 export const rejectWithdraw   = (id, reason)=> client.post(`/admin/withdrawals/${id}/reject`, { reason });
 export const getAdminSettings = ()          => client.get('/admin/settings');
 export const saveSettings     = (data)      => client.put('/admin/settings', data);
-export const runSettingsAction = (action, data = {}) => client.post(`/admin/settings/actions/${action}`, data);
+export const runSettingsAction = (action, data = {}) => client.post(
+  `/admin/settings/actions/${action}`,
+  data,
+  { timeout: ['test-smtp', 'test-telegram-connection'].includes(action) ? 60000 : 15000 }
+);
 export const getAdminReferrals = ()         => client.get('/admin/referrals');
 export const saveReferralSettings = (data)  => client.put('/admin/referrals/settings', data);
 export const approveReferral = (userId, data) => client.post(`/admin/referrals/${userId}/approve`, data);

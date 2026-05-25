@@ -221,7 +221,10 @@ export default function SettingsPage({ page = 'finance' }) {
       const { data } = await runSettingsAction(action, payload);
       toast.success(data.message || 'Готово');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Ошибка выполнения');
+      const timeoutMessage = err.code === 'ECONNABORTED'
+        ? 'Проверка превысила время ожидания. Проверьте сетевой доступ сервера к внешнему сервису.'
+        : null;
+      toast.error(err.response?.data?.error || timeoutMessage || err.message || 'Ошибка выполнения');
     } finally {
       setActionLoading('');
     }
