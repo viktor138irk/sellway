@@ -12,7 +12,7 @@ import { BUYER_CHECKOUT_RULES_SHORT } from '../../content/platformRules';
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const isService = p => p?.delivery_type === 'service';
 function CategoryIcon({ product, size = 20 }) {
-  return <span style={{ width:size, height:size, borderRadius:6, overflow:'hidden', background:'#0A0A14', border:`1px solid ${C.border}`, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+  return <span style={{ width:size, height:size, borderRadius:6, overflow:'hidden', background:C.media, border:`1px solid ${C.border}`, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
     {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:Math.max(10, size * .45), fontWeight:900, color:C.t2 }}>{String(product.category_name || '?').trim().slice(0, 1).toUpperCase()}</span>}
   </span>;
 }
@@ -153,7 +153,7 @@ export default function ProductPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'minmax(280px, 420px) 1fr', gap:isMobile ? 18 : 28 }}>
         <div>
-          <div style={{ background:'#0A0A14', borderRadius:16, overflow:'hidden', aspectRatio:'1', border:`1px solid ${C.border}`, marginBottom:10, position:'relative' }}>
+          <div style={{ background:C.media, borderRadius:8, overflow:'hidden', aspectRatio:'1', border:`1px solid ${C.border}`, marginBottom:10, position:'relative' }}>
             {images.length > 0 ? <img src={images[imgIdx]} alt={product.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>{service ? '🧑‍💻' : '📦'}</div>}
             {disc > 0 && <div style={{ position:'absolute', top:12, left:12, background:C.red, color:'#fff', fontSize:13, fontWeight:800, padding:'4px 10px', borderRadius:8 }}>-{disc}%</div>}
           </div>
@@ -183,7 +183,7 @@ export default function ProductPage() {
             {product.delivery_type === 'file' && (product.files_count > 0 ? <div style={{ fontSize:12, color:C.green, marginTop:4 }}>Файл готов к выдаче</div> : <div style={{ fontSize:12, color:C.red, marginTop:4 }}>Файл не загружен</div>)}
           </div>
 
-          {!service && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:14, marginBottom:16 }}>
+          {!service && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:14, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center', flexWrap:'wrap' }}>
               <div>
                 <div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>Количество</div>
@@ -192,15 +192,15 @@ export default function ProductPage() {
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <button type="button" onClick={()=>setQuantity(q=>Math.max(1, q-1))} style={{ width:34, height:34, borderRadius:8, background:'#0A0A12', border:`1px solid ${C.border}`, color:C.t1, fontSize:18, cursor:'pointer' }}>-</button>
+                <button type="button" onClick={()=>setQuantity(q=>Math.max(1, q-1))} style={{ width:34, height:34, borderRadius:8, background:C.field, border:`1px solid ${C.border}`, color:C.t1, fontSize:18, cursor:'pointer' }}>-</button>
                 <Input type="number" min="1" max={product.delivery_type === 'auto' ? product.keys_count : 100} value={quantity} onChange={e=>setQuantity(Math.min(product.delivery_type === 'auto' ? Number(product.keys_count || 1) : 100, Math.max(1, Number(e.target.value || 1))))} style={{ width:76, textAlign:'center' }} />
-                <button type="button" onClick={()=>setQuantity(q=>Math.min(product.delivery_type === 'auto' ? Number(product.keys_count || 1) : 100, q+1))} style={{ width:34, height:34, borderRadius:8, background:'#0A0A12', border:`1px solid ${C.border}`, color:C.t1, fontSize:18, cursor:'pointer' }}>+</button>
+                <button type="button" onClick={()=>setQuantity(q=>Math.min(product.delivery_type === 'auto' ? Number(product.keys_count || 1) : 100, q+1))} style={{ width:34, height:34, borderRadius:8, background:C.field, border:`1px solid ${C.border}`, color:C.t1, fontSize:18, cursor:'pointer' }}>+</button>
               </div>
             </div>
             {quantity > 1 && <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', fontSize:13 }}><span style={{ color:C.t2 }}>Итого</span><b style={{ color:C.t1 }}>{money(Number(product.price) * quantity)}</b></div>}
           </div>}
 
-          {service && <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:12, padding:14, marginBottom:16 }}>
+          {service && <div style={{ background:C.infoBg, border:`1px solid ${C.accent}33`, borderRadius:8, padding:14, marginBottom:16 }}>
             <div style={{ fontSize:13, fontWeight:800, color:C.t1, marginBottom:8 }}>Сообщение фрилансеру</div>
             <Textarea value={serviceMessage} onChange={e=>setServiceMessage(e.target.value)} rows={4} placeholder="Кратко опишите задачу, сроки, пожелания..." style={{ width:'100%' }} />
           </div>}
@@ -214,9 +214,9 @@ export default function ProductPage() {
             {(service ? [['Безопасная сделка','Оплата резервируется сразу'],['Этапы','Фрилансер ведёт работу в заказе'],['Спор','Можно открыть спор по сделке'],['Цена от','Оплачивается указанная стартовая стоимость']] : [['Безопасная сделка','Средства заморожены до подтверждения'],['Выдача',product.delivery_type==='auto'?'Мгновенно':product.delivery_type==='file'?'Файл автоматически':'Продавец передает вручную'],['Гарантия',product.guarantee_days>0?`${product.guarantee_days} дней`:'Уточните у продавца'],['Возврат','При открытии спора']]).map(([t,d])=><div key={t} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:9, padding:'10px 14px' }}><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{t}</div><div style={{ fontSize:11, color:C.t2, marginTop:2 }}>{d}</div></div>)}
           </div>
 
-          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'14px 18px' }}>
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'14px 18px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:42, height:42, borderRadius:12, background:service?C.accent:C.green, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, color:'#fff', flexShrink:0, overflow:'hidden' }}>{product.seller_avatar ? <img src={product.seller_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : product.seller_name?.[0]?.toUpperCase()}</div>
+              <div style={{ width:42, height:42, borderRadius:8, background:service?C.accent:C.green, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, color:'#fff', flexShrink:0, overflow:'hidden' }}>{product.seller_avatar ? <img src={product.seller_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : product.seller_name?.[0]?.toUpperCase()}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:700, color:C.t1 }}>{product.seller_name}</div>
                 {product.seller_rating > 0 && <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3 }}><Stars n={product.seller_rating} size={12}/><span style={{ fontSize:11, color:C.t2 }}>{parseFloat(product.seller_rating).toFixed(1)} · {product.seller_sales} продаж</span></div>}
@@ -225,7 +225,7 @@ export default function ProductPage() {
             </div>
           </div>
 
-          {product.tags?.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:14 }}>{product.tags.map(t=><span key={t} style={{ fontSize:11, background:'#1A1A28', color:C.t2, padding:'4px 10px', borderRadius:7 }}>{t}</span>)}</div>}
+          {product.tags?.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:14 }}>{product.tags.map(t=><span key={t} style={{ fontSize:11, background:C.soft, color:C.t2, padding:'4px 10px', borderRadius:7 }}>{t}</span>)}</div>}
         </div>
       </div>
 
@@ -233,18 +233,18 @@ export default function ProductPage() {
         <div style={{ display:'flex', gap:0, borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
           {['desc','reviews'].map(t=><button key={t} onClick={()=>setTab(t)} style={{ background:'transparent', border:'none', borderBottom:`2px solid ${tab===t?C.accent:'transparent'}`, color:tab===t?C.accent:C.t2, padding:'11px 22px', fontSize:14, fontWeight:tab===t?700:400, cursor:'pointer', fontFamily:'inherit', marginBottom:-1 }}>{t==='desc'?'Описание':`Отзывы (${product.reviews_count})`}</button>)}
         </div>
-        {tab === 'desc' && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:24 }}>
-          {service && serviceSteps.length > 0 && <div style={{ marginBottom:20 }}><div style={{ fontSize:14, fontWeight:900, color:C.t1, marginBottom:10 }}>Типовые этапы</div><div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:10 }}>{serviceSteps.map((s,i)=><div key={i} style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:10, padding:12 }}><div style={{ color:C.t1, fontWeight:800, fontSize:13 }}>{s.title}</div>{s.description && <div style={{ color:C.t2, fontSize:12, marginTop:5, lineHeight:1.4 }}>{s.description}</div>}</div>)}</div></div>}
+        {tab === 'desc' && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:24 }}>
+          {service && serviceSteps.length > 0 && <div style={{ marginBottom:20 }}><div style={{ fontSize:14, fontWeight:900, color:C.t1, marginBottom:10 }}>Типовые этапы</div><div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:10 }}>{serviceSteps.map((s,i)=><div key={i} style={{ background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:12 }}><div style={{ color:C.t1, fontWeight:800, fontSize:13 }}>{s.title}</div>{s.description && <div style={{ color:C.t2, fontSize:12, marginTop:5, lineHeight:1.4 }}>{s.description}</div>}</div>)}</div></div>}
           {product.description ? <div style={{ fontSize:14, color:C.t2, lineHeight:1.8, whiteSpace:'pre-wrap' }}>{product.description}</div> : <div style={{ color:C.t3, fontSize:13 }}>Описание не указано</div>}
         </div>}
-        {tab === 'reviews' && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:24 }}>{!product.reviews?.length ? <div style={{ textAlign:'center', color:C.t3, padding:32 }}>Пока нет отзывов</div> : product.reviews.map((r,i)=><div key={i} style={{ borderTop:i?`1px solid ${C.border}`:'none', paddingTop:i?16:0, marginTop:i?16:0 }}><div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}><b style={{ color:C.t1, fontSize:13 }}>{r.buyer_name}</b><span style={{ fontSize:11, color:C.t3 }}>{new Date(r.created_at).toLocaleDateString('ru')}</span></div><Stars n={r.rating} size={12}/>{r.comment && <p style={{ fontSize:13, color:C.t2, lineHeight:1.55 }}>{r.comment}</p>}</div>)}</div>}
+        {tab === 'reviews' && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:24 }}>{!product.reviews?.length ? <div style={{ textAlign:'center', color:C.t3, padding:32 }}>Пока нет отзывов</div> : product.reviews.map((r,i)=><div key={i} style={{ borderTop:i?`1px solid ${C.border}`:'none', paddingTop:i?16:0, marginTop:i?16:0 }}><div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}><b style={{ color:C.t1, fontSize:13 }}>{r.buyer_name}</b><span style={{ fontSize:11, color:C.t3 }}>{new Date(r.created_at).toLocaleDateString('ru')}</span></div><Stars n={r.rating} size={12}/>{r.comment && <p style={{ fontSize:13, color:C.t2, lineHeight:1.55 }}>{r.comment}</p>}</div>)}</div>}
       </div>
 
       {checkoutModal && <Modal title={user ? 'Подтверждение заказа' : 'Покупка без регистрации'} onClose={()=>setCheckoutModal(false)}>
         <form onSubmit={handleGuestCheckout} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          {!user && <><div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.t2, lineHeight:1.5 }}>Укажите email. Мы автоматически создадим аккаунт покупателя, отправим пароль на почту и перенаправим на оплату.</div>
+          {!user && <><div style={{ background:C.infoBg, border:`1px solid ${C.accent}33`, borderRadius:8, padding:'12px 16px', fontSize:13, color:C.t2, lineHeight:1.5 }}>Укажите email. Мы автоматически создадим аккаунт покупателя, отправим пароль на почту и перенаправим на оплату.</div>
           <Input label="Email для доступа к покупке" type="email" value={checkoutEmail} onChange={e=>setCheckoutEmail(e.target.value)} placeholder="you@example.com" required /></>}
-          <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:'#0A0A12', border:`1px solid ${purchaseRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:10, padding:'12px 14px', cursor:'pointer' }}>
+          <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:C.field, border:`1px solid ${purchaseRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:8, padding:'12px 14px', cursor:'pointer' }}>
             <input type="checkbox" checked={purchaseRulesAccepted} onChange={e=>setPurchaseRulesAccepted(e.target.checked)} style={{ marginTop:3, accentColor:C.accent }} />
             <span style={{ color:C.t2, fontSize:12, lineHeight:1.6 }}>{BUYER_CHECKOUT_RULES_SHORT}{' '}<Link to="/terms" target="_blank" style={{ color:C.accent }}>Правила площадки</Link></span>
           </label>

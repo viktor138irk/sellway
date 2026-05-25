@@ -4,6 +4,9 @@ export const C = {
   border: '#1E1E2E', accent: '#7C6EFF', accentL: '#9B8FFF',
   green: '#34D399', amber: '#FBBF24', red: '#F87171',
   t1: '#E8E8F0', t2: '#8888A8', t3: '#55556A',
+  field: '#0A0A12', media: '#0A0A14', header: '#0F0F18',
+  soft: '#1A1A28', infoBg: '#1A2E4A', toggle: '#2A2A40',
+  shadow: '0 12px 40px rgba(0,0,0,.55)',
 };
 
 // ── Button ───────────────────────────────────────────
@@ -12,7 +15,7 @@ import { useState } from 'react';
 export function Btn({ children, onClick, variant = 'primary', size = 'md', full, disabled, loading, type = 'button', icon }) {
   const [h, setH] = useState(false);
   const bg = disabled || loading
-    ? '#1A1A28'
+    ? C.soft
     : variant === 'primary' ? (h ? C.accentL : C.accent)
     : variant === 'danger'  ? (h ? '#C04040' : '#3A1010')
     : variant === 'green'   ? (h ? '#2DBF8A' : C.green)
@@ -45,7 +48,7 @@ export function Input({ label, error, helper, type = 'text', ...props }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {label && <label style={{ fontSize: 12, fontWeight: 700, color: C.t2 }}>{label}</label>}
       <input type={type} {...props}
-        style={{ background: '#0A0A12', border: `1px solid ${error ? C.red : C.border}`, borderRadius: 9,
+        style={{ background: C.field, border: `1px solid ${error ? C.red : C.border}`, borderRadius: 9,
           padding: '11px 13px', color: C.t1, fontSize: 14, outline: 'none', fontFamily: 'inherit',
           transition: 'border-color .15s', width: '100%', ...props.style }} />
       {(error || helper) && <div style={{ fontSize: 11, color: error ? C.red : C.t3 }}>{error || helper}</div>}
@@ -59,7 +62,7 @@ export function Textarea({ label, ...props }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {label && <label style={{ fontSize: 12, fontWeight: 700, color: C.t2 }}>{label}</label>}
       <textarea {...props}
-        style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 9,
+        style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 9,
           padding: '11px 13px', color: C.t1, fontSize: 14, outline: 'none', fontFamily: 'inherit',
           resize: 'vertical', lineHeight: 1.5, ...props.style }} />
     </div>
@@ -72,7 +75,7 @@ export function Select({ label, children, ...props }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {label && <label style={{ fontSize: 12, fontWeight: 700, color: C.t2 }}>{label}</label>}
       <select {...props}
-        style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 9,
+        style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 9,
           padding: '11px 13px', color: C.t1, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer', ...props.style }}>
         {children}
       </select>
@@ -130,7 +133,7 @@ export function Card({ children, style, hover, onClick }) {
 export function Toggle({ value, onChange }) {
   return (
     <div onClick={() => onChange(!value)} style={{ width: 40, height: 22, borderRadius: 11,
-      background: value ? C.accent : '#2A2A40', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+      background: value ? C.accent : C.toggle, cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
       <div style={{ position: 'absolute', top: 3, left: value ? 20 : 3, width: 16, height: 16,
         borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
     </div>
@@ -165,7 +168,7 @@ style.textContent = `
   @keyframes spin { to { transform: rotate(360deg) } }
   @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
   .fade-in { animation: fadeIn .2s ease }
-  input::placeholder, textarea::placeholder { color: #45454F }
-  select option { background: #111119 }
+  input::placeholder, textarea::placeholder { color: var(--sw-muted, #66758a) }
+  select option { background: var(--sw-card, #111119); color: var(--sw-text, #E8E8F0) }
 `;
 document.head.appendChild(style);

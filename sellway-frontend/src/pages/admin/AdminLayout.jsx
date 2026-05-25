@@ -37,6 +37,7 @@ const SECTIONS = [
       ['/admin/settings/finance', '💰', 'Финансы'],
       ['/admin/settings/telegram', '✈️', 'Настройки телеграм'],
       ['/admin/settings/notifications', '✉️', 'Уведомления'],
+      ['/admin/settings/seo', '🔎', 'SEO'],
       ['/admin/settings/system', '⚙️', 'Система'],
     ],
   },

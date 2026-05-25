@@ -14,7 +14,7 @@ function AuthWrap({ children, title, sub }) {
           <h1 style={{ fontSize: 24, fontWeight: 900, color: C.t1, marginBottom: 8 }}>{title}</h1>
           <p style={{ fontSize: 14, color: C.t2 }}>{sub}</p>
         </div>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 'clamp(18px, 5vw, 28px)' }}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 'clamp(18px, 5vw, 28px)', boxShadow: C.shadow }}>
           {children}
         </div>
       </div>
@@ -136,7 +136,7 @@ export function RegisterPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: 8 }}>
             {roleOptions.map(([val, icon, label, hint]) => (
               <button key={val} type="button" onClick={() => setForm(f => ({ ...f, role: val, commercialTermsAccepted: val === 'buyer' ? false : f.commercialTermsAccepted }))}
-                style={{ background: form.role === val ? C.accent + '18' : '#0A0A12', border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 10, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit' }}>
+                style={{ background: form.role === val ? C.infoBg : C.field, border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 8, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: form.role === val ? C.accent : C.t1 }}>{label}</div>
                 <div style={{ fontSize: 10, color: C.t3, marginTop: 3, lineHeight: 1.3 }}>{hint}</div>
@@ -150,7 +150,7 @@ export function RegisterPage() {
         {['seller', 'freelancer'].includes(form.role) && (
           <Input label="Реферальный код" value={form.ref} placeholder="если есть" onChange={e => setForm(f => ({ ...f, ref: e.target.value.trim() }))} error={errors.ref} />
         )}
-        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#0A0A12', border: `1px solid ${errors.termsAccepted ? C.red : C.border}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: C.field, border: `1px solid ${errors.termsAccepted ? C.red : C.border}`, borderRadius: 8, padding: 12, cursor: 'pointer' }}>
           <input type="checkbox" checked={form.termsAccepted} onChange={e => setForm(f => ({ ...f, termsAccepted: e.target.checked }))} style={{ marginTop: 2, accentColor: C.accent }} />
           <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.5 }}>
             {REGISTRATION_RULES_SHORT}{' '}
@@ -159,7 +159,7 @@ export function RegisterPage() {
           </span>
         </label>
         {['seller', 'freelancer'].includes(form.role) && (
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#0A0A12', border: `1px solid ${errors.commercialTermsAccepted ? C.red : C.border}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: C.field, border: `1px solid ${errors.commercialTermsAccepted ? C.red : C.border}`, borderRadius: 8, padding: 12, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.commercialTermsAccepted} onChange={e => setForm(f => ({ ...f, commercialTermsAccepted: e.target.checked }))} style={{ marginTop: 2, accentColor: C.accent }} />
             <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.5 }}>
               Я принимаю дополнительные условия для коммерческого аккаунта и понимаю, что публикация товаров или услуг станет доступна только после модерации администратором.

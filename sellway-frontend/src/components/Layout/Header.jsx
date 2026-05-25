@@ -113,7 +113,7 @@ export default function Header() {
     background: C.card,
     border: `1px solid ${C.border}`,
     borderRadius: 14,
-    boxShadow: '0 12px 40px rgba(0,0,0,.55)',
+    boxShadow: C.shadow,
     overflow: 'hidden',
   };
   const userPanelStyle = {
@@ -122,24 +122,24 @@ export default function Header() {
     background: C.card,
     border: `1px solid ${C.border}`,
     borderRadius: 12,
-    boxShadow: '0 12px 40px rgba(0,0,0,.55)',
+    boxShadow: C.shadow,
     overflow: 'hidden',
   };
 
-  return <header className="site-header" style={{ background: '#0F0F18', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 4000 }}>
+  return <header className="site-header" style={{ background: C.header, borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 4000, boxShadow: '0 1px 3px rgba(18,32,51,.04)' }}>
     <div className="site-header-row" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 10px' : '0 20px', height: 58, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14 }}>
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
         <img className="site-brand-logo" src="/brand-logo.png" alt="SellWay" style={{ display:'block', width:isMobile ? 112 : 130, height:40, objectFit:'contain' }} />
       </Link>
 
       <form className="site-search" onSubmit={handleSearch} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск товаров и услуг..." style={{ width: '100%', boxSizing: 'border-box', background: '#141420', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', color: C.t1, fontSize: 14, outline: 'none', fontFamily: 'inherit' }} />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск товаров и услуг..." style={{ width: '100%', boxSizing: 'border-box', background: C.field, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', color: C.t1, fontSize: 14, outline: 'none', fontFamily: 'inherit' }} />
       </form>
 
       <div className="site-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
         {user ? <>
           <div ref={notifsRef} style={{ position: 'relative' }}>
-            <button type="button" onClick={toggleNotifs} aria-label="Уведомления" style={{ width: 34, height: 34, borderRadius: 9, background: showNotifs ? '#1A1A28' : 'transparent', border: `1px solid ${C.border}`, color: C.t2, fontSize: 15, cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button type="button" onClick={toggleNotifs} aria-label="Уведомления" style={{ width: 34, height: 34, borderRadius: 9, background: showNotifs ? C.soft : 'transparent', border: `1px solid ${C.border}`, color: C.t2, fontSize: 15, cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               🔔
               {unread > 0 && <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 16, height: 16, padding: '0 3px', borderRadius: 999, background: C.red, color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unread > 9 ? '9+' : unread}</span>}
             </button>

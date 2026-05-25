@@ -17,8 +17,8 @@ function ProductCard({ p, compact }) {
 
   return (
     <button type="button" onClick={() => navigate(`/product/${p.id}`)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ background: hov ? C.cardHov : C.card, border: `1px solid ${hov ? C.accent + '55' : C.border}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', transition: 'all .18s', display: 'flex', flexDirection: 'column', textAlign: 'left', padding: 0, fontFamily: 'inherit', minWidth: 0 }}>
-      <div style={{ position: 'relative', height: imageSize, background: '#0A0A14', overflow: 'hidden' }}>
+      style={{ background: hov ? C.cardHov : C.card, border: `1px solid ${hov ? C.accent + '55' : C.border}`, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', transition: 'all .18s', display: 'flex', flexDirection: 'column', textAlign: 'left', padding: 0, fontFamily: 'inherit', minWidth: 0, boxShadow: hov ? C.shadow : 'none' }}>
+      <div style={{ position: 'relative', height: imageSize, background: C.media, overflow: 'hidden' }}>
         {img ? <img src={img} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .3s', transform: hov ? 'scale(1.04)' : 'scale(1)' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: compact ? 30 : 38 }}>{service ? '🧑‍💻' : '📦'}</div>}
         <div style={{ position: 'absolute', top: 7, left: 7, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {disc > 0 && <span style={{ background: C.red, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>-{disc}%</span>}
@@ -49,9 +49,9 @@ const SellerLogo = ({ seller, service }) => <div style={{ width: 17, height: 17,
 
 function CategoryRow({ cat, active, onClick, indent = 0 }) {
   const img = categoryImage(cat);
-  return <button type="button" onClick={onClick} style={{ width: '100%', padding: `8px 10px 8px ${10 + indent}px`, borderRadius: 7, cursor: 'pointer', fontSize: 13, marginBottom: 2, background: active ? '#1A1A30' : 'transparent', border: 'none', borderLeft: `3px solid ${active ? C.accent : 'transparent'}`, color: active ? C.accentL : C.t2, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', textAlign: 'left', fontFamily: 'inherit' }}>
+  return <button type="button" onClick={onClick} style={{ width: '100%', padding: `8px 10px 8px ${10 + indent}px`, borderRadius: 7, cursor: 'pointer', fontSize: 13, marginBottom: 2, background: active ? C.infoBg : 'transparent', border: 'none', borderLeft: `3px solid ${active ? C.accent : 'transparent'}`, color: active ? C.accentL : C.t2, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', textAlign: 'left', fontFamily: 'inherit' }}>
     <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-      {img ? <img src={img} style={{ width: 16, height: 16, borderRadius: 4, objectFit: 'cover' }} alt="" /> : <span style={{ width: 16, height: 16, borderRadius: 4, background: '#1A1A28', color: C.t2, fontSize: 10, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{categoryInitial(cat)}</span>}
+      {img ? <img src={img} style={{ width: 16, height: 16, borderRadius: 4, objectFit: 'cover' }} alt="" /> : <span style={{ width: 16, height: 16, borderRadius: 4, background: C.soft, color: C.t2, fontSize: 10, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{categoryInitial(cat)}</span>}
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
     </span>
     <span style={{ fontSize: 10, color: C.t3 }}>{(cat.product_count || 0).toLocaleString('ru')}</span>
@@ -108,7 +108,7 @@ export default function CatalogPage() {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 20px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 14 : 22, width: '100%', boxSizing: 'border-box' }} className="fade-in">
       <aside style={{ width: isMobile ? '100%' : 230, flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 12, overflowX: isMobile ? 'auto' : 'visible', alignItems: isMobile ? 'stretch' : 'normal' }}>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: 14, minWidth: isMobile ? 280 : 'auto' }}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, minWidth: isMobile ? 280 : 'auto' }}>
           <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: C.t3, marginBottom: 12 }}>Категории</div>
           <CategoryRow cat={{ name: kind === 'services' ? 'Все услуги' : 'Все товары', emoji: '•' }} active={!category} onClick={() => setParam('category', '')} />
           {rootCats.map(c => <CategoryRow key={c.id} cat={c} active={selectedRoot?.id === c.id && selectedCat?.id === c.id} onClick={() => setParam('category', c.slug)} />)}

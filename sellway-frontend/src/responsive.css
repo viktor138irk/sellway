@@ -12,7 +12,17 @@ body,
 
 body {
   overflow-x: hidden;
-  background: #080812;
+  background: var(--sw-bg, #f5f7fb);
+  color: var(--sw-text, #122033);
+  transition: background-color .18s ease, color .18s ease;
+}
+
+html[data-theme="clear"] {
+  color-scheme: light;
+}
+
+html[data-theme="classic"] {
+  color-scheme: dark;
 }
 
 img,
@@ -81,7 +91,7 @@ textarea {
     min-width: 0 !important;
     max-width: none !important;
     border-right: 0 !important;
-    border-bottom: 1px solid #1e1e2e !important;
+    border-bottom: 1px solid var(--sw-border, #1e1e2e) !important;
     justify-content: flex-start;
   }
 
@@ -128,7 +138,7 @@ textarea {
     position: relative !important;
     height: auto !important;
     border-right: 0 !important;
-    border-bottom: 1px solid #1e1e2e !important;
+    border-bottom: 1px solid var(--sw-border, #1e1e2e) !important;
   }
 
   aside[style*="width: 220"] nav {
@@ -173,7 +183,7 @@ textarea {
     height: 220px !important;
     flex-shrink: 0;
     border-right: 0 !important;
-    border-bottom: 1px solid #1e1e2e;
+    border-bottom: 1px solid var(--sw-border, #1e1e2e);
   }
 
   .admin-support-dialog {

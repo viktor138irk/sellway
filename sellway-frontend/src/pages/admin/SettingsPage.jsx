@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
-import { C, Spinner, Btn, Input, Toggle, Textarea } from '../../components/UI';
+import { C, Spinner, Btn, Input, Toggle, Textarea, Select } from '../../components/UI';
 import { getAdminSettings, saveSettings, runSettingsAction } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -80,11 +80,25 @@ const PAGES = {
       ]},
     ],
   },
+  seo: {
+    title: 'SEO и аналитика',
+    subtitle: 'Индексация площадки и счетчики посещаемости',
+    groups: [
+      { title: 'Счетчики', keys: [
+        ['seo_yandex_metrika_id','ID счетчика Яндекс Метрики','text','','Только номер счетчика, например: 12345678'],
+        ['seo_google_analytics_id','Google Analytics Measurement ID','text','','Идентификатор потока GA4, например: G-XXXXXXXXXX'],
+      ]},
+    ],
+  },
   system: {
     title: 'Система',
     subtitle: 'Платформа и опасная зона обслуживания',
     groups: [
       { title: 'Платформа', keys: [
+        ['public_site_theme','Дизайн публичной витрины','select','clear','Светлую тему можно вернуть на классическую одним сохранением', [
+          ['clear', 'SellWay Clear (светлый)'],
+          ['classic', 'Классический темный'],
+        ]],
         ['maintenance_mode','Режим обслуживания','toggle','false','Закрыть сайт для пользователей'],
         ['new_seller_requires_verify','Верификация продавцов','toggle','true','Требовать проверку новых продавцов'],
         ['terms_version','Версия правил площадки','text','1.0','Показывается в согласии при регистрации'],
@@ -116,7 +130,7 @@ function valueToString(raw, fallback = '') {
 }
 
 function SettingField({ item, value, changed, onChange }) {
-  const [key, label, type, def, helper] = item;
+  const [key, label, type, def, helper, options = []] = item;
   const val = valueToString(value, def);
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 22px', borderBottom:`1px solid ${C.border}`, background: changed ? C.accent+'08' : 'transparent', gap:18, flexWrap:'wrap' }}>
@@ -131,6 +145,10 @@ function SettingField({ item, value, changed, onChange }) {
           ? <Toggle value={val === 'true'} onChange={v => onChange(key, v)} />
           : type === 'textarea'
             ? <Textarea rows={8} value={val} onChange={e => onChange(key, e.target.value)} style={{ width:300 }} />
+            : type === 'select'
+              ? <Select value={val} onChange={e => onChange(key, e.target.value)} style={{ width:300 }}>
+                  {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
+                </Select>
             : <Input type={type} value={val} onChange={e => onChange(key, e.target.value)} autoComplete="new-password" style={{ width:type === 'number' ? 130 : 300, textAlign:type === 'number' ? 'right' : 'left' }} />}
       </div>
     </div>
@@ -285,6 +303,19 @@ export default function SettingsPage({ page = 'finance' }) {
                 <Btn loading={actionLoading === 'test-smtp'} onClick={() => handleAction('test-smtp', { email: testEmail || user?.email }, false)}>Отправить тест</Btn>
               </div>
               <div style={{ color:C.t3, fontSize:11, lineHeight:1.55, marginTop:12 }}>Для сервера обычно подходят: порт 465 с защищенным соединением или порт 587 без него. Подключение выполняется по IPv4, чтобы не упираться в нерабочий IPv6 хостинга.</div>
+            </div>
+          )}
+
+          {page === 'seo' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22, display:'flex', flexDirection:'column', gap:14 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:C.t1 }}>Индексация и проверка</div>
+              <div style={{ color:C.t2, fontSize:12, lineHeight:1.65 }}>
+                После обновления сайта отправьте карту страниц в Яндекс Вебмастер и Google Search Console. Счетчики начинают собирать посещения после сохранения ID и обновления страницы сайта.
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+                <a href="https://sellway.pro/robots.txt" target="_blank" rel="noreferrer" style={{ color:C.accent, fontSize:13, textDecoration:'none', border:`1px solid ${C.border}`, borderRadius:8, padding:'9px 12px' }}>Открыть robots.txt</a>
+                <a href="https://sellway.pro/sitemap.xml" target="_blank" rel="noreferrer" style={{ color:C.accent, fontSize:13, textDecoration:'none', border:`1px solid ${C.border}`, borderRadius:8, padding:'9px 12px' }}>Открыть sitemap.xml</a>
+              </div>
             </div>
           )}
 

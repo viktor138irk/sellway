@@ -2,8 +2,10 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import Header from './components/Layout/Header';
 import SupportWidget from './components/SupportWidget';
+import AnalyticsTags from './components/AnalyticsTags';
 import { C, Spinner } from './components/UI';
 import { syncPaymentReturn } from './api/payments';
 
@@ -101,6 +103,7 @@ function AppRoutes() {
     <Route path="/admin/settings/finance" element={<Protected roles={['admin']}><AdminSettings page="finance"/></Protected>}/>
     <Route path="/admin/settings/telegram" element={<Protected roles={['admin']}><AdminSettings page="telegram"/></Protected>}/>
     <Route path="/admin/settings/notifications" element={<Protected roles={['admin']}><AdminSettings page="notifications"/></Protected>}/>
+    <Route path="/admin/settings/seo" element={<Protected roles={['admin']}><AdminSettings page="seo"/></Protected>}/>
     <Route path="/admin/settings/system" element={<Protected roles={['admin']}><AdminSettings page="system"/></Protected>}/>
     <Route path="/admin/logs" element={<Protected roles={['admin']}><AdminLogs/></Protected>}/>
     <Route path="/payment/success" element={<PaymentSuccess/>}/>
@@ -161,4 +164,8 @@ function PaymentSuccess() {
   </div>;
 }
 function NotFound() { return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20 }}><div style={{ fontSize:56 }}>🔍</div><h1 style={{ fontSize:26, fontWeight:900, color:C.t1 }}>404</h1><p style={{ fontSize:14, color:C.t2 }}>Страница не найдена</p><a href="/" style={{ color:C.accent, textDecoration:'none', fontSize:14, fontWeight:700 }}>← На главную</a></div>; }
-export default function App() { return <BrowserRouter><AuthProvider><ToastProvider><div style={{ minHeight:'100vh', background:C.bg, color:C.t1, fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}><AppRoutes/><footer style={{ borderTop:`1px solid ${C.border}`, padding:'20px', textAlign:'center', fontSize:12, color:C.t3, marginTop:40 }}>© 2025 SellWay · sellway.pro · Безопасный маркетплейс цифровых товаров и услуг · <a href="/terms" style={{ color:C.accent, textDecoration:'none' }}>Правила площадки</a></footer></div></ToastProvider></AuthProvider></BrowserRouter>; }
+function ThemedApp() {
+  useTheme();
+  return <AuthProvider><ToastProvider><AnalyticsTags/><div style={{ minHeight:'100vh', background:C.bg, color:C.t1, fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}><AppRoutes/><footer style={{ borderTop:`1px solid ${C.border}`, padding:'20px', textAlign:'center', fontSize:12, color:C.t3, marginTop:40 }}>© 2025 SellWay · sellway.pro · Безопасный маркетплейс цифровых товаров и услуг · <a href="/terms" style={{ color:C.accent, textDecoration:'none' }}>Правила площадки</a></footer></div></ToastProvider></AuthProvider>;
+}
+export default function App() { return <BrowserRouter><ThemeProvider><ThemedApp/></ThemeProvider></BrowserRouter>; }
