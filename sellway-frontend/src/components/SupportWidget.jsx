@@ -54,7 +54,7 @@ export default function SupportWidget() {
   if (location.pathname.startsWith('/admin')) return null;
 
   return <>
-    {open && <section className="support-chat-panel" style={{ position:'fixed', right:20, bottom:82, width:340, height:450, maxWidth:'calc(100vw - 24px)', maxHeight:'calc(100vh - 108px)', zIndex:5100, background:C.card, border:`1px solid ${C.border}`, borderRadius:14, boxShadow:C.shadow, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+    {open && <section className="support-chat-panel" style={{ position:'fixed', right:20, bottom:82, width:340, height:450, maxWidth:'calc(100vw - 24px)', maxHeight:'calc(100vh - 108px)', zIndex:5100, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, boxShadow:C.shadow, overflow:'hidden', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'13px 14px', borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div><div style={{ fontSize:14, fontWeight:900, color:C.t1 }}>Поддержка SellWay</div><div style={{ fontSize:11, color:C.t3 }}>Ответим прямо здесь</div></div>
         <button type="button" onClick={() => setOpen(false)} style={{ width:30, height:30, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.t2, cursor:'pointer' }}>x</button>

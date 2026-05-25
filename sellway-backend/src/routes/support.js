@@ -65,6 +65,27 @@ router.get('/admin/threads', requireRole('admin', 'moderator'), async (req, res)
   }
 });
 
+router.post('/admin/users/:userId/message', requireRole('admin', 'moderator'), async (req, res) => {
+  const message = String(req.body?.message || '').trim().slice(0, 2000);
+  if (!message) return res.status(400).json({ error: 'Введите сообщение' });
+  try {
+    const { rows: [recipient] } = await query('SELECT id FROM users WHERE id=$1', [req.params.userId]);
+    if (!recipient) return res.status(404).json({ error: 'Пользователь не найден' });
+    const thread = await getOrCreateThread(recipient.id);
+    const { rows: [saved] } = await query(
+      `INSERT INTO support_messages (thread_id, sender_type, sender_id, message)
+       VALUES ($1,'admin',$2,$3) RETURNING id, sender_type, message, created_at`,
+      [thread.id, req.user.id, message]
+    );
+    await query('UPDATE support_threads SET updated_at=NOW() WHERE id=$1', [thread.id]);
+    await notify.create(recipient.id, 'system', 'Сообщение администрации', message, null).catch(() => {});
+    res.status(201).json({ thread, message: saved });
+  } catch (err) {
+    logger.error('Admin direct message error', { err: err.message, userId: req.params.userId });
+    res.status(500).json({ error: 'Ошибка отправки сообщения' });
+  }
+});
+
 router.get('/admin/threads/:id', requireRole('admin', 'moderator'), async (req, res) => {
   try {
     const { rows: [thread] } = await query(

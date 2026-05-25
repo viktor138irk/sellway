@@ -6,70 +6,15 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
 const { query, transaction } = require('../config/db');
 const notify = require('../services/notify');
-const { sendTestEmail } = require('../services/mailer');
 const { paySellerReferral } = require('../services/referrals');
 const { canUseReferralProgram } = require('../services/referralEligibility');
 const { createTelegramRequestOptions } = require('./proxy');
 
 const telegramToken = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
-const ENV_FILE = path.resolve(__dirname, '..', '..', '.env');
-const ENV_SETTINGS = new Set([
-  'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_BOT_TOKEN',
-  'TELEGRAM_ADMIN_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID', 'PROXY_ENABLED',
-  'PROXY_SCHEME', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_USERNAME', 'PROXY_PASSWORD',
-  'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM',
-  'SMSPILOT_ENABLED', 'SMSPILOT_API_KEY', 'SMSPILOT_SENDER', 'SMS_CODE_TEMPLATE',
-]);
-const SECRET_SETTINGS = new Set([
-  'TELEGRAM_BOT_TOKEN', 'TELEGRAM_ADMIN_BOT_TOKEN', 'PROXY_PASSWORD', 'SMTP_PASS', 'SMSPILOT_API_KEY',
-]);
-const SETTING_GROUPS = {
-  finance: {
-    title: 'Финансы, системы вывода и сделки',
-    keys: [
-      'platform_commission', 'default_seller_commission_rate', 'default_referral_commission_rate',
-      'withdrawal_commission', 'min_withdrawal', 'max_withdrawal_daily',
-      'auto_payouts_enabled', 'auto_payout_min_balance', 'auto_payout_interval_hours',
-      'usdt_rub_rate_fallback', 'withdraw_method_card_enabled', 'withdraw_method_card_commission',
-      'withdraw_method_sbp_enabled', 'withdraw_method_sbp_commission',
-      'withdraw_method_paypal_enabled', 'withdraw_method_paypal_commission',
-      'withdraw_method_crypto_enabled', 'withdraw_method_crypto_commission',
-      'escrow_auto_confirm_hours', 'auto_review_rating',
-    ],
-  },
-  telegram: {
-    title: 'Telegram и SOCKS5',
-    keys: [
-      'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_BOT_TOKEN',
-      'TELEGRAM_ADMIN_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID',
-      'PROXY_ENABLED', 'PROXY_SCHEME', 'PROXY_HOST', 'PROXY_PORT',
-      'PROXY_USERNAME', 'PROXY_PASSWORD',
-    ],
-  },
-  notifications: {
-    title: 'SMTP и SMSPilot',
-    keys: [
-      'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM',
-      'SMSPILOT_ENABLED', 'SMSPILOT_API_KEY', 'SMSPILOT_SENDER', 'SMS_CODE_TEMPLATE',
-    ],
-  },
-  system: {
-    title: 'Платформа и опасная зона',
-    keys: [
-      'maintenance_mode', 'new_seller_requires_verify', 'terms_version', 'terms_title', 'terms_content',
-    ],
-  },
-};
-const BOOLEAN_SETTINGS = new Set([
-  'auto_payouts_enabled', 'withdraw_method_card_enabled', 'withdraw_method_sbp_enabled',
-  'withdraw_method_paypal_enabled', 'withdraw_method_crypto_enabled', 'PROXY_ENABLED',
-  'SMTP_SECURE', 'SMSPILOT_ENABLED', 'maintenance_mode', 'new_seller_requires_verify',
-  'referral_enabled',
-]);
 const MENU_TEXT = new Set([
   'Дашборд', 'Модерация', 'Пользователи', 'Заказы', 'Споры', 'Выплаты',
-  'Рефералы', 'Поддержка', 'Категории товаров', 'Категории услуг',
-  'Настройки', 'Аудит', 'Товары на модерации', 'Аккаунты на модерации',
+  'Рефералы', 'Поддержка',
+  'Товары на модерации', 'Аккаунты на модерации',
   'Обращения поддержки', 'Статус',
 ]);
 
@@ -103,8 +48,6 @@ function adminKeyboard() {
         [{ text: 'Пользователи' }, { text: 'Заказы' }],
         [{ text: 'Споры' }, { text: 'Выплаты' }],
         [{ text: 'Рефералы' }, { text: 'Поддержка' }],
-        [{ text: 'Категории товаров' }, { text: 'Категории услуг' }],
-        [{ text: 'Настройки' }, { text: 'Аудит' }],
       ],
       resize_keyboard: true,
     },
@@ -164,27 +107,6 @@ function sellerMeta(item) {
     else delivery = `~${(minutes / 1440).toFixed(1)} дн`;
   }
   return `Онлайн: ${yes(item?.seller_online)}; средняя выдача: ${delivery}`;
-}
-
-function settingValue(key, value) {
-  if (SECRET_SETTINGS.has(key)) return value ? 'настроено (скрыто)' : 'не задано';
-  if (key === 'terms_content') return value ? `заполнено, ${String(value).length} симв.` : 'не задано';
-  return String(value ?? '') || 'не задано';
-}
-
-function setEnvValue(content, key, value) {
-  const raw = String(value ?? '').replace(/\r?\n/g, '');
-  const escaped = raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-  const line = `${key}="${escaped}"`;
-  const re = new RegExp(`^${key}=.*$`, 'm');
-  return re.test(content) ? content.replace(re, line) : `${content.replace(/\s*$/, '')}\n${line}\n`;
-}
-
-function writeEnvSetting(key, value) {
-  let content = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8') : '';
-  content = setEnvValue(content, key, value);
-  fs.writeFileSync(ENV_FILE, content, { mode: 0o600 });
-  process.env[key] = String(value ?? '');
 }
 
 function slugify(value) {
@@ -486,24 +408,15 @@ async function sendWithdrawals(chatId, status = 'pending') {
 }
 
 async function sendReferrals(chatId) {
-  const [summary, applications, settings] = await Promise.all([
+  const [summary, applications] = await Promise.all([
     query(`SELECT COALESCE(SUM(amount),0) paid, COUNT(*) count FROM transactions WHERE meta->>'source'='seller_referral'`),
     query(`SELECT s.user_id, u.username, u.email, u.email_verified, u.phone_verified, u.telegram_verified
            FROM sellers s JOIN users u ON u.id=s.user_id WHERE s.referral_application_status='pending'
            ORDER BY s.referral_requested_at ASC NULLS LAST LIMIT 10`),
-    query(`SELECT key, value FROM settings WHERE key IN ('referral_enabled','default_referral_commission_rate','max_referral_commission_rate','referral_payout_basis')`),
   ]);
-  const config = Object.fromEntries(settings.rows.map(row => [row.key, row.value]));
   await bot.sendMessage(chatId,
     `Реферальная программа\n\nВыплачено: ${rub(summary.rows[0].paid)} (${summary.rows[0].count} начислений)\n` +
-    `Включена: ${config.referral_enabled || 'true'}\nСтавка по умолчанию: ${config.default_referral_commission_rate || '0.0100'}\n` +
-    `Максимум: ${config.max_referral_commission_rate || '0.0500'}\nБаза: ${config.referral_payout_basis || 'turnover'}\n` +
-    `Заявок ожидает: ${applications.rows.length}`,
-    buttons([
-      [{ text: 'Вкл/выкл программу', callback_data: 'refsetting:toggle:referral_enabled' }],
-      [{ text: 'Ставка по умолчанию', callback_data: 'refsetting:edit:default_referral_commission_rate' }, { text: 'Максимум', callback_data: 'refsetting:edit:max_referral_commission_rate' }],
-      [{ text: 'База выплат', callback_data: 'refsetting:edit:referral_payout_basis' }],
-    ])
+    `Заявок ожидает: ${applications.rows.length}`
   );
   for (const user of applications.rows) {
     await bot.sendMessage(chatId,
@@ -585,37 +498,6 @@ async function sendCategoryCard(chatId, id) {
       ...children.map(child => [{ text: `${child.is_active ? '' : '(скрыта) '}${child.name}`, callback_data: `category:view:${child.id}` }]),
     ])
   );
-}
-
-async function sendSettingsMenu(chatId) {
-  await bot.sendMessage(chatId, 'Настройки платформы. Секреты отображаются только как наличие значения.', buttons([
-    [{ text: 'Финансы и сделки', callback_data: 'settings:show:finance' }],
-    [{ text: 'Telegram и SOCKS5', callback_data: 'settings:show:telegram' }],
-    [{ text: 'SMTP и SMSPilot', callback_data: 'settings:show:notifications' }],
-    [{ text: 'Система и правила', callback_data: 'settings:show:system' }],
-  ]));
-}
-
-async function sendSettingsGroup(chatId, groupKey) {
-  const group = SETTING_GROUPS[groupKey];
-  if (!group) return;
-  const dbKeys = group.keys.filter(key => !ENV_SETTINGS.has(key));
-  const { rows } = dbKeys.length ? await query('SELECT key, value FROM settings WHERE key = ANY($1)', [dbKeys]) : { rows: [] };
-  const values = Object.fromEntries(rows.map(row => [row.key, row.value]));
-  const current = key => ENV_SETTINGS.has(key) ? process.env[key] : values[key];
-  const text = group.keys.map(key => `${key}: ${settingValue(key, current(key))}`).join('\n');
-  const editButtons = group.keys.map(key => BOOLEAN_SETTINGS.has(key)
-    ? [{ text: `${String(current(key)) === 'true' ? 'Выключить' : 'Включить'} ${key}`, callback_data: `setting:toggle:${key}` }]
-    : [{ text: `Изменить ${key}`, callback_data: `setting:edit:${key}` }]
-  );
-  const actions = groupKey === 'telegram'
-    ? [[{ text: 'Тест Telegram/SOCKS5', callback_data: 'action:telegram:test' }, { text: 'Тестовое сообщение', callback_data: 'action:telegram:send' }]]
-    : groupKey === 'notifications'
-      ? [[{ text: 'Отправить тест SMTP', callback_data: 'action:smtp:test' }]]
-      : groupKey === 'system'
-        ? [[{ text: 'Завершить просроченные сделки', callback_data: 'danger:ask:autoconfirm' }], [{ text: 'Сбросить статистику модерации', callback_data: 'danger:ask:reset' }]]
-        : [];
-  await bot.sendMessage(chatId, `${group.title}\n\n${text}`, buttons([...editButtons, ...actions]));
 }
 
 async function sendAudit(chatId) {
@@ -768,19 +650,6 @@ async function decideReferral(userId, approved, reason = '') {
   await audit(admin.id, approved ? 'referral_approved' : 'referral_rejected', 'seller', userId, { reason });
 }
 
-async function setSetting(key, value) {
-  if (ENV_SETTINGS.has(key)) {
-    writeEnvSetting(key, value);
-    return true;
-  }
-  await query(
-    `INSERT INTO settings (key, value, updated_at) VALUES ($1,$2,NOW())
-     ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
-    [key, String(value)]
-  );
-  return false;
-}
-
 async function autoConfirmExpired() {
   const admin = await actingAdmin();
   const confirmed = await transaction(async client => {
@@ -856,7 +725,9 @@ bot.onText(/^Рефералы$/, async msg => { if (!await rejectIfNotAdmin(msg)
 bot.onText(/^Поддержка$|^Обращения поддержки$|\/support/, async msg => { if (!await rejectIfNotAdmin(msg)) await sendSupport(msg.chat.id); });
 bot.onText(/^Категории товаров$/, async msg => { if (!await rejectIfNotAdmin(msg)) await sendCategories(msg.chat.id, 'product'); });
 bot.onText(/^Категории услуг$/, async msg => { if (!await rejectIfNotAdmin(msg)) await sendCategories(msg.chat.id, 'service'); });
-bot.onText(/^Настройки$/, async msg => { if (!await rejectIfNotAdmin(msg)) await sendSettingsMenu(msg.chat.id); });
+bot.onText(/^Настройки$/, async msg => {
+  if (!await rejectIfNotAdmin(msg)) await bot.sendMessage(msg.chat.id, 'Настройки площадки доступны только в защищенной веб-панели.', adminKeyboard());
+});
 bot.onText(/^Аудит$/, async msg => { if (!await rejectIfNotAdmin(msg)) await sendAudit(msg.chat.id); });
 
 bot.on('callback_query', async cq => {
@@ -935,14 +806,6 @@ bot.on('callback_query', async cq => {
       return bot.sendMessage(chatId, 'Участие в реферальной программе одобрено.');
     }
     if (entity === 'referral' && action === 'reject') return prompt(chatId, { kind: 'referral_reject', id }, 'Введите причину отклонения реферальной заявки:');
-    if (entity === 'refsetting') {
-      if (action === 'toggle') {
-        const { rows: [row] } = await query('SELECT value FROM settings WHERE key=$1', [id]);
-        await setSetting(id, String(row?.value) !== 'false' ? 'false' : 'true');
-        return sendReferrals(chatId);
-      }
-      return prompt(chatId, { kind: 'setting', key: id, group: 'referrals' }, `Введите новое значение ${id}:`);
-    }
     if (entity === 'support' && action === 'view') return sendSupportThread(chatId, id);
     if (entity === 'support' && action === 'reply') return prompt(chatId, { kind: 'support_reply', id }, `Напишите ответ по обращению ${String(id).slice(0, 8)}:`);
     if (entity === 'support' && action === 'close') {
@@ -963,34 +826,6 @@ bot.on('callback_query', async cq => {
       if (!category) throw new Error('Категория не найдена');
       await bot.sendMessage(chatId, category.is_active ? 'Категория включена.' : 'Категория скрыта.');
       return sendCategoryCard(chatId, id);
-    }
-    if (entity === 'settings' && action === 'show') return sendSettingsGroup(chatId, id);
-    if (entity === 'setting' && action === 'edit') return prompt(chatId, { kind: 'setting', key: id }, `Введите новое значение ${id}:`);
-    if (entity === 'setting' && action === 'toggle') {
-      const current = ENV_SETTINGS.has(id)
-        ? process.env[id]
-        : (await query('SELECT value FROM settings WHERE key=$1', [id])).rows[0]?.value;
-      const restart = await setSetting(id, String(current) === 'true' ? 'false' : 'true');
-      await bot.sendMessage(chatId, restart ? 'Переключено. Для применения перезапустите backend и Telegram-ботов через PM2.' : 'Переключено.');
-      const group = Object.keys(SETTING_GROUPS).find(key => SETTING_GROUPS[key].keys.includes(id));
-      if (group) return sendSettingsGroup(chatId, group);
-      return;
-    }
-    if (entity === 'action' && action === 'telegram' && id === 'test') {
-      const userBot = require('./bot');
-      if (!userBot.bot) throw new Error('Пользовательский Telegram bot не настроен');
-      const [userMe, adminMe] = await Promise.all([userBot.bot.getMe(), bot.getMe()]);
-      return bot.sendMessage(chatId, `Telegram API доступен через текущую сеть/SOCKS5: user @${userMe.username}, admin @${adminMe.username}.`);
-    }
-    if (entity === 'action' && action === 'telegram' && id === 'send') return bot.sendMessage(chatId, 'Тестовое сообщение SellWay Admin получено успешно.');
-    if (entity === 'action' && action === 'smtp') return prompt(chatId, { kind: 'smtp_test' }, 'Введите email, на который отправить тестовое письмо:');
-    if (entity === 'danger' && action === 'ask') {
-      const title = id === 'autoconfirm' ? 'завершить все просроченные выданные сделки' : 'сбросить поля статистики модерации товаров';
-      return bot.sendMessage(chatId, `Подтвердите действие: ${title}.`, buttons([[{ text: 'Подтвердить', callback_data: `danger:confirm:${id}` }, { text: 'Отмена', callback_data: 'input:cancel:none' }]]));
-    }
-    if (entity === 'danger' && action === 'confirm') {
-      const count = id === 'autoconfirm' ? await autoConfirmExpired() : await resetModerationStats();
-      return bot.sendMessage(chatId, id === 'autoconfirm' ? `Просроченные сделки завершены: ${count}.` : `Статистика модерации сброшена. Товаров: ${count}.`);
     }
   } catch (err) {
     logger.error('Admin bot callback error', { err: err.message, data: cq.data });
@@ -1076,23 +911,6 @@ async function handlePendingInput(msg, pending) {
     if (imageUrl === undefined || imageUrl === '') throw new Error('Отправьте изображение или URL');
     await query('UPDATE categories SET image_url=$1 WHERE id=$2', [imageUrl, pending.id]);
     return sendCategoryCard(chatId, pending.id);
-  }
-  if (pending.kind === 'setting') {
-    if (['default_referral_commission_rate', 'max_referral_commission_rate'].includes(pending.key)) {
-      const value = Number(text.replace(',', '.'));
-      if (!Number.isFinite(value) || value < 0 || value > 0.5) throw new Error('Реферальная ставка должна быть от 0 до 0.5');
-    }
-    if (pending.key === 'referral_payout_basis' && !['turnover', 'platform_commission'].includes(text)) {
-      throw new Error('База выплат: turnover или platform_commission');
-    }
-    const restart = await setSetting(pending.key, text);
-    await bot.sendMessage(chatId, restart ? 'Настройка сохранена. Для применения переменных перезапустите backend и Telegram-ботов через PM2.' : 'Настройка сохранена.');
-    if (pending.group === 'referrals') return sendReferrals(chatId);
-    return;
-  }
-  if (pending.kind === 'smtp_test') {
-    await sendTestEmail(text);
-    return bot.sendMessage(chatId, `Тестовое письмо отправлено на ${text}.`);
   }
 }
 

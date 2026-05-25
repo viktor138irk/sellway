@@ -32,9 +32,9 @@ export default function SellerOrdersPage() {
           </select>
         </div>
         {loading ? <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:300 }}><Spinner size={36}/></div>
-        : orders.length === 0 ? <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:60, textAlign:'center', color:C.t3 }}><div style={{ fontSize:36, marginBottom:12 }}>📭</div><div style={{ color:C.t2, fontSize:14 }}>Нет заказов</div></div>
-        : <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 160px 120px 90px 80px', gap:12, padding:'10px 18px', background:'#0A0A12', borderBottom:`1px solid ${C.border}` }}>
+        : orders.length === 0 ? <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:60, textAlign:'center', color:C.t3 }}><div style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize:24, marginBottom:12 }}>Orders</div><div style={{ color:C.t2, fontSize:14 }}>Нет заказов</div></div>
+        : <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 160px 120px 90px 80px', gap:12, padding:'10px 18px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
               {['Товар / Заказ','Покупатель','Сумма','Статус',''].map((h,i)=><div key={i} style={{ fontSize:10, fontWeight:800, color:C.t3, textTransform:'uppercase', letterSpacing:1 }}>{h}</div>)}
             </div>
             {orders.map(o=>(

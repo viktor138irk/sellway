@@ -10,7 +10,7 @@ function AuthWrap({ children, title, sub }) {
     <div style={{ minHeight: 'calc(100vh - 90px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 460 }}>
         <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>⚡</div>
+          <img src="/brand-logo.png" alt="SellWay" style={{ display:'block', width:128, height:'auto', margin:'0 auto 16px' }} />
           <h1 style={{ fontSize: 24, fontWeight: 900, color: C.t1, marginBottom: 8 }}>{title}</h1>
           <p style={{ fontSize: 14, color: C.t2 }}>{sub}</p>
         </div>
@@ -112,7 +112,7 @@ export function RegisterPage() {
   if (done) return (
     <AuthWrap title="Проверьте почту" sub="">
       <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ fontSize: 48 }}>📧</div>
+        <div style={{ fontFamily:'var(--sw-serif)', fontSize: 46, color:C.accent }}>Email</div>
         <p style={{ color: C.t2, lineHeight: 1.6 }}>
           Мы отправили ссылку подтверждения на <strong style={{ color: C.t1 }}>{form.email}</strong>.<br />
           Перейдите по ней для активации аккаунта.
@@ -123,9 +123,9 @@ export function RegisterPage() {
   );
 
   const roleOptions = [
-    ['buyer', '🛒', 'Покупатель', 'Покупать товары и услуги'],
-    ['seller', '📦', 'Продавец', 'Готовые цифровые товары'],
-    ['freelancer', '🧑‍💻', 'Фрилансер', 'Услуги и поэтапные сделки'],
+    ['buyer', '01', 'Покупатель', 'Покупать товары и услуги'],
+    ['seller', '02', 'Продавец', 'Готовые цифровые товары'],
+    ['freelancer', '03', 'Фрилансер', 'Услуги и поэтапные сделки'],
   ];
 
   return (
@@ -137,7 +137,7 @@ export function RegisterPage() {
             {roleOptions.map(([val, icon, label, hint]) => (
               <button key={val} type="button" onClick={() => setForm(f => ({ ...f, role: val, commercialTermsAccepted: val === 'buyer' ? false : f.commercialTermsAccepted }))}
                 style={{ background: form.role === val ? C.infoBg : C.field, border: `1.5px solid ${form.role === val ? C.accent : C.border}`, borderRadius: 8, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit' }}>
-                <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+                <div style={{ fontFamily:'var(--sw-serif)', fontSize: 17, color:C.accent, marginBottom: 4 }}>{icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: form.role === val ? C.accent : C.t1 }}>{label}</div>
                 <div style={{ fontSize: 10, color: C.t3, marginTop: 3, lineHeight: 1.3 }}>{hint}</div>
               </button>

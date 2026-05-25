@@ -25,6 +25,14 @@ const avatarUpload = multer({
 
 function roleForLink(role) { return role === 'freelancer' ? 'freelancer' : 'seller'; }
 function referralLink(code, role) { return code ? `${process.env.FRONTEND_URL || 'https://sellway.pro'}/register?role=${roleForLink(role)}&ref=${code}` : null; }
+async function loadReferralUser(userId) {
+  const { rows: [user] } = await query(
+    `SELECT id, username, role, email_verified, phone_verified, telegram_verified
+     FROM users WHERE id=$1`,
+    [userId]
+  );
+  return user;
+}
 async function requireApprovedCommercial(req, res, next) {
   if (req.user.role === 'admin') return next();
   try {
@@ -57,7 +65,7 @@ router.use(requireRole('seller', 'freelancer', 'admin'));
 
 router.get('/dashboard', async (req, res) => {
   try {
-    const [wallet, seller, recentOrders, products, referralStats] = await Promise.all([
+    const [wallet, seller, recentOrders, products, referralStats, currentUser] = await Promise.all([
       query('SELECT * FROM wallets WHERE user_id=$1', [req.user.id]),
       query(`SELECT s.*,
                     (s.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online,
@@ -74,21 +82,23 @@ router.get('/dashboard', async (req, res) => {
       query(`SELECT o.*, p.title AS product_title FROM orders o JOIN products p ON p.id=o.product_id WHERE o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 10`, [req.user.id]),
       query("SELECT id, title, price, status, delivery_type, keys_count, sales_count FROM products WHERE seller_id=$1 AND status!='archived' ORDER BY created_at DESC", [req.user.id]),
       query(`SELECT COUNT(*) AS referred_count, COALESCE(SUM(CASE WHEN child.created_at >= NOW()-INTERVAL '30 days' THEN 1 ELSE 0 END),0) AS referred_30d FROM sellers child WHERE child.referred_by_seller_id=$1`, [req.user.id]),
+      loadReferralUser(req.user.id),
     ]);
     const s = seller.rows[0] || {};
-    const requirements = referralRequirements(req.user);
-    const canUseReferral = Boolean(s.referral_enabled && s.referral_application_status === 'approved' && canUseReferralProgram(req.user));
+    const verifiedUser = currentUser || req.user;
+    const requirements = referralRequirements(verifiedUser);
+    const canUseReferral = Boolean(s.referral_enabled && s.referral_application_status === 'approved' && canUseReferralProgram(verifiedUser));
     res.json({
       wallet: wallet.rows[0], seller: s, recentOrders: recentOrders.rows, products: products.rows,
       referral: {
         code: s.referral_code || null,
-        link: canUseReferral ? referralLink(s.referral_code, req.user.role) : null,
+        link: canUseReferral ? referralLink(s.referral_code, verifiedUser.role) : null,
         referredCount: parseInt(referralStats.rows[0]?.referred_count || 0),
         referred30d: parseInt(referralStats.rows[0]?.referred_30d || 0),
         earnings: s.referral_earnings || '0.00',
         referralRate: s.referral_commission_rate || '0.0100',
         commissionRate: s.custom_commission_rate ?? null,
-        role: roleForLink(req.user.role),
+        role: roleForLink(verifiedUser.role),
         enabled: canUseReferral,
         applicationStatus: s.referral_application_status || 'not_requested',
         requirements,
@@ -143,17 +153,104 @@ router.get('/transactions', async (req, res) => {
   }
 });
 
+router.get('/reviews', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT r.id, r.rating, r.comment, r.created_at, r.is_auto,
+              p.id AS product_id, p.title AS product_title, p.delivery_type,
+              u.username AS buyer_name, o.order_number
+       FROM reviews r
+       JOIN products p ON p.id=r.product_id
+       JOIN users u ON u.id=r.buyer_id
+       JOIN orders o ON o.id=r.order_id
+       WHERE r.seller_id=$1
+       ORDER BY r.created_at DESC
+       LIMIT 100`,
+      [req.user.id]
+    );
+    const summary = rows.reduce((result, review) => {
+      result.count += 1;
+      result.total += Number(review.rating || 0);
+      return result;
+    }, { count: 0, total: 0 });
+    res.json({
+      reviews: rows,
+      count: summary.count,
+      average: summary.count ? Number((summary.total / summary.count).toFixed(2)) : 0,
+    });
+  } catch (err) {
+    logger.error('Seller reviews error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка загрузки отзывов' });
+  }
+});
+
+router.get('/promos', requireApprovedCommercial, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, code, discount_pct, discount_fixed, max_uses, used_count, expires_at, is_active, created_at
+       FROM promo_codes WHERE created_by=$1 ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+    res.json({ promos: rows });
+  } catch (err) {
+    logger.error('Seller promos error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка загрузки промокодов' });
+  }
+});
+
+router.post('/promos', requireApprovedCommercial, async (req, res) => {
+  const code = String(req.body?.code || '').trim().toUpperCase().replace(/\s+/g, '');
+  const discountPct = req.body?.discount_pct === '' ? null : Number(req.body?.discount_pct);
+  const discountFixed = req.body?.discount_fixed === '' ? null : Number(req.body?.discount_fixed);
+  const maxUses = req.body?.max_uses === '' ? null : Number(req.body?.max_uses);
+  const expiresAt = req.body?.expires_at || null;
+  if (!/^[A-ZА-Я0-9_-]{3,32}$/i.test(code)) return res.status(400).json({ error: 'Код: 3-32 буквы, цифры, _ или -' });
+  if (!((discountPct > 0 && discountPct <= 100) || (discountFixed > 0))) return res.status(400).json({ error: 'Укажите процент или сумму скидки' });
+  if (discountPct > 0 && discountFixed > 0) return res.status(400).json({ error: 'Выберите один тип скидки' });
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) return res.status(400).json({ error: 'Лимит использований должен быть положительным числом' });
+  try {
+    const { rows: [promo] } = await query(
+      `INSERT INTO promo_codes (code, discount_pct, discount_fixed, max_uses, expires_at, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [code, discountPct || null, discountFixed || null, maxUses, expiresAt, req.user.id]
+    );
+    res.status(201).json({ promo });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Такой промокод уже существует' });
+    logger.error('Seller promo create error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка создания промокода' });
+  }
+});
+
+router.delete('/promos/:id', requireApprovedCommercial, async (req, res) => {
+  try {
+    const { rows: [promo] } = await query(
+      'UPDATE promo_codes SET is_active=FALSE WHERE id=$1 AND created_by=$2 RETURNING id',
+      [req.params.id, req.user.id]
+    );
+    if (!promo) return res.status(404).json({ error: 'Промокод не найден' });
+    res.json({ message: 'Промокод отключен' });
+  } catch (err) {
+    logger.error('Seller promo disable error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка отключения промокода' });
+  }
+});
+
 router.get('/referrals', requireApprovedCommercial, async (req, res) => {
   try {
-    const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
+    const [{ rows: [seller] }, currentUser] = await Promise.all([
+      query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]),
+      loadReferralUser(req.user.id),
+    ]);
     if (!seller) return res.status(404).json({ error: 'Профиль продавца/фрилансера не найден' });
-    const requirements = referralRequirements(req.user);
-    const canUseReferral = Boolean(seller.referral_enabled && seller.referral_application_status === 'approved' && canUseReferralProgram(req.user));
+    const verifiedUser = currentUser || req.user;
+    const requirements = referralRequirements(verifiedUser);
+    const canUseReferral = Boolean(seller.referral_enabled && seller.referral_application_status === 'approved' && canUseReferralProgram(verifiedUser));
     const { rows: referred } = await query(`SELECT child.user_id, u.username, u.email, u.role, child.created_at, child.referral_commission_rate, child.total_sales, (child.last_seen_at > NOW() - INTERVAL '5 minutes') AS seller_online, delivery.avg_delivery_time_min AS seller_delivery_time_min, COALESCE(SUM(o.amount),0) AS turnover, COUNT(o.id)::int AS orders_count, COALESCE(SUM(rt.amount),0) AS paid_to_you FROM sellers child JOIN users u ON u.id=child.user_id LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (completed.delivered_at - COALESCE(completed.paid_at, completed.created_at))) / 60))::int AS avg_delivery_time_min FROM orders completed WHERE completed.seller_id=child.user_id AND completed.delivered_at IS NOT NULL AND completed.delivered_at >= COALESCE(completed.paid_at, completed.created_at)) delivery ON TRUE LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' LEFT JOIN transactions rt ON rt.order_id=o.id AND rt.user_id=$1 AND rt.meta->>'source'='seller_referral' WHERE child.referred_by_seller_id=$1 GROUP BY child.user_id, u.username, u.email, u.role, child.created_at, child.referral_commission_rate, child.total_sales, child.last_seen_at, delivery.avg_delivery_time_min ORDER BY child.created_at DESC`, [req.user.id]);
     const { rows: payments } = await query(`SELECT t.id, t.amount, t.description, t.created_at, t.order_id, o.order_number, p.title AS product_title, seller_u.username AS seller_name, (seller_profile.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online, delivery.avg_delivery_time_min AS seller_delivery_time_min FROM transactions t LEFT JOIN orders o ON o.id=t.order_id LEFT JOIN products p ON p.id=o.product_id LEFT JOIN users seller_u ON seller_u.id=o.seller_id LEFT JOIN sellers seller_profile ON seller_profile.user_id=o.seller_id LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (completed.delivered_at - COALESCE(completed.paid_at, completed.created_at))) / 60))::int AS avg_delivery_time_min FROM orders completed WHERE completed.seller_id=o.seller_id AND completed.delivered_at IS NOT NULL AND completed.delivered_at >= COALESCE(completed.paid_at, completed.created_at)) delivery ON TRUE WHERE t.user_id=$1 AND t.meta->>'source'='seller_referral' ORDER BY t.created_at DESC LIMIT 50`, [req.user.id]);
     const summary = referred.reduce((acc, r) => { acc.referredCount += 1; acc.turnover += Number(r.turnover || 0); acc.ordersCount += Number(r.orders_count || 0); acc.paidToYou += Number(r.paid_to_you || 0); return acc; }, { referredCount: 0, turnover: 0, ordersCount: 0, paidToYou: 0 });
     res.json({
-      referral: { code: seller.referral_code, link: canUseReferral ? referralLink(seller.referral_code, req.user.role) : null, rate: seller.referral_commission_rate || '0.0100', earnings: seller.referral_earnings || '0.00', role: roleForLink(req.user.role), enabled: canUseReferral, applicationStatus: seller.referral_application_status || 'not_requested', rejectReason: seller.referral_reject_reason || '', requirements },
+      referral: { code: seller.referral_code, link: canUseReferral ? referralLink(seller.referral_code, verifiedUser.role) : null, rate: seller.referral_commission_rate || '0.0100', earnings: seller.referral_earnings || '0.00', role: roleForLink(verifiedUser.role), enabled: canUseReferral, applicationStatus: seller.referral_application_status || 'not_requested', rejectReason: seller.referral_reject_reason || '', requirements },
       summary, referred, payments,
     });
   } catch (err) { logger.error('Referrals page error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
@@ -161,8 +258,9 @@ router.get('/referrals', requireApprovedCommercial, async (req, res) => {
 
 router.post('/referrals/apply', requireApprovedCommercial, async (req, res) => {
   try {
-    if (!canUseReferralProgram(req.user)) {
-      const requirements = referralRequirements(req.user);
+    const currentUser = await loadReferralUser(req.user.id) || req.user;
+    if (!canUseReferralProgram(currentUser)) {
+      const requirements = referralRequirements(currentUser);
       return res.status(400).json({ error: requirements.full ? 'Для заявки нужно подтвердить email, телефон и Telegram' : 'Для заявки нужно подтвердить email' });
     }
     const note = String(req.body?.note || '').trim().slice(0, 1000);
@@ -173,14 +271,14 @@ router.post('/referrals/apply', requireApprovedCommercial, async (req, res) => {
       if (seller.referral_application_status === 'pending') throw { status: 400, message: 'Заявка уже отправлена на модерацию' };
       await client.query(`UPDATE sellers SET referral_application_status='pending', referral_requested_at=NOW(), referral_reject_reason=NULL, referral_moderation_note=$1 WHERE user_id=$2`, [note, req.user.id]);
     });
-    await notify.notifyAdmins('system', 'Заявка на реферальную программу', `${req.user.username} отправил заявку на участие в реферальной программе`, '/admin/referrals').catch(() => {});
+    await notify.notifyAdmins('system', 'Заявка на реферальную программу', `${currentUser.username} отправил заявку на участие в реферальной программе`, '/admin/referrals').catch(() => {});
     res.json({ message: 'Заявка отправлена на модерацию' });
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Referral apply error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 router.use('/withdrawal', requireApprovedCommercial);
 
-const WITHDRAW_METHODS = { card: { label: 'Банковская карта', icon: '💳', placeholder: 'Номер карты' }, sbp: { label: 'СБП (Быстрые платежи)', icon: '⚡', placeholder: 'Номер телефона' }, paypal: { label: 'PayPal', icon: '🅿️', placeholder: 'Email PayPal' }, crypto: { label: 'Криптовалюта', icon: '₿', placeholder: 'Адрес кошелька' } };
+const WITHDRAW_METHODS = { card: { label: 'Банковская карта', icon: 'CARD', placeholder: 'Номер карты' }, sbp: { label: 'СБП (Быстрые платежи)', icon: 'SBP', placeholder: 'Номер телефона' }, paypal: { label: 'PayPal', icon: 'PP', placeholder: 'Email PayPal' }, crypto: { label: 'Криптовалюта', icon: 'USDT', placeholder: 'Адрес кошелька' } };
 async function getUsdtRateRub(settings = {}) {
   const fallback = parseFloat(settings.usdt_rub_rate_fallback || process.env.USDT_RUB_RATE || 90);
   try {

@@ -76,7 +76,7 @@ export default function WithdrawalPage() {
         <h1 style={{ fontSize: 22, fontWeight: 900, color: C.t1, marginBottom: 24 }}>⬆️ Вывод средств</h1>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }}>
           <Card style={{ padding: 24 }}>
-            <div style={{ marginBottom: 20, padding: '16px', background: '#0A0A12', borderRadius: 10, border: `1px solid ${C.border}` }}>
+            <div style={{ marginBottom: 20, padding: '16px', background: C.field, borderRadius: 8, border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 11, color: C.t2, marginBottom: 4 }}>Доступно для вывода</div>
               <div style={{ fontSize: 28, fontWeight: 900, color: C.t1 }}>{balance.toLocaleString('ru')} ₽</div>
               <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:10, fontSize:12, color:C.t2 }}>
@@ -90,8 +90,8 @@ export default function WithdrawalPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {methods.map(m => (
                     <div key={m.id} onClick={() => setMethod(m.id)}
-                      style={{ background: method===m.id ? C.accent+'18' : '#0A0A12', border: `1.5px solid ${method===m.id ? C.accent : C.border}`,
-                        borderRadius: 10, padding: '12px', cursor: 'pointer', transition: 'all .15s' }}>
+                      style={{ background: method===m.id ? C.infoBg : C.field, border: `1.5px solid ${method===m.id ? C.accent : C.border}`,
+                        borderRadius: 8, padding: '12px', cursor: 'pointer', transition: 'all .15s' }}>
                       <div style={{ fontSize: 20, marginBottom: 5 }}>{m.icon}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: method===m.id ? C.accent : C.t1 }}>{m.label}</div>
                       <div style={{ fontSize: 10, color: C.t3 }}>Комиссия {(m.commission*100).toFixed(2).replace(/\.?0+$/,'')}%</div>
@@ -108,11 +108,11 @@ export default function WithdrawalPage() {
                   </button>
                 </div>
                 <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0"
-                  style={{ width: '100%', background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 9, padding: '11px 13px', color: C.t1, fontSize: 16, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }} />
+                  style={{ width: '100%', background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: '11px 13px', color: C.t1, fontSize: 16, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }} />
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                   {[1000, 5000, 10000, 25000].map(v => (
                     <button key={v} type="button" onClick={() => setAmount(String(v))}
-                      style={{ flex: 1, background: amount===String(v) ? C.accent+'25' : '#0A0A12', border: `1px solid ${amount===String(v) ? C.accent : C.border}`,
+                      style={{ flex: 1, background: amount===String(v) ? C.infoBg : C.field, border: `1px solid ${amount===String(v) ? C.accent : C.border}`,
                         borderRadius: 7, padding: '7px 4px', color: amount===String(v) ? C.accent : C.t2, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
                       {(v/1000).toFixed(0)}к
                     </button>
@@ -121,7 +121,7 @@ export default function WithdrawalPage() {
               </div>
               <Input label="Реквизиты" value={account} onChange={e => setAccount(e.target.value)}
                 placeholder={selectedMethod?.placeholder || 'Реквизиты'} />
-              <div style={{ background: '#0A0A12', borderRadius: 9, padding: '14px 16px' }}>
+              <div style={{ background: C.field, borderRadius: 8, padding: '14px 16px' }}>
                 {[['Сумма', amount ? `${parseFloat(amount).toLocaleString('ru')} ₽` : '—'],
                   [`Комиссия (${(feeRate*100).toFixed(0)}%)`, `${fee.toLocaleString('ru')} ₽`],
                   ['К получению', method === 'crypto' ? payoutPreview : `${receive.toLocaleString('ru')} ₽`]].map(([l, v], i) => (
@@ -136,7 +136,7 @@ export default function WithdrawalPage() {
           </Card>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Card style={{ padding: 18 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>📏 Лимиты</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>Лимиты</div>
               {[['Минимум', `${limits.minAmount.toLocaleString('ru')} ₽`],['Максимум в день',`${limits.maxDaily.toLocaleString('ru')} ₽`],['Время обработки','до 24 часов']].map(([l,v]) => (
                 <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12 }}>
                   <span style={{ color: C.t2 }}>{l}</span><span style={{ color: C.t1, fontWeight: 600 }}>{v}</span>
@@ -154,13 +154,13 @@ export default function WithdrawalPage() {
               <div style={{ display:'grid', gap:12 }}>
                 <div>
                   <div style={{ fontSize:11, color:C.t2, fontWeight:700, marginBottom:6 }}>Метод</div>
-                  <select value={autoPayout.method} onChange={e => setAutoPayout(p => ({ ...p, method:e.target.value }))} style={{ width:'100%', background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:'10px 12px', color:C.t1, fontFamily:'inherit' }}>
+                  <select value={autoPayout.method} onChange={e => setAutoPayout(p => ({ ...p, method:e.target.value }))} style={{ width:'100%', background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 12px', color:C.t1, fontFamily:'inherit' }}>
                     {methods.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                 </div>
                 <Input label="Порог (₽)" type="number" value={autoPayout.threshold} onChange={e => setAutoPayout(p => ({ ...p, threshold:e.target.value }))} />
                 <Input label="Реквизиты" value={autoPayout.requisites?.account || ''} onChange={e => setAutoPayout(p => ({ ...p, requisites:{ ...(p.requisites || {}), account:e.target.value } }))} placeholder="Карта, телефон или USDT TRC20" />
-                {autoPayout.method === 'crypto' && <div style={{ fontSize:12, color:C.t2, background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:10 }}>
+                {autoPayout.method === 'crypto' && <div style={{ fontSize:12, color:C.t2, background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:10 }}>
                   При текущем балансе будет доступно примерно <b style={{ color:C.accent }}>{toUsdt(balance).toLocaleString('ru', { maximumFractionDigits: 2 })} USDT</b>.
                 </div>}
                 <Btn size="sm" loading={autoSaving} onClick={handleAutoSave}>Сохранить автовыплаты</Btn>

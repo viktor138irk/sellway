@@ -69,17 +69,17 @@ export default function FinancesPage() {
         : <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'repeat(3,1fr)', gap:12 }}>
               {[['Доступный баланс', money(wallet?.balance), C.green], ['Заморожено', money(wallet?.held), C.amber], ['Всего получено', money(wallet?.total_in), C.t1]].map(([label, value, color]) => (
-                <div key={label} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 18px' }}>
+                <div key={label} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'16px 18px' }}>
                   <div style={{ fontSize:12, color:C.t2, marginBottom:6 }}>{label}</div>
                   <div style={{ fontSize:22, fontWeight:900, color }}>{value}</div>
                 </div>
               ))}
             </div>
-            <section style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+            <section style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
               <div style={{ padding:'16px 18px', borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', gap:12, alignItems:'center', flexWrap:'wrap' }}>
                 <div style={{ fontSize:15, fontWeight:900, color:C.t1 }}>История транзакций</div>
                 <div style={{ display:'flex', gap:6, overflowX:'auto' }}>
-                  {FILTERS.map(([value, label]) => <button key={value} type="button" onClick={()=>setFilter(value)} style={{ background:filter===value ? C.accent : '#0A0A12', color:filter===value ? '#fff' : C.t2, border:`1px solid ${filter===value ? C.accent : C.border}`, borderRadius:8, padding:'7px 11px', fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', fontFamily:'inherit' }}>{label}</button>)}
+                  {FILTERS.map(([value, label]) => <button key={value} type="button" onClick={()=>setFilter(value)} style={{ background:filter===value ? C.accent : C.field, color:filter===value ? '#fff' : C.t2, border:`1px solid ${filter===value ? C.accent : C.border}`, borderRadius:8, padding:'7px 11px', fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', fontFamily:'inherit' }}>{label}</button>)}
                 </div>
               </div>
               {historyLoading ? <div style={{ height:180, display:'flex', alignItems:'center', justifyContent:'center' }}><Spinner size={28}/></div>

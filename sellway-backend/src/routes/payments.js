@@ -213,7 +213,17 @@ async function completeDirectPurchase(payment, source) {
     );
     if (!product) throw new Error('Product unavailable for direct checkout');
     if (product.seller_user_id === userId) throw new Error('Self purchase is not allowed');
-    const expectedAmount = Number((Number(product.price) * quantity).toFixed(2));
+    const baseAmount = Number((Number(product.price) * quantity).toFixed(2));
+    let promo = null;
+    if (metadata.promo_id) {
+      const { rows: [candidate] } = await client.query(
+        'SELECT * FROM promo_codes WHERE id=$1 AND created_by=$2 FOR UPDATE',
+        [metadata.promo_id, product.seller_user_id]
+      );
+      promo = candidate || null;
+    }
+    const promoDiscount = promo ? Number(metadata.promo_discount || 0) : 0;
+    const expectedAmount = Number(Math.max(1, baseAmount - promoDiscount).toFixed(2));
     if (expectedAmount.toFixed(2) !== amount.toFixed(2)) throw new Error('Payment amount mismatch');
     if (product.delivery_type === 'auto' && product.keys_count < quantity) throw new Error('No keys in stock');
 
@@ -287,6 +297,7 @@ async function completeDirectPurchase(payment, source) {
        RETURNING id`,
       [payment.id, order.id, JSON.stringify(completedMeta)]
     );
+    if (promo) await client.query('UPDATE promo_codes SET used_count=used_count+1 WHERE id=$1', [promo.id]);
     if (updated.rowCount === 0) {
       await client.query(
         `INSERT INTO transactions (user_id, order_id, type, amount, description, meta)
@@ -370,7 +381,7 @@ async function completePaidPayment(payment, source) {
     await notify.create(
       userId,
       'balance_credit',
-      '💰 Баланс пополнен',
+      'Баланс пополнен',
       `На ваш счёт зачислено ${amount.toLocaleString('ru')} ₽`,
       metadata.product_id ? `/product/${metadata.product_id}` : '/profile'
     ).catch(() => {});
@@ -387,6 +398,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const message = String(req.body.message || '').trim().slice(0, 2000);
   const quantity = parseQuantity(req.body.quantity);
+  const promoCode = String(req.body.promo_code || '').trim().toUpperCase();
 
   if (!productId) return res.status(400).json({ error: 'product_id обязателен' });
   if (!quantity) return res.status(400).json({ error: 'Укажите корректное количество' });
@@ -422,10 +434,28 @@ router.post('/checkout', optionalAuth, async (req, res) => {
       }
       if (product.seller_id === checkoutUser.id) throw { status: 400, message: 'Нельзя купить свою позицию' };
 
-      return { product, user: checkoutUser, createdAccount };
+      let promo = null;
+      if (promoCode) {
+        const { rows: [validPromo] } = await client.query(
+          `SELECT id, code, discount_pct, discount_fixed FROM promo_codes
+           WHERE code=$1 AND created_by=$2 AND is_active=TRUE
+             AND (expires_at IS NULL OR expires_at > NOW())
+             AND (max_uses IS NULL OR used_count < max_uses)`,
+          [promoCode, product.seller_id]
+        );
+        if (!validPromo) throw { status: 400, message: 'Промокод недействителен или закончился' };
+        promo = validPromo;
+      }
+      return { product, user: checkoutUser, createdAccount, promo };
     });
 
-    const amount = Number((Number(prepared.product.price) * quantity).toFixed(2));
+    const baseAmount = Number((Number(prepared.product.price) * quantity).toFixed(2));
+    const discount = prepared.promo
+      ? prepared.promo.discount_pct
+        ? baseAmount * Number(prepared.promo.discount_pct) / 100
+        : Number(prepared.promo.discount_fixed || 0)
+      : 0;
+    const amount = Number(Math.max(1, baseAmount - discount).toFixed(2));
     if (!Number.isFinite(amount) || amount < 1) return res.status(400).json({ error: 'Некорректная стоимость позиции' });
 
     const idempotencyKey = uuidv4();
@@ -446,6 +476,9 @@ router.post('/checkout', optionalAuth, async (req, res) => {
         quantity: String(quantity),
         guest_checkout: prepared.createdAccount ? 'true' : 'false',
         message,
+        promo_code: prepared.promo?.code || '',
+        promo_id: prepared.promo?.id || '',
+        promo_discount: discount.toFixed(2),
       },
     }, {
       headers: { 'Idempotence-Key': idempotencyKey },
@@ -466,6 +499,9 @@ router.post('/checkout', optionalAuth, async (req, res) => {
           product_id: productId,
           quantity,
           guest_checkout: prepared.createdAccount,
+          promo_code: prepared.promo?.code || '',
+          promo_id: prepared.promo?.id || '',
+          promo_discount: discount.toFixed(2),
         }),
       ]
     );

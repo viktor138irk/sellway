@@ -32,6 +32,7 @@ export default function ProductPage() {
   const [purchaseRulesAccepted, setPurchaseRulesAccepted] = useState(false);
   const [serviceMessage, setServiceMessage] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [promoCode, setPromoCode] = useState('');
   const isMobile = useMediaQuery('(max-width: 760px)');
 
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function ProductPage() {
   async function startCheckout(email = '') {
     setBuyLoading(true);
     try {
-      const { data } = await createCheckout({ product_id: product.id, email, quantity: service ? 1 : quantity, message: service ? serviceMessage : '' });
+      const { data } = await createCheckout({ product_id: product.id, email, quantity: service ? 1 : quantity, message: service ? serviceMessage : '', promo_code: promoCode.trim() });
       if (data.createdAccount) toast.success('Аккаунт создан. Пароль отправлен на email.');
       window.location.href = data.confirmationUrl;
     } catch (err) {
@@ -154,7 +155,7 @@ export default function ProductPage() {
       <div style={{ display:'grid', gridTemplateColumns:isMobile ? '1fr' : 'minmax(280px, 420px) 1fr', gap:isMobile ? 18 : 28 }}>
         <div>
           <div style={{ background:C.media, borderRadius:8, overflow:'hidden', aspectRatio:'1', border:`1px solid ${C.border}`, marginBottom:10, position:'relative' }}>
-            {images.length > 0 ? <img src={images[imgIdx]} alt={product.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>{service ? '🧑‍💻' : '📦'}</div>}
+            {images.length > 0 ? <img src={images[imgIdx]} alt={product.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', gap:8, alignItems:'center', justifyContent:'center', color:C.t3 }}><span style={{ fontFamily:'var(--sw-serif)', fontSize:72 }}>{String(product.title || 'S').slice(0,1)}</span><span style={{ fontSize:12, textTransform:'uppercase' }}>{service ? 'Услуга' : 'Товар'}</span></div>}
             {disc > 0 && <div style={{ position:'absolute', top:12, left:12, background:C.red, color:'#fff', fontSize:13, fontWeight:800, padding:'4px 10px', borderRadius:8 }}>-{disc}%</div>}
           </div>
           {images.length > 1 && <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>{images.map((src,i)=><button key={i} onClick={()=>setImgIdx(i)} style={{ width:60, height:60, borderRadius:8, overflow:'hidden', cursor:'pointer', border:`2px solid ${i===imgIdx?C.accent:C.border}`, padding:0, background:'transparent' }}><img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /></button>)}</div>}
@@ -163,10 +164,7 @@ export default function ProductPage() {
         <div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:16 }}>
             {service && <Badge color={C.accent}>Услуга / поэтапная сделка</Badge>}
-            {product.delivery_type === 'auto' && <Badge color={C.green}>Авто-ключи</Badge>}
-            {product.delivery_type === 'file' && <Badge color={C.green}>Авто-файл</Badge>}
-            {product.delivery_type === 'manual' && <Badge color={C.green}>Ручная выдача</Badge>}
-            {product.seller_verified && <Badge color="#60A5FA">Проверенный автор</Badge>}
+            {product.seller_verified && <Badge color={C.green}>Проверенный автор</Badge>}
             {!service && product.guarantee_days > 0 && <Badge color={C.t2}>Гарантия {product.guarantee_days} дн.</Badge>}
           </div>
 
@@ -244,6 +242,7 @@ export default function ProductPage() {
         <form onSubmit={handleGuestCheckout} style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {!user && <><div style={{ background:C.infoBg, border:`1px solid ${C.accent}33`, borderRadius:8, padding:'12px 16px', fontSize:13, color:C.t2, lineHeight:1.5 }}>Укажите email. Мы автоматически создадим аккаунт покупателя, отправим пароль на почту и перенаправим на оплату.</div>
           <Input label="Email для доступа к покупке" type="email" value={checkoutEmail} onChange={e=>setCheckoutEmail(e.target.value)} placeholder="you@example.com" required /></>}
+          <Input label="Промокод" value={promoCode} onChange={e=>setPromoCode(e.target.value.toUpperCase())} placeholder="Если есть" />
           <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:C.field, border:`1px solid ${purchaseRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:8, padding:'12px 14px', cursor:'pointer' }}>
             <input type="checkbox" checked={purchaseRulesAccepted} onChange={e=>setPurchaseRulesAccepted(e.target.checked)} style={{ marginTop:3, accentColor:C.accent }} />
             <span style={{ color:C.t2, fontSize:12, lineHeight:1.6 }}>{BUYER_CHECKOUT_RULES_SHORT}{' '}<Link to="/terms" target="_blank" style={{ color:C.accent }}>Правила площадки</Link></span>

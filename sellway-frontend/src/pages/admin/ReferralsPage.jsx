@@ -9,7 +9,7 @@ const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const pct = v => `${(Number(v || 0) * 100).toFixed(2)}%`;
 
 function Tile({ label, value, sub, color = C.t1 }) {
-  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:16 }}>
+  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:16 }}>
     <div style={{ fontSize:11, color:C.t3, fontWeight:800, textTransform:'uppercase', letterSpacing:.6, marginBottom:6 }}>{label}</div>
     <div style={{ fontSize:23, fontWeight:900, color }}>{value}</div>
     {sub && <div style={{ fontSize:11, color:C.t2, marginTop:5 }}>{sub}</div>}
@@ -64,10 +64,10 @@ export default function AdminReferralsPage() {
       <Btn loading={saving} onClick={save}>Сохранить настройки</Btn>
     </div>
 
-    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:18 }}>
+    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:18 }}>
       <div style={{ fontSize:15, fontWeight:900, color:C.t1, marginBottom:14 }}>Общие настройки</div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:14 }}>
-        <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:12, padding:14, display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+        <div style={{ background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:14, display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
           <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>Реферальная система</div><div style={{ fontSize:11, color:C.t3, marginTop:3 }}>Включить регистрацию и выплаты</div></div>
           <Toggle value={settings.referral_enabled !== 'false'} onChange={v => setSettings(s => ({ ...s, referral_enabled:String(v) }))} />
         </div>
@@ -90,7 +90,7 @@ export default function AdminReferralsPage() {
       <Tile label="Приглашённых" value={summary.invited_count || 0} />
     </div>
 
-    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
       <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Заявки на участие</div>
       {applications.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.t3, fontSize:13 }}>Нет заявок</div> : applications.map(u => {
         const pending = u.referral_application_status === 'pending';
@@ -114,7 +114,7 @@ export default function AdminReferralsPage() {
     </div>
 
     <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(340px,.8fr)', gap:16 }}>
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
         <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Топ рефереров</div>
         {top.length === 0 ? <div style={{ padding:34, textAlign:'center', color:C.t3 }}>Рефереров пока нет</div> : top.map(u => <div key={u.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:12, alignItems:'center', padding:'13px 18px', borderBottom:`1px solid ${C.border}` }}>
           <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div><div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : u.role === 'seller' ? 'Продавец' : u.role}</div><SellerMeta seller={u} compact /></div>
@@ -124,7 +124,7 @@ export default function AdminReferralsPage() {
         </div>)}
       </div>
 
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
         <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Последние выплаты</div>
         {payments.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.t3, fontSize:13 }}>Выплат пока нет</div> : payments.map(p => <div key={p.id} style={{ padding:'12px 16px', borderBottom:`1px solid ${C.border}` }}>
           <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}><div style={{ fontSize:13, color:C.green, fontWeight:900 }}>{money(p.amount)}</div><div style={{ fontSize:10, color:C.t3 }}>{new Date(p.created_at).toLocaleString('ru')}</div></div>
@@ -135,7 +135,7 @@ export default function AdminReferralsPage() {
       </div>
     </div>
 
-    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
       <div style={{ padding:'15px 18px', borderBottom:`1px solid ${C.border}`, fontSize:15, fontWeight:900, color:C.t1 }}>Приглашённые продавцы и фрилансеры</div>
       {invited.length === 0 ? <div style={{ padding:34, textAlign:'center', color:C.t3 }}>Приглашённых пока нет</div> : invited.map(u => <div key={u.user_id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto auto', gap:12, alignItems:'center', padding:'13px 18px', borderBottom:`1px solid ${C.border}` }}>
         <div><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{u.username}</div><div style={{ fontSize:11, color:C.t3 }}>{u.email} · {u.role === 'freelancer' ? 'Фрилансер' : 'Продавец'} · приглашён: {u.referrer_name || '—'}</div><SellerMeta seller={u} compact /></div>

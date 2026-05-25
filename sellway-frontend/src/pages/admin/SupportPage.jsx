@@ -112,8 +112,8 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="admin-support-layout" style={{ display:'grid', gridTemplateColumns:'300px minmax(0,1fr)', height:'calc(100vh - 150px)', minHeight:520, minWidth:0, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden', background:C.card }}>
-        <aside className="admin-support-threads" style={{ borderRight:`1px solid ${C.border}`, overflowY:'auto', background:'#0B0B13' }}>
+      <div className="admin-support-layout" style={{ display:'grid', gridTemplateColumns:'300px minmax(0,1fr)', height:'calc(100vh - 150px)', minHeight:520, minWidth:0, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden', background:C.card }}>
+        <aside className="admin-support-threads" style={{ borderRight:`1px solid ${C.border}`, overflowY:'auto', minHeight:0, background:C.field }}>
           {loading ? <div style={{ padding:36, display:'flex', justifyContent:'center' }}><Spinner size={26}/></div> :
             threads.length === 0 ? <div style={{ padding:28, color:C.t3, fontSize:13, textAlign:'center' }}>Обращений нет</div> :
               threads.map(thread => <button key={thread.id} type="button" onClick={() => setSelectedId(thread.id)} style={{ width:'100%', textAlign:'left', border:0, borderBottom:`1px solid ${C.border}`, borderLeft:`3px solid ${selectedId === thread.id ? C.accent : 'transparent'}`, background:selectedId === thread.id ? C.accent+'15' : 'transparent', padding:'13px 12px', cursor:'pointer', fontFamily:'inherit' }}>
@@ -139,11 +139,11 @@ export default function SupportPage() {
                   </div>
                   {dialog.thread.status === 'open' && <Btn size="sm" variant="ghost" onClick={closeThread}>Закрыть обращение</Btn>}
                 </div>
-                <div ref={messagesRef} className="admin-support-messages" style={{ flex:1, minHeight:0, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, background:'#0D0D15' }}>
+                <div ref={messagesRef} className="admin-support-messages" style={{ flex:1, minHeight:0, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, background:C.field }}>
                   {(dialog.messages || []).map(message => <div key={message.id} style={{ display:'flex', justifyContent:message.sender_type === 'admin' ? 'flex-end' : 'flex-start' }}>
                     <div style={{ maxWidth:'76%' }}>
                       <div style={{ fontSize:10, color:C.t3, marginBottom:3, textAlign:message.sender_type === 'admin' ? 'right' : 'left' }}>{message.sender_type === 'admin' ? 'Поддержка' : dialog.thread.username}</div>
-                      <div style={{ background:message.sender_type === 'admin' ? C.accent : '#1A1A28', color:'#fff', borderRadius:message.sender_type === 'admin' ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding:'9px 12px', fontSize:13, lineHeight:1.5, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{message.message}</div>
+                      <div style={{ background:message.sender_type === 'admin' ? C.accent : C.card, border:`1px solid ${message.sender_type === 'admin' ? C.accent : C.border}`, color:message.sender_type === 'admin' ? '#fff' : C.t1, borderRadius:message.sender_type === 'admin' ? '8px 8px 3px 8px' : '8px 8px 8px 3px', padding:'9px 12px', fontSize:13, lineHeight:1.5, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{message.message}</div>
                       <div style={{ marginTop:3, color:C.t3, fontSize:10, textAlign:message.sender_type === 'admin' ? 'right' : 'left' }}>{dateTime(message.created_at)}</div>
                     </div>
                   </div>)}

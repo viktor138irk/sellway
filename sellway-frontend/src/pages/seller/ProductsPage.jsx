@@ -29,7 +29,7 @@ function ImageUpload({ images, onChange, max = 8 }) {
       <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Фотографии <span style={{ color: C.t3, fontWeight: 400 }}>({images.length}/{max}, первое — главное)</span></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 10 }}>
         {images.map((img, i) => (
-          <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: `2px solid ${i === 0 ? C.accent : C.border}`, background: '#0A0A12' }}>
+          <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden', border: `2px solid ${i === 0 ? C.accent : C.border}`, background: C.media }}>
             <img src={img.preview || img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             {i === 0 && <div style={{ position: 'absolute', top: 5, left: 5, background: C.accent, color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>ГЛАВНОЕ</div>}
             <div style={{ position: 'absolute', right: 5, bottom: 5, display: 'flex', gap: 4 }}>
@@ -39,7 +39,7 @@ function ImageUpload({ images, onChange, max = 8 }) {
           </div>
         ))}
         {images.length < max && (
-          <button type="button" onClick={() => ref.current.click()} style={{ aspectRatio: '1', borderRadius: 10, border: `2px dashed ${C.border}`, background: '#0A0A12', color: C.t3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 6, fontFamily: 'inherit' }}>
+          <button type="button" onClick={() => ref.current.click()} style={{ aspectRatio: '1', borderRadius: 8, border: `2px dashed ${C.border}`, background: C.field, color: C.t3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 6, fontFamily: 'inherit' }}>
             <div style={{ fontSize: 24, opacity: .5 }}>+</div>
             <div style={{ fontSize: 10 }}>Добавить</div>
           </button>
@@ -60,10 +60,10 @@ function ServiceStepsEditor({ steps, onChange }) {
   function remove(i) { onChange(steps.filter((_, idx) => idx !== i)); }
 
   return (
-    <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+    <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.t1 }}>🧩 Типовые этапы услуги</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.t1 }}>Типовые этапы услуги</div>
           <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>Это шаблон. Финальная смета утверждается в сделке с заказчиком.</div>
         </div>
         <Btn size="sm" variant="ghost" onClick={add}>+ Этап</Btn>
@@ -88,7 +88,7 @@ function ServiceStepsEditor({ steps, onChange }) {
 function CategoryIcon({ cat, size = 30 }) {
   const img = cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
   const letter = String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
-  return <span style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+  return <span style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', background: C.media, border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
     {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(11, size * .38), fontWeight: 900, color: C.t2 }}>{letter}</span>}
   </span>;
 }
@@ -113,7 +113,7 @@ function CommercialAccessBlock({ service, status, onRefresh }) {
     }
   }
   return (
-    <div style={{ background: C.card, border: `1px solid ${rejected ? C.red + '66' : C.border}`, borderRadius: 14, padding: 22, maxWidth: 720 }}>
+    <div style={{ background: C.card, border: `1px solid ${rejected ? C.red + '66' : C.border}`, borderRadius: 8, padding: 22, maxWidth: 720 }}>
       <div style={{ fontSize: 18, fontWeight: 900, color: C.t1, marginBottom: 8 }}>
         {service ? 'Публикация услуг недоступна' : 'Публикация товаров недоступна'}
       </div>
@@ -222,14 +222,14 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
           <option value={subCats.length ? '' : parentCategoryId}>{subCats.length ? 'Выберите подкатегорию' : 'Без подкатегории'}</option>
           {subCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
-        {selectedCategory && <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', alignSelf: 'end' }}>
+        {selectedCategory && <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', alignSelf: 'end' }}>
           <CategoryIcon cat={selectedCategory} />
           <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, color: C.t3 }}>Выбрана категория</div><div style={{ fontSize: 13, color: C.t1, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCategory.name}</div></div>
         </div>}
         {!service && <Select label="Тип выдачи" value={form.delivery_type} onChange={e => set('delivery_type')(e.target.value)}>
-          <option value="auto">🔑 Автовыдача ключей</option>
-          <option value="file">📎 Автовыдача файла</option>
-          <option value="manual">⏱ Ручная выдача</option>
+          <option value="auto">Автовыдача ключей</option>
+          <option value="file">Автовыдача файла</option>
+          <option value="manual">Ручная выдача</option>
         </Select>}
         {service && <Input label="Тип сделки" value="Услуга / поэтапная сделка" disabled />}
         <Input label={service ? 'Стоимость от (₽) *' : 'Цена (₽) *'} type="number" value={form.price} onChange={setFromInput('price')} placeholder={service ? '5000' : '1200'} />
@@ -242,25 +242,25 @@ function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
 
       {service && <ServiceStepsEditor steps={serviceSteps} onChange={setServiceSteps} />}
 
-      {!service && form.delivery_type === 'auto' && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>🔑 Ключи / коды</div>
+      {!service && form.delivery_type === 'auto' && <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>Ключи / коды</div>
         {!productId
           ? <Textarea label="Ключи для первой публикации (по одному на строку)" value={keysText} onChange={e => setKeysText(e.target.value)} rows={5} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} />
-          : <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'11px 13px', color:C.t2, fontSize:12, lineHeight:1.55 }}>Доступно ключей: <b style={{ color:C.t1 }}>{availableKeys.length}</b>. Пополнение и удаление остатка вынесены в кнопку <b style={{ color:C.accent }}>Ключи</b> на странице товаров и не требуют повторной модерации.</div>}
+          : <div style={{ background:C.infoBg, border:`1px solid ${C.border}`, borderRadius:8, padding:'11px 13px', color:C.t2, fontSize:12, lineHeight:1.55 }}>Доступно ключей: <b style={{ color:C.t1 }}>{availableKeys.length}</b>. Пополнение и удаление остатка вынесены в кнопку <b style={{ color:C.accent }}>Ключи</b> на странице товаров и не требуют повторной модерации.</div>}
         <div style={{ marginTop:16 }}><Textarea label="Сообщение покупателю после получения ключа" value={form.auto_delivery_message} onChange={e => set('auto_delivery_message')(e.target.value)} rows={4} placeholder="Например: откройте Steam, выберите «Активировать продукт» и вставьте ключ..." style={{ width:'100%' }} /></div>
       </div>}
 
-      {!service && form.delivery_type === 'file' && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 10 }}>📎 Файл для выдачи</div>
+      {!service && form.delivery_type === 'file' && <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 10 }}>Файл для выдачи</div>
         {existingFile && !productFile && <div style={{ fontSize: 12, color: C.t2, marginBottom: 10 }}>Текущий файл: {existingFile.filename}</div>}
-        <input type="file" onChange={e => setProductFile(e.target.files?.[0] || null)} style={{ width: '100%', background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 9, padding: '11px 13px', color: C.t1, fontSize: 13, fontFamily: 'inherit' }} />
+        <input type="file" onChange={e => setProductFile(e.target.files?.[0] || null)} style={{ width: '100%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: '11px 13px', color: C.t1, fontSize: 13, fontFamily: 'inherit' }} />
       </div>}
 
-      <div style={{ background: service ? '#10101F' : '#0A1A0A', border: `1px solid ${service ? C.accent + '44' : C.green + '33'}`, borderRadius: 10, padding: '12px 16px', fontSize: 12, color: service ? C.t2 : C.green, lineHeight: 1.5 }}>
-        {service ? '💼 Для услуги указанная цена показывается как “от”. Финальная стоимость и этапы утверждаются с заказчиком внутри сделки, после чего средства резервируются.' : <>💡 После сохранения карточка уйдёт на модерацию. Ваш доход: <strong>{form.price ? `${Number(estimatedIncome).toLocaleString('ru')} ₽` : '—'}</strong> <span style={{ color:C.t2 }}>(комиссия с продажи {(commissionRate * 100).toLocaleString('ru')}%)</span></>}
+      <div style={{ background: service ? C.infoBg : C.soft, border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 12, color: service ? C.t2 : C.green, lineHeight: 1.5 }}>
+        {service ? 'Для услуги указанная цена показывается как “от”. Финальная стоимость и этапы утверждаются с заказчиком внутри сделки, после чего средства резервируются.' : <>После сохранения карточка уйдёт на модерацию. Ваш доход: <strong>{form.price ? `${Number(estimatedIncome).toLocaleString('ru')} ₽` : '—'}</strong> <span style={{ color:C.t2 }}>(комиссия с продажи {(commissionRate * 100).toLocaleString('ru')}%)</span></>}
       </div>
 
-      <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:'#0A0A12', border:`1px solid ${publicationRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:10, padding:'12px 14px', cursor:'pointer' }}>
+      <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:C.field, border:`1px solid ${publicationRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:8, padding:'12px 14px', cursor:'pointer' }}>
         <input type="checkbox" checked={publicationRulesAccepted} onChange={e=>setPublicationRulesAccepted(e.target.checked)} style={{ marginTop:3, accentColor:C.accent }} />
         <span style={{ fontSize:12, lineHeight:1.6, color:C.t2 }}>
           {service ? 'Публикуя услугу, исполнитель подтверждает, что услуга законна, соответствует описанию, не нарушает права третьих лиц и не запрещена к оказанию. Исполнитель несет ответственность за результат, сроки выполнения и согласованные условия.' : SELLER_PUBLICATION_RULES_SHORT}{' '}
@@ -331,7 +331,7 @@ function KeyInventoryModal({ product, onClose }) {
   return (
     <Modal title={`Ключи: ${product.title}`} onClose={onClose} width={600}>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'10px 13px', color:C.t2, fontSize:12 }}>Изменения остатка ключей применяются сразу и не отправляют товар на повторную модерацию.</div>
+        <div style={{ background:C.infoBg, border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 13px', color:C.t2, fontSize:12 }}>Изменения остатка ключей применяются сразу и не отправляют товар на повторную модерацию.</div>
         <Textarea label="Добавить ключи (по одному на строку)" value={newKeys} onChange={e => setNewKeys(e.target.value)} rows={4} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ fontFamily:'monospace' }} />
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
           <div style={{ color:C.t2, fontSize:12, fontWeight:800 }}>Доступно для продажи: {availableKeys.length}</div>
@@ -340,7 +340,7 @@ function KeyInventoryModal({ product, onClose }) {
         {loading ? <div style={{ display:'flex', justifyContent:'center', padding:20 }}><Spinner size={28}/></div>
           : availableKeys.length === 0 ? <div style={{ color:C.t3, fontSize:12, padding:'14px 0' }}>Свободных ключей нет.</div>
           : <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:260, overflowY:'auto' }}>
-              {availableKeys.map(key => <div key={key.id} style={{ display:'flex', alignItems:'center', gap:10, background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 10px' }}>
+              {availableKeys.map(key => <div key={key.id} style={{ display:'flex', alignItems:'center', gap:10, background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 10px' }}>
                 <code style={{ flex:1, color:C.t1, fontSize:12, overflow:'hidden', textOverflow:'ellipsis' }}>{key.key_value}</code>
                 <Btn size="sm" variant="danger" disabled={saving} onClick={() => removeInventoryKey(key.id)}>Удалить</Btn>
               </div>)}
@@ -403,7 +403,7 @@ export default function ProductsPage({ mode }) {
           <button onClick={() => navigate('/seller/products')} style={{ background: 'transparent', border: 'none', color: C.t2, fontSize: 20, cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{mode === 'edit' ? (service ? 'Редактировать услугу' : 'Редактировать товар') : (service ? 'Новая услуга' : 'Новый товар')}</h1>
         </div>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 'clamp(16px, 4vw, 24px)' }}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 'clamp(16px, 4vw, 24px)' }}>
           {canPublish
             ? <ProductForm productId={editId} user={user} commercialStatus={commercialStatus} onSave={() => navigate('/seller/products')} onCancel={() => navigate('/seller/products')} />
             : <CommercialAccessBlock service={service} status={commercialStatus} onRefresh={loadCommercialStatus} />}
@@ -428,17 +428,17 @@ export default function ProductsPage({ mode }) {
         </div>}
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
-        : products.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 50, textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>{service ? '🧑‍💻' : '📦'}</div>
+        : products.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 50, textAlign: 'center' }}>
+            <div style={{ fontFamily:'var(--sw-serif)', fontSize: 28, color:C.accent, marginBottom: 16 }}>{service ? 'Services' : 'Market'}</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: C.t2, marginBottom: 8 }}>{service ? 'Нет услуг' : 'Нет товаров'}</div>
             <div style={{ fontSize: 13, color: C.t3, marginBottom: 24 }}>{service ? 'Добавьте первую услугу, чтобы получать заказы' : 'Добавьте первый товар, чтобы начать продавать'}</div>
             <Btn onClick={() => navigate('/seller/products/new')} icon="+">{service ? 'Добавить услугу' : 'Добавить товар'}</Btn>
           </div>
         : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
             {products.map(p => (
-              <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-                <div style={{ height: 150, background: '#0A0A12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {p.images?.[0] ? <img src={p.images[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <span style={{ fontSize: 42 }}>{service ? '🧑‍💻' : '📦'}</span>}
+              <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ height: 150, background: C.media, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {p.images?.[0] ? <img src={p.images[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <span style={{ fontFamily:'var(--sw-serif)', fontSize: 38, color:C.accent }}>{String(p.title || '?').slice(0,1).toUpperCase()}</span>}
                 </div>
                 <div style={{ padding: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start', marginBottom: 8 }}>

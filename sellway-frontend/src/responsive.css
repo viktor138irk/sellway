@@ -12,12 +12,12 @@ body,
 
 body {
   overflow-x: hidden;
-  background: var(--sw-bg, #f5f7fb);
-  color: var(--sw-text, #122033);
+  background: var(--sw-bg, #f6f0e7);
+  color: var(--sw-text, #2c241f);
   transition: background-color .18s ease, color .18s ease;
 }
 
-html[data-theme="clear"] {
+html[data-theme="editorial"] {
   color-scheme: light;
 }
 
@@ -91,7 +91,7 @@ textarea {
     min-width: 0 !important;
     max-width: none !important;
     border-right: 0 !important;
-    border-bottom: 1px solid var(--sw-border, #1e1e2e) !important;
+    border-bottom: 1px solid var(--sw-border, #ddcfbf) !important;
     justify-content: flex-start;
   }
 
@@ -132,16 +132,20 @@ textarea {
     min-height: auto !important;
   }
 
-  aside[style*="width: 220"] {
+  aside[style*="width: 220"],
+  aside[style*="width: 242"],
+  aside[style*="width: 248"] {
     width: 100% !important;
     max-width: 100% !important;
     position: relative !important;
     height: auto !important;
     border-right: 0 !important;
-    border-bottom: 1px solid var(--sw-border, #1e1e2e) !important;
+    border-bottom: 1px solid var(--sw-border, #ddcfbf) !important;
   }
 
-  aside[style*="width: 220"] nav {
+  aside[style*="width: 220"] nav,
+  aside[style*="width: 242"] nav,
+  aside[style*="width: 248"] nav {
     display: flex !important;
     overflow-x: auto !important;
     gap: 6px !important;
@@ -149,13 +153,17 @@ textarea {
     white-space: nowrap !important;
   }
 
-  aside[style*="width: 220"] nav a {
+  aside[style*="width: 220"] nav a,
+  aside[style*="width: 242"] nav a,
+  aside[style*="width: 248"] nav a {
     flex: 0 0 auto !important;
     border-left: 0 !important;
     padding: 9px 12px !important;
   }
 
-  aside[style*="width: 220"] + main {
+  aside[style*="width: 220"] + main,
+  aside[style*="width: 242"] + main,
+  aside[style*="width: 248"] + main {
     width: 100% !important;
     min-width: 0 !important;
   }
@@ -183,7 +191,7 @@ textarea {
     height: 220px !important;
     flex-shrink: 0;
     border-right: 0 !important;
-    border-bottom: 1px solid var(--sw-border, #1e1e2e);
+    border-bottom: 1px solid var(--sw-border, #ddcfbf);
   }
 
   .admin-support-dialog {

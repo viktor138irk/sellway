@@ -42,14 +42,14 @@ export default function PurchasesPage() {
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
       ) : orders.length === 0 ? (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: isMobile ? 34 : 60, textAlign: 'center', color: C.t3 }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🛒</div>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? 34 : 60, textAlign: 'center', color: C.t3 }}>
+          <div style={{ fontFamily:'var(--sw-serif)', fontSize: 34, color:C.accent, marginBottom: 12 }}>01</div>
           <div style={{ color: C.t2, fontSize: 14, marginBottom: 16 }}>Покупок пока нет</div>
           <Link to="/catalog?kind=products"><Btn size="sm">Открыть каталог</Btn></Link>
         </div>
       ) : isMobile ? (
         <div style={{ display: 'grid', gap: 10 }}>
-          {orders.map(o => <Link key={o.id} to={`/orders/${o.id}`} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: 14, textDecoration: 'none', display: 'grid', gap: 10 }}>
+          {orders.map(o => <Link key={o.id} to={`/orders/${o.id}`} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, textDecoration: 'none', display: 'grid', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: C.t1, lineHeight: 1.35 }}>{o.product_title}</div>
@@ -65,8 +65,8 @@ export default function PurchasesPage() {
           </Link>)}
         </div>
       ) : (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px 80px', gap: 12, padding: '10px 18px', background: '#0A0A12', borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px 80px', gap: 12, padding: '10px 18px', background: C.field, borderBottom: `1px solid ${C.border}` }}>
             {['Позиция / заказ', 'Продавец', 'Сумма', 'Статус', ''].map(h => <div key={h} style={{ fontSize: 10, fontWeight: 800, color: C.t3, textTransform: 'uppercase', letterSpacing: 1 }}>{h}</div>)}
           </div>
           {orders.map(o => <div key={o.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px 80px', gap: 12, padding: '14px 18px', alignItems: 'center', borderBottom: `1px solid ${C.border}` }}>

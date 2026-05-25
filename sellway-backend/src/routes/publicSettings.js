@@ -5,11 +5,11 @@ const logger = require('../config/logger');
 router.get('/theme', async (req, res) => {
   try {
     const { rows } = await query("SELECT value FROM settings WHERE key = 'public_site_theme' LIMIT 1");
-    const selected = rows[0]?.value === 'classic' ? 'classic' : 'clear';
+    const selected = rows[0]?.value === 'classic' ? 'classic' : 'editorial';
     res.json({ theme: selected });
   } catch (err) {
     logger.error('Public theme settings error', { err: err.message });
-    res.json({ theme: 'clear' });
+    res.json({ theme: 'editorial' });
   }
 });
 

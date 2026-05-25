@@ -95,8 +95,8 @@ const PAGES = {
     subtitle: 'Платформа и опасная зона обслуживания',
     groups: [
       { title: 'Платформа', keys: [
-        ['public_site_theme','Дизайн публичной витрины','select','clear','Светлую тему можно вернуть на классическую одним сохранением', [
-          ['clear', 'SellWay Clear (светлый)'],
+        ['public_site_theme','Дизайн всей площадки','select','editorial','Классическую тему можно вернуть одним сохранением', [
+          ['editorial', 'SellWay Editorial (теплый)'],
           ['classic', 'Классический темный'],
         ]],
         ['maintenance_mode','Режим обслуживания','toggle','false','Закрыть сайт для пользователей'],
@@ -161,9 +161,9 @@ function DangerZone({ onAction, loading }) {
     ['auto-confirm-expired', 'Принудительное завершение просроченных сделок', 'Завершает выданные сделки, у которых истек срок авто-подтверждения, и переводит средства продавцам.'],
   ];
   return (
-    <div style={{ background:'#1A0808', border:`1px solid ${C.red}44`, borderRadius:16, overflow:'hidden' }}>
+    <div style={{ background:`${C.red}0D`, border:`1px solid ${C.red}44`, borderRadius:8, overflow:'hidden' }}>
       <div style={{ padding:'14px 22px', borderBottom:`1px solid ${C.red}22` }}>
-        <span style={{ fontSize:14, fontWeight:800, color:C.red }}>⚠️ Опасная зона</span>
+        <span style={{ fontSize:14, fontWeight:800, color:C.red }}>Опасная зона</span>
       </div>
       <div style={{ padding:22, display:'flex', flexDirection:'column', gap:14 }}>
         {actions.map(([id, label, desc]) => (
@@ -266,8 +266,8 @@ export default function SettingsPage({ page = 'finance' }) {
 
         <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
           {config.groups.map(group => (
-            <div key={group.title} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, overflow:'hidden' }}>
-              <div style={{ padding:'14px 22px', borderBottom:`1px solid ${C.border}`, background:'#0A0A12' }}>
+            <div key={group.title} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+              <div style={{ padding:'14px 22px', borderBottom:`1px solid ${C.border}`, background:C.field }}>
                 <span style={{ fontSize:14, fontWeight:800, color:C.t1 }}>{group.title}</span>
               </div>
               <div>
@@ -277,13 +277,13 @@ export default function SettingsPage({ page = 'finance' }) {
           ))}
 
           {page === 'finance' && (
-            <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:12, padding:'14px 18px', color:C.t2, fontSize:12, lineHeight:1.65 }}>
+            <div style={{ background:C.infoBg, border:`1px solid ${C.border}`, borderRadius:8, padding:'14px 18px', color:C.t2, fontSize:12, lineHeight:1.65 }}>
               <b style={{ color:C.t1 }}>Как считаются комиссии:</b> ставка с продаж применяется к доходу от заказа. У каждого продавца можно задать индивидуальную ставку, включая <b style={{ color:C.green }}>0%</b>. Для вывода сначала проверяется индивидуальная ставка вывода, затем ставка выбранного способа; вывод USDT остается без комиссии.
             </div>
           )}
 
           {page === 'telegram' && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22 }}>
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:22 }}>
               <div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:12 }}>Тест Telegram</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'end' }}>
                 <Input label="Chat ID" value={testChatId || settings.TELEGRAM_ADMIN_CHAT_ID || ''} onChange={e => setTestChatId(e.target.value)} placeholder="123456789" />
@@ -296,7 +296,7 @@ export default function SettingsPage({ page = 'finance' }) {
           )}
 
           {page === 'notifications' && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22 }}>
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:22 }}>
               <div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:12 }}>Тест SMTP</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'end' }}>
                 <Input label="Email для теста" value={testEmail || user?.email || ''} onChange={e => setTestEmail(e.target.value)} placeholder="admin@example.com" />
@@ -307,7 +307,7 @@ export default function SettingsPage({ page = 'finance' }) {
           )}
 
           {page === 'seo' && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22, display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:22, display:'flex', flexDirection:'column', gap:14 }}>
               <div style={{ fontSize:14, fontWeight:800, color:C.t1 }}>Индексация и проверка</div>
               <div style={{ color:C.t2, fontSize:12, lineHeight:1.65 }}>
                 После обновления сайта отправьте карту страниц в Яндекс Вебмастер и Google Search Console. Счетчики начинают собирать посещения после сохранения ID и обновления страницы сайта.
@@ -320,7 +320,7 @@ export default function SettingsPage({ page = 'finance' }) {
           )}
 
           {Object.keys(changed).some(key => RESTART_KEYS.has(key)) && (
-            <div style={{ background:C.amber+'12', border:`1px solid ${C.amber}44`, borderRadius:12, padding:'14px 18px', color:C.amber, fontSize:12, fontWeight:700 }}>
+            <div style={{ background:C.amber+'12', border:`1px solid ${C.amber}44`, borderRadius:8, padding:'14px 18px', color:C.amber, fontSize:12, fontWeight:700 }}>
               После сохранения Telegram, SOCKS5, SMTP или SMSPilot выполни на сервере: pm2 restart sellway-api sellway-bot sellway-admin-bot --update-env
             </div>
           )}

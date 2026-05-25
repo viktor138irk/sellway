@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminLayout from './AdminLayout';
 import { C, Spinner, Btn, Input, Modal, Toggle, Select, Textarea } from '../../components/UI';
-import { getCategories, createCategory, updateCategory, deleteCategory } from '../../api/products';
+import { getCategories, createCategory, updateCategory, deleteCategory, bulkImportCategories } from '../../api/products';
 import { useToast } from '../../contexts/ToastContext';
 import client from '../../api/client';
 
-const EMOJIS = ['🎮','🧱','⛏️','💳','🏆','🌟','🔑','💎','👑','🛡️','⚡','🤖','👾','🕹️','💻','📦','🛒','💰','🎁','📱','🎵','🎬','🧑‍💻','🎨','🛠️','🚀'];
-const toSlug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
+const TRANSLIT = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sch',ы:'y',э:'e',ю:'yu',я:'ya',ь:'',ъ:'' };
+const toSlug = s => String(s || '').toLowerCase().trim().split('').map(ch => TRANSLIT[ch] ?? ch).join('').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 78);
 
 function CategoryAvatar({ cat, size = 42 }) {
   const img = cat?.display_image_url || cat?.image_url || cat?.parent_image_url || '';
   const letter = String(cat?.name || '?').trim().slice(0, 1).toUpperCase();
   return (
-    <span style={{ width: size, height: size, borderRadius: 12, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <span style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', background: C.media, border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(14, size * 0.42), fontWeight: 900, color: C.t2 }}>{letter}</span>}
     </span>
   );
@@ -23,7 +23,6 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
   const toast = useToast();
   const [name, setName] = useState(initial?.name || '');
   const [slug, setSlug] = useState(initial?.slug || '');
-  const [emoji, setEmoji] = useState(initial?.emoji || parent?.emoji || '📂');
   const [image, setImage] = useState(initial?.image_url || null);
   const [description, setDescription] = useState(initial?.description || '');
   const [active, setActive] = useState(initial?.is_active !== false);
@@ -54,7 +53,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
         const r = await client.post('/admin/upload-image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
         imageUrl = r.data.url;
       }
-      const data = { category_type: categoryType, name: name.trim(), slug: slug.trim(), emoji, image_url: imageUrl, description, is_active: active, parent_id: parentId || null, sort_order: Number(sortOrder || 0) };
+      const data = { category_type: categoryType, name: name.trim(), slug: slug.trim(), image_url: imageUrl, description, is_active: active, parent_id: parentId || null, sort_order: Number(sortOrder || 0) };
       if (initial?.id) await updateCategory(initial.id, data);
       else await createCategory(data);
       toast.success(initial?.id ? 'Категория обновлена' : 'Категория создана');
@@ -68,19 +67,14 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Иконка</div>
-          <button type="button" onClick={() => ref.current.click()} style={{ width: 82, height: 82, borderRadius: 16, overflow: 'hidden', cursor: 'pointer', border: `2px dashed ${image ? C.accent : C.border}`, background: '#0A0A12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Изображение категории</div>
+          <button type="button" onClick={() => ref.current.click()} style={{ width: 82, height: 82, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: `2px dashed ${image ? C.accent : C.border}`, background: C.field, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {image ? <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : inheritedImage ? <img src={inheritedImage} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity:.78 }} alt="" /> : <span style={{ fontSize: 22, fontWeight: 900, color: C.t2 }}>{String(name || '?').trim().slice(0, 1).toUpperCase()}</span>}
           </button>
           <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => pickImg(e.target.files?.[0])} />
           {image && <button type="button" onClick={() => { setImage(null); setImgFile(null); }} style={{ background: 'transparent', border: 'none', color: C.red, fontSize: 11, cursor: 'pointer', marginTop: 6 }}>Убрать</button>}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.t2, marginBottom: 8 }}>Эмодзи</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 108, overflowY: 'auto' }}>
-            {EMOJIS.map(e => <button key={e} type="button" onClick={() => setEmoji(e)} style={{ width: 31, height: 31, borderRadius: 8, border: `1px solid ${emoji === e ? C.accent : C.border}`, background: emoji === e ? C.accent + '33' : '#0A0A12', cursor: 'pointer' }}>{e}</button>)}
-          </div>
-        </div>
+        <div style={{ flex: 1, color:C.t2, fontSize:12, lineHeight:1.55, paddingTop:28 }}>Загрузите квадратную иконку или обложку. Если для подкатегории изображение не выбрано, в каталоге используется изображение родительской категории.</div>
       </div>
       <Input label="Название *" value={name} onChange={e => onName(e.target.value)} placeholder="Сайты" />
       <Input label="Slug *" value={slug} onChange={e => { setAutoSlug(false); setSlug(e.target.value); }} helper={`/catalog?kind=${categoryType === 'service' ? 'services' : 'products'}&category=${slug || '...'}`} style={{ fontFamily: 'monospace' }} />
@@ -90,7 +84,7 @@ function CategoryForm({ initial, parent, categories, categoryType, onSave, onCan
       </Select>
       <Input label="Порядок сортировки" type="number" value={sortOrder} onChange={e => setSortOrder(e.target.value)} />
       <Textarea label="Описание" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 14px' }}>
         <div><div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>Активна</div><div style={{ fontSize: 12, color: C.t2 }}>Показывать в каталоге</div></div>
         <Toggle value={active} onChange={setActive} />
       </div>
@@ -106,14 +100,16 @@ export default function CategoriesPage({ type = 'product' }) {
   const toast = useToast();
   const isService = type === 'service';
   const labels = isService
-    ? { title: '🧑‍💻 Услуги: категории и подкатегории', hint: 'Отдельный каталог для услуг фрилансеров. Товарные категории здесь не показываются.', root: 'Основные категории услуг', addRoot: '+ Категория услуг', empty: 'Категорий услуг пока нет', products: 'Услуг' }
-    : { title: '📂 Категории и подкатегории', hint: 'Товарный каталог продавцов. Категории услуг находятся в отдельном разделе.', root: 'Основные категории товаров', addRoot: '+ Основная категория', empty: 'Категорий пока нет', products: 'Товаров' };
+    ? { title: 'Категории услуг', hint: 'Отдельный каталог для услуг фрилансеров. Товарные категории здесь не показываются.', root: 'Основные категории услуг', addRoot: '+ Категория услуг', empty: 'Категорий услуг пока нет', products: 'Услуг' }
+    : { title: 'Категории товаров', hint: 'Товарный каталог продавцов. Категории услуг находятся в отдельном разделе.', root: 'Основные категории товаров', addRoot: '+ Основная категория', empty: 'Категорий пока нет', products: 'Товаров' };
   const [cats, setCats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState('');
   const [modal, setModal] = useState(null);
   const [editCat, setEditCat] = useState(null);
   const [deleteCat, setDeleteCat] = useState(null);
+  const [importText, setImportText] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const roots = cats.filter(c => !c.parent_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
   const selected = roots.find(c => c.id === selectedId) || roots[0];
@@ -141,8 +137,23 @@ export default function CategoriesPage({ type = 'product' }) {
 
   function openCreate(parent = null) { setEditCat(parent ? { parent_id: parent.id } : null); setModal('create'); }
   function openEdit(cat) { setEditCat(cat); setModal('edit'); }
+  async function importCatalog() {
+    if (!importText.trim()) return toast.warn('Вставьте список категорий');
+    setImporting(true);
+    try {
+      const { data } = await bulkImportCategories({ type, text: importText });
+      toast.success(`Импортировано: ${data.createdRoots} групп, ${data.createdChildren} подгрупп`);
+      setImportText('');
+      setModal(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка импорта');
+    } finally {
+      setImporting(false);
+    }
+  }
 
-  const card = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 };
+  const card = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 8 };
 
   return (
     <AdminLayout>
@@ -152,7 +163,7 @@ export default function CategoriesPage({ type = 'product' }) {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{labels.title}</h1>
             <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{labels.hint}</div>
           </div>
-          <Btn onClick={() => openCreate(null)}>{labels.addRoot}</Btn>
+          <div style={{ display:'flex', gap:8 }}><Btn variant="ghost" onClick={() => setModal('import')}>Импорт списком</Btn><Btn onClick={() => openCreate(null)}>{labels.addRoot}</Btn></div>
         </div>
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320 }}><Spinner size={36} /></div>
@@ -197,12 +208,12 @@ export default function CategoriesPage({ type = 'product' }) {
                   </div>
                 </div>
                 <div style={{ padding: 16, borderBottom: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-                  <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{children.length}</div><div style={{ fontSize: 11, color: C.t3 }}>Подкатегорий</div></div>
-                  <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{Number(selected.product_count || 0).toLocaleString('ru')}</div><div style={{ fontSize: 11, color: C.t3 }}>{labels.products}</div></div>
-                  <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: selected.is_active ? C.green : C.t3 }}>{selected.is_active ? 'Активна' : 'Скрыта'}</div><div style={{ fontSize: 11, color: C.t3 }}>Статус</div></div>
+                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{children.length}</div><div style={{ fontSize: 11, color: C.t3 }}>Подкатегорий</div></div>
+                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: C.accent }}>{Number(selected.product_count || 0).toLocaleString('ru')}</div><div style={{ fontSize: 11, color: C.t3 }}>{labels.products}</div></div>
+                  <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}><div style={{ fontSize: 18, fontWeight: 900, color: selected.is_active ? C.green : C.t3 }}>{selected.is_active ? 'Активна' : 'Скрыта'}</div><div style={{ fontSize: 11, color: C.t3 }}>Статус</div></div>
                 </div>
                 <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
-                  {children.map(cat => <div key={cat.id} style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+                  {children.map(cat => <div key={cat.id} style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
                       <CategoryAvatar cat={cat} />
                       <div style={{ minWidth: 0, flex: 1 }}>
@@ -228,6 +239,14 @@ export default function CategoriesPage({ type = 'product' }) {
 
       {(modal === 'create' || modal === 'edit') && <Modal title={modal === 'edit' ? 'Редактировать категорию' : (editCat?.parent_id ? 'Новая подкатегория' : 'Новая категория')} onClose={() => setModal(null)}>
         <CategoryForm initial={editCat?.id ? editCat : null} parent={editCat?.parent_id ? cats.find(c => c.id === editCat.parent_id) : null} categories={cats} categoryType={type} onSave={() => { setModal(null); load(); }} onCancel={() => setModal(null)} />
+      </Modal>}
+
+      {modal === 'import' && <Modal title={`Импорт: ${labels.root}`} onClose={() => setModal(null)} width={700}>
+        <div style={{ display:'grid', gap:14 }}>
+          <p style={{ color:C.t2, fontSize:13, lineHeight:1.6, margin:0 }}>Вставьте блоки: первая строка - название группы, следующая строка - подгруппы. Для составных названий точнее всего разделять подгруппы символом <b>;</b>. Повторный импорт не создаёт дубликаты.</p>
+          <Textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={14} placeholder={'ChatGPT\nАккаунты; Подписка; Прочее\nClaude\nАккаунты; Токены; Услуги; Подписка'} />
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}><Btn variant="ghost" onClick={()=>setModal(null)}>Отмена</Btn><Btn loading={importing} onClick={importCatalog}>Импортировать</Btn></div>
+        </div>
       </Modal>}
 
       {deleteCat && <Modal title="Скрыть категорию?" onClose={() => setDeleteCat(null)} width={420}>

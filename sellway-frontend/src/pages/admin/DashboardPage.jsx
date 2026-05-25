@@ -15,7 +15,7 @@ function MiniChart({ data, color = C.accent, height = 52 }) {
 }
 
 function StatCard({ label, value, sub, trend = [], color = C.accent }) {
-  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 18px' }}>
+  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'16px 18px' }}>
     <div style={{ fontSize:11, color:C.t2, fontWeight:800, marginBottom:8 }}>{label}</div>
     <div style={{ fontSize:22, fontWeight:900, color, marginBottom:6 }}>{value}</div>
     {sub && <div style={{ fontSize:11, color:C.t3, marginBottom:8 }}>{sub}</div>}
@@ -25,11 +25,11 @@ function StatCard({ label, value, sub, trend = [], color = C.accent }) {
 
 function QuickSettings({ settings, onToggle }) {
   const items = [['autoissue','Авто-выдача ключей'],['notifications','Email-уведомления'],['moderation','Ручная модерация'],['twofa','2FA для админов'],['maintenance_mode','Режим обслуживания'],['new_seller_requires_verify','Верификация продавцов']];
-  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'18px 20px' }}><div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:16 }}>Быстрые настройки</div><div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))', gap:10 }}>{items.map(([key,label])=><div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 0' }}><span style={{ fontSize:12, color:C.t2 }}>{label}</span><Toggle value={settings[key]==='true'} onChange={v=>onToggle(key,v)} /></div>)}</div></div>;
+  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'18px 20px' }}><div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:16 }}>Быстрые настройки</div><div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))', gap:10 }}>{items.map(([key,label])=><div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 0' }}><span style={{ fontSize:12, color:C.t2 }}>{label}</span><Toggle value={settings[key]==='true'} onChange={v=>onToggle(key,v)} /></div>)}</div></div>;
 }
 
 function QuickAction({ title, sub, to }) {
-  return <Link to={to} style={{ textDecoration:'none', background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:'14px 16px', display:'flex', flexDirection:'column', gap:4 }}><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{title}</div><div style={{ fontSize:11, color:C.t2 }}>{sub}</div></Link>;
+  return <Link to={to} style={{ textDecoration:'none', background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'14px 16px', display:'flex', flexDirection:'column', gap:4 }}><div style={{ fontSize:13, fontWeight:800, color:C.t1 }}>{title}</div><div style={{ fontSize:11, color:C.t2 }}>{sub}</div></Link>;
 }
 
 function valueToString(raw, fallback='') {
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
       <QuickAction title="Услуги" sub="категории фрилансеров" to="/admin/service-categories" />
     </div>
 
-    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:18 }}>
+    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:18 }}>
       <div style={{ fontSize:15, fontWeight:900, color:C.t1, marginBottom:12 }}>Расчёт прибыли</div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10 }}>
         {[
@@ -111,18 +111,18 @@ export default function AdminDashboard() {
           ['Реферальные выплаты', `− ${money(rev.referral_total)}`, C.amber],
           ['Чистая прибыль', money(rev.profit_total), C.green],
           ['Сегодня чистыми', money(rev.profit_today), C.green],
-        ].map(([l,v,color]) => <div key={l} style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:10, padding:12 }}><div style={{ fontSize:11, color:C.t3 }}>{l}</div><div style={{ fontSize:18, color, fontWeight:900, marginTop:4 }}>{v}</div></div>)}
+        ].map(([l,v,color]) => <div key={l} style={{ background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:12 }}><div style={{ fontSize:11, color:C.t3 }}>{l}</div><div style={{ fontSize:18, color, fontWeight:900, marginTop:4 }}>{v}</div></div>)}
       </div>
     </div>
 
     <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(300px,.7fr)', gap:16 }}>
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
+      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 18px', borderBottom:`1px solid ${C.border}` }}><span style={{ fontSize:14, fontWeight:800, color:C.t1 }}>Последние заказы</span><Link to="/admin/orders" style={{ fontSize:12, color:C.accent, textDecoration:'none' }}>Все</Link></div>
         {orders.length === 0 ? <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>Нет заказов</div> : orders.map(o => <div key={o.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:12, padding:'12px 18px', borderBottom:`1px solid ${C.border}`, alignItems:'center' }}><div><div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>{o.product_title?.slice(0,45)}</div><div style={{ fontSize:10, color:C.accent, fontFamily:'monospace', marginTop:2 }}>{o.order_number}</div><div style={{ fontSize:10, color:C.t3 }}>{o.buyer_name} → {o.seller_name}</div><SellerMeta seller={o} compact /></div><StatusBadge status={o.status}/><div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{money(o.amount)}</div></div>)}
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
         <QuickSettings settings={settings} onToggle={handleToggle} />
-        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}><div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`, fontSize:13, fontWeight:800, color:C.t1 }}>Системные логи</div>{logs.length === 0 ? <div style={{ padding:24, textAlign:'center', color:C.t3, fontSize:12 }}>Нет логов</div> : logs.map((l,i)=><div key={i} style={{ padding:'10px 18px', borderBottom:`1px solid ${C.border}`, fontSize:11 }}><div style={{ color:C.t2 }}>{l.action}</div><div style={{ color:C.t3, marginTop:3 }}>{new Date(l.created_at).toLocaleTimeString('ru')} {l.username ? `· ${l.username}` : ''}</div></div>)}</div>
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}><div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`, fontSize:13, fontWeight:800, color:C.t1 }}>Системные логи</div>{logs.length === 0 ? <div style={{ padding:24, textAlign:'center', color:C.t3, fontSize:12 }}>Нет логов</div> : logs.map((l,i)=><div key={i} style={{ padding:'10px 18px', borderBottom:`1px solid ${C.border}`, fontSize:11 }}><div style={{ color:C.t2 }}>{l.action}</div><div style={{ color:C.t3, marginTop:3 }}>{new Date(l.created_at).toLocaleTimeString('ru')} {l.username ? `· ${l.username}` : ''}</div></div>)}</div>
       </div>
     </div>
   </div></AdminLayout>;

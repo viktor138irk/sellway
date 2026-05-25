@@ -19,7 +19,7 @@ function ProductCard({ p, compact }) {
     <button type="button" onClick={() => navigate(`/product/${p.id}`)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: hov ? C.cardHov : C.card, border: `1px solid ${hov ? C.accent + '55' : C.border}`, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', transition: 'all .18s', display: 'flex', flexDirection: 'column', textAlign: 'left', padding: 0, fontFamily: 'inherit', minWidth: 0, boxShadow: hov ? C.shadow : 'none' }}>
       <div style={{ position: 'relative', height: imageSize, background: C.media, overflow: 'hidden' }}>
-        {img ? <img src={img} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .3s', transform: hov ? 'scale(1.04)' : 'scale(1)' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: compact ? 30 : 38 }}>{service ? '🧑‍💻' : '📦'}</div>}
+        {img ? <img src={img} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .3s', transform: hov ? 'scale(1.04)' : 'scale(1)' }} /> : <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', gap:5, alignItems:'center', justifyContent:'center', color:C.t3 }}><span style={{ fontFamily:'var(--sw-serif)', fontSize:compact ? 27 : 32 }}>{String(p.title || 'S').slice(0,1)}</span><span style={{ fontSize:10, textTransform:'uppercase' }}>{service ? 'Услуга' : 'Товар'}</span></div>}
         <div style={{ position: 'absolute', top: 7, left: 7, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {disc > 0 && <span style={{ background: C.red, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>-{disc}%</span>}
           {service && <span style={{ background: C.accent, color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6 }}>Услуга</span>}
@@ -110,7 +110,7 @@ export default function CatalogPage() {
       <aside style={{ width: isMobile ? '100%' : 230, flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 12, overflowX: isMobile ? 'auto' : 'visible', alignItems: isMobile ? 'stretch' : 'normal' }}>
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, minWidth: isMobile ? 280 : 'auto' }}>
           <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: C.t3, marginBottom: 12 }}>Категории</div>
-          <CategoryRow cat={{ name: kind === 'services' ? 'Все услуги' : 'Все товары', emoji: '•' }} active={!category} onClick={() => setParam('category', '')} />
+          <CategoryRow cat={{ name: kind === 'services' ? 'Все услуги' : 'Все товары' }} active={!category} onClick={() => setParam('category', '')} />
           {rootCats.map(c => <CategoryRow key={c.id} cat={c} active={selectedRoot?.id === c.id && selectedCat?.id === c.id} onClick={() => setParam('category', c.slug)} />)}
           {selectedRoot && visibleChildren.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 11, color: C.t3, margin: '0 0 7px 10px' }}>Подкатегории</div>

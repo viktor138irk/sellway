@@ -488,4 +488,14 @@ router.post('/change-password', require('../middleware/auth').auth, [
   }
 });
 
+router.post('/logout-other-sessions', require('../middleware/auth').auth, async (req, res) => {
+  try {
+    await query('DELETE FROM refresh_tokens WHERE user_id=$1', [req.user.id]);
+    res.json({ message: 'Сессии отозваны. Текущий экран доступен до истечения access-токена, затем потребуется войти снова.' });
+  } catch (err) {
+    logger.error('Logout other sessions error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Не удалось завершить сессии' });
+  }
+});
+
 module.exports = router;

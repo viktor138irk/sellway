@@ -23,7 +23,8 @@ const SellerFinances   = lazy(() => import('./pages/seller/FinancesPage'));
 const SellerReferrals  = lazy(() => import('./pages/seller/ReferralsPage'));
 const SellerWithdrawal = lazy(() => import('./pages/seller/WithdrawalPage'));
 const SellerSettings   = lazy(() => import('./pages/seller/SettingsPage'));
-const SellerPlaceholder = lazy(() => import('./pages/seller/PlaceholderPage'));
+const SellerPromotions = lazy(() => import('./pages/seller/PromotionsPage'));
+const SellerReviews    = lazy(() => import('./pages/seller/ReviewsPage'));
 const PurchasesPage = lazy(() => import('./pages/profile/PurchasesPage'));
 const SettingsPage = lazy(() => import('./pages/profile/SettingsPage'));
 const AdminDashboard    = lazy(() => import('./pages/admin/DashboardPage'));
@@ -84,8 +85,8 @@ function AppRoutes() {
     <Route path="/seller/finances" element={<Protected roles={SELLER_ROLES}><SellerFinances/></Protected>}/>
     <Route path="/seller/referrals" element={<Protected roles={SELLER_ROLES}><SellerReferrals/></Protected>}/>
     <Route path="/seller/withdrawal" element={<Protected roles={SELLER_ROLES}><SellerWithdrawal/></Protected>}/>
-    <Route path="/seller/reviews" element={<Protected roles={SELLER_ROLES}><SellerPlaceholder type="reviews"/></Protected>}/>
-    <Route path="/seller/promo" element={<Protected roles={SELLER_ROLES}><SellerPlaceholder type="promo"/></Protected>}/>
+    <Route path="/seller/reviews" element={<Protected roles={SELLER_ROLES}><SellerReviews/></Protected>}/>
+    <Route path="/seller/promo" element={<Protected roles={SELLER_ROLES}><SellerPromotions/></Protected>}/>
     <Route path="/seller/settings" element={<Protected roles={SELLER_ROLES}><SellerSettings/></Protected>}/>
     <Route path="/profile/settings" element={<Protected><SettingsPage/></Protected>}/>
     <Route path="/admin" element={<Protected roles={['admin','moderator']}><AdminDashboard/></Protected>}/>
@@ -157,15 +158,15 @@ function PaymentSuccess() {
   const button = state.orderId ? 'Открыть заказ' : productId ? 'Вернуться к товару' : 'На главную';
 
   return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20, textAlign:'center' }}>
-    <div style={{ fontSize:56 }}>{loading ? '⏳' : ok ? '🎉' : canceled ? '⚠️' : '⌛'}</div>
+    <div style={{ fontFamily:'var(--sw-serif)', fontSize:18, letterSpacing:0, color:ok ? C.green : canceled ? C.red : C.accent, textTransform:'uppercase' }}>{loading ? 'Проверка' : ok ? 'Оплачено' : canceled ? 'Отменено' : 'В обработке'}</div>
     <h1 style={{ fontSize:26, fontWeight:900, color:C.t1 }}>{title}</h1>
     <p style={{ fontSize:14, color:C.t2, maxWidth:420 }}>{text}</p>
     <a href={href} style={{ background:C.accent, color:'#fff', borderRadius:10, padding:'11px 24px', textDecoration:'none', fontSize:14, fontWeight:700 }}>← {button}</a>
   </div>;
 }
-function NotFound() { return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20 }}><div style={{ fontSize:56 }}>🔍</div><h1 style={{ fontSize:26, fontWeight:900, color:C.t1 }}>404</h1><p style={{ fontSize:14, color:C.t2 }}>Страница не найдена</p><a href="/" style={{ color:C.accent, textDecoration:'none', fontSize:14, fontWeight:700 }}>← На главную</a></div>; }
+function NotFound() { return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16, padding:20 }}><div style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize:18 }}>SellWay</div><h1 style={{ fontSize:48, fontWeight:650, color:C.t1, margin:0 }}>404</h1><p style={{ fontSize:14, color:C.t2 }}>Страница не найдена</p><a href="/" style={{ color:C.accent, textDecoration:'none', fontSize:14, fontWeight:700 }}>← На главную</a></div>; }
 function ThemedApp() {
   useTheme();
-  return <AuthProvider><ToastProvider><AnalyticsTags/><div style={{ minHeight:'100vh', background:C.bg, color:C.t1, fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}><AppRoutes/><footer style={{ borderTop:`1px solid ${C.border}`, padding:'20px', textAlign:'center', fontSize:12, color:C.t3, marginTop:40 }}>© 2025 SellWay · sellway.pro · Безопасный маркетплейс цифровых товаров и услуг · <a href="/terms" style={{ color:C.accent, textDecoration:'none' }}>Правила площадки</a></footer></div></ToastProvider></AuthProvider>;
+  return <AuthProvider><ToastProvider><AnalyticsTags/><div style={{ minHeight:'100vh', background:C.bg, color:C.t1, fontFamily:'var(--sw-sans)' }}><AppRoutes/><footer style={{ borderTop:`1px solid ${C.border}`, padding:'20px', textAlign:'center', fontSize:12, color:C.t3, marginTop:40 }}>© 2025 SellWay · sellway.pro · Безопасный маркетплейс цифровых товаров и услуг · <a href="/terms" style={{ color:C.accent, textDecoration:'none' }}>Правила площадки</a></footer></div></ToastProvider></AuthProvider>;
 }
 export default function App() { return <BrowserRouter><ThemeProvider><ThemedApp/></ThemeProvider></BrowserRouter>; }

@@ -1,8 +1,12 @@
 import client from './client';
 export const getDashboard   = () => client.get('/seller/dashboard');
 export const getTransactions = (params) => client.get('/seller/transactions', { params });
+export const getReviews = () => client.get('/seller/reviews');
 export const getReferrals   = () => client.get('/seller/referrals');
 export const applyReferrals = (data) => client.post('/seller/referrals/apply', data);
+export const getPromos = () => client.get('/seller/promos');
+export const createPromo = (data) => client.post('/seller/promos', data);
+export const disablePromo = (id) => client.delete(`/seller/promos/${id}`);
 export const requestWithdraw = (data) => client.post('/seller/withdrawal', data);
 export const getWithdrawConfig = () => client.get('/seller/withdrawal/config');
 export const saveAutoPayout = (data) => client.put('/seller/withdrawal/auto-payout', data);

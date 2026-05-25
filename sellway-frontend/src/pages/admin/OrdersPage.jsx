@@ -21,10 +21,10 @@ export default function AdminOrdersPage() {
     <AdminLayout>
       <div style={{ padding:'24px 28px' }} className="fade-in">
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <h1 style={{ fontSize:20, fontWeight:900, color:C.t1 }}>🛒 Все заказы</h1>
+          <h1 style={{ fontSize:28, fontWeight:650, color:C.t1 }}>Все заказы</h1>
           <div style={{ display:'flex', gap:8 }}>
             <div style={{ position:'relative' }}>
-              <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:C.t3, fontSize:13 }}>🔍</span>
+              <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:C.t3, fontSize:13 }}>?</span>
               <input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Номер заказа..."
                 style={{ background:C.card, border:`1px solid ${C.border}`, color:C.t1, borderRadius:8, padding:'7px 10px 7px 30px', fontSize:12, outline:'none', fontFamily:'inherit', width:200 }} />
             </div>
@@ -35,8 +35,8 @@ export default function AdminOrdersPage() {
           </div>
         </div>
         {loading ? <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:300 }}><Spinner size={36}/></div>
-        : <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 130px 130px 120px 90px 90px', gap:12, padding:'10px 18px', background:'#0A0A12', borderBottom:`1px solid ${C.border}` }}>
+        : <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 130px 130px 120px 90px 90px', gap:12, padding:'10px 18px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
               {['Заказ / Товар','Покупатель','Продавец','Сумма','Статус',''].map((h,i)=><div key={i} style={{ fontSize:10, fontWeight:800, color:C.t3, textTransform:'uppercase', letterSpacing:1 }}>{h}</div>)}
             </div>
             {orders.length===0 ? <div style={{ padding:40, textAlign:'center', color:C.t3 }}>Нет заказов</div>

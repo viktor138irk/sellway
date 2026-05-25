@@ -273,7 +273,7 @@ router.post('/:id/rate-buyer', auth, async (req, res) => {
          VALUES ($1,$2,$3,TRUE)`,
         [order.id, order.seller_id, `Продавец оценил покупателя на ${rating}/5.`]
       );
-      await notify.create(order.buyer_id, 'review_new', '⭐ Вам поставили оценку', `Продавец оценил сделку ${order.order_number} на ${rating}/5.`, `/orders/${order.id}`).catch(() => {});
+      await notify.create(order.buyer_id, 'review_new', 'Вам поставили оценку', `Продавец оценил сделку ${order.order_number} на ${rating}/5.`, `/orders/${order.id}`).catch(() => {});
       return res.json({ review });
     });
   } catch (err) {

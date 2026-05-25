@@ -23,7 +23,7 @@ const DELIVERY = {
 function money(v) { return Number(v || 0).toLocaleString('ru') + ' ₽'; }
 function isService(p) { return p.delivery_type === 'service'; }
 function CategoryIcon({ product, size = 20 }) {
-  return <span style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', background: '#0A0A14', border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+  return <span style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', background: C.media, border: `1px solid ${C.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
     {product.category_image_url ? <img src={product.category_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: Math.max(10, size * .45), fontWeight: 900, color: C.t2 }}>{String(product.category_name || '?').trim().slice(0, 1).toUpperCase()}</span>}
   </span>;
 }
@@ -111,10 +111,10 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
     <Modal title={startEditing ? (isService(product) ? 'Редактировать услугу' : 'Редактировать товар') : (isService(product) ? 'Модерация услуги' : 'Модерация товара')} onClose={onClose} width={760}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {images.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
-          {images.map((url, i) => <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 12, objectFit: 'cover', border: `1px solid ${C.border}` }} />)}
+          {images.map((url, i) => <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', border: `1px solid ${C.border}` }} />)}
         </div>}
 
-        <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
+        <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'start', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 900, color: C.t1 }}>{product.title}</div>
@@ -128,20 +128,20 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
               ['Создан', product.created_at ? new Date(product.created_at).toLocaleString('ru') : '—'],
               ['Гарантия', product.guarantee_days ? `${product.guarantee_days} дн.` : isService(product) ? 'по договоренности' : 'Нет'],
               ['Статус', STATUS_STYLE[product.status]?.label || product.status],
-            ].map(([l, v]) => <div key={l} style={{ background: '#111119', border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}><div style={{ color: C.t3, fontSize: 11, marginBottom: 3 }}>{l}</div><div style={{ color: C.t1, fontWeight: 700, fontSize: 12 }}>{v}</div></div>)}
+            ].map(([l, v]) => <div key={l} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10 }}><div style={{ color: C.t3, fontSize: 11, marginBottom: 3 }}>{l}</div><div style={{ color: C.t1, fontWeight: 700, fontSize: 12 }}>{v}</div></div>)}
           </div>
           <SellerMeta seller={product} />
         </div>
 
-        {product.description && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+        {product.description && <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
           <div style={{ fontSize: 11, color: C.t3, marginBottom: 8, fontWeight: 800 }}>ОПИСАНИЕ</div>
           <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.6, maxHeight: 170, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{product.description}</div>
         </div>}
 
-        {isService(product) && <div style={{ background: '#10101F', border: `1px solid ${C.accent}33`, borderRadius: 14, padding: 14 }}>
+        {isService(product) && <div style={{ background: C.infoBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
           <div style={{ fontSize: 12, color: C.accent, fontWeight: 900, marginBottom: 8 }}>Услуга: цена от, финальная смета утверждается в сделке</div>
           {steps.length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {steps.map((s, i) => <div key={i} style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+            {steps.map((s, i) => <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><b style={{ color: C.t1, fontSize: 13 }}>{s.title}</b><span style={{ color: C.t2, fontSize: 12 }}>{s.price ? money(s.price) : 'по смете'}</span></div>
               {s.description && <div style={{ color: C.t3, fontSize: 12, marginTop: 4 }}>{s.description}</div>}
             </div>)}
@@ -149,10 +149,10 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
         </div>}
 
         {product.tags?.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {product.tags.map(t => <span key={t} style={{ fontSize: 11, background: '#1A1A28', color: C.t2, padding: '4px 10px', borderRadius: 8 }}>#{t}</span>)}
+          {product.tags.map(t => <span key={t} style={{ fontSize: 11, background: C.soft, color: C.t2, padding: '4px 10px', borderRadius: 8 }}>#{t}</span>)}
         </div>}
 
-        {canManage && editing && <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:14, padding:14, display:'grid', gap:12 }}>
+        {canManage && editing && <div style={{ background:C.infoBg, border:`1px solid ${C.border}`, borderRadius:8, padding:14, display:'grid', gap:12 }}>
           <div style={{ fontWeight:900, color:C.t1, fontSize:13 }}>Редактирование опубликованной позиции</div>
           <Input label="Название" value={draft.title} onChange={e => setDraft(d => ({ ...d, title:e.target.value }))} />
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -165,18 +165,18 @@ function ProductDetail({ product, onClose, onAction, onChanged, canManage, start
           <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}><Btn variant="ghost" onClick={() => setEditing(false)}>Отмена</Btn><Btn loading={loading === 'save'} onClick={saveEdit}>Сохранить</Btn></div>
         </div>}
 
-        {canManage && product.delivery_type === 'auto' && <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:14, padding:14 }}>
+        {canManage && product.delivery_type === 'auto' && <div style={{ background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:14 }}>
           <div style={{ fontSize:12, fontWeight:900, color:C.t1, marginBottom:10 }}>Остаток ключей: {keys.filter(key => !key.is_sold).length}</div>
           <Textarea rows={3} value={keysText} onChange={e => setKeysText(e.target.value)} placeholder="Новые ключи, по одному на строку" />
           <div style={{ display:'flex', justifyContent:'flex-end', marginTop:8 }}><Btn size="sm" variant="green" loading={loading === 'keys'} onClick={addInventory}>Добавить ключи</Btn></div>
           <div style={{ maxHeight:170, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginTop:10 }}>
-            {keys.filter(key => !key.is_sold).map(key => <div key={key.id} style={{ display:'flex', gap:8, alignItems:'center', background:'#111119', borderRadius:8, padding:'7px 9px' }}><code style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', color:C.t2, fontSize:11 }}>{key.key_value}</code><Btn size="sm" variant="danger" onClick={() => removeKey(key.id)}>Удалить</Btn></div>)}
+            {keys.filter(key => !key.is_sold).map(key => <div key={key.id} style={{ display:'flex', gap:8, alignItems:'center', background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'7px 9px' }}><code style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', color:C.t2, fontSize:11 }}>{key.key_value}</code><Btn size="sm" variant="danger" onClick={() => removeKey(key.id)}>Удалить</Btn></div>)}
           </div>
         </div>}
 
         {showReject && <div>
           <label style={{ fontSize: 12, fontWeight: 800, color: C.t2, display: 'block', marginBottom: 8 }}>Причина отклонения</label>
-          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Напишите причину для автора..." style={{ width: '100%', background: '#0A0A12', border: `1px solid ${C.red}44`, borderRadius: 10, padding: '11px 13px', color: C.t1, fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'vertical' }} />
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Напишите причину для автора..." style={{ width: '100%', background: C.field, border: `1px solid ${C.red}44`, borderRadius: 8, padding: '11px 13px', color: C.t1, fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'vertical' }} />
         </div>}
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -201,9 +201,9 @@ function ModerationCard({ product, filter, onSelect, onAction, published }) {
   const [, deliveryLabel] = DELIVERY[product.delivery_type] || ['Товар', product.delivery_type || '—'];
   const service = isService(product);
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ height: 156, background: '#0A0A12', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {product.main_image ? <img src={product.main_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 46 }}>{service ? '🧑‍💻' : '📦'}</span>}
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: 156, background: C.media, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {product.main_image ? <img src={product.main_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize: 42 }}>{String(product.title || '?').trim().slice(0, 1).toUpperCase()}</span>}
         <span style={{ position: 'absolute', top: 10, left: 10, fontSize: 10, fontWeight: 900, padding: '4px 9px', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
         <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, fontWeight: 900, padding: '4px 9px', borderRadius: 20, background: service ? C.accent + '22' : C.green + '22', color: service ? C.accent : C.green }}>{service ? 'УСЛУГА' : 'ТОВАР'}</span>
       </div>
@@ -214,8 +214,8 @@ function ModerationCard({ product, filter, onSelect, onAction, published }) {
           <SellerMeta seller={product} compact />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Цена</div><div style={{ fontSize: 14, fontWeight: 900, color: C.t1 }}>{service ? 'от ' : ''}{money(product.price)}</div></div>
-          <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 10, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Тип</div><div style={{ fontSize: 12, fontWeight: 800, color: C.t2 }}>{deliveryLabel}</div></div>
+          <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Цена</div><div style={{ fontSize: 14, fontWeight: 900, color: C.t1 }}>{service ? 'от ' : ''}{money(product.price)}</div></div>
+          <div style={{ background: C.field, border: `1px solid ${C.border}`, borderRadius: 8, padding: 9 }}><div style={{ fontSize: 10, color: C.t3 }}>Тип</div><div style={{ fontSize: 12, fontWeight: 800, color: C.t2 }}>{deliveryLabel}</div></div>
         </div>
         {product.short_desc && <div style={{ fontSize: 12, color: C.t2, lineHeight: 1.45, minHeight: 34 }}>{product.short_desc}</div>}
         <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
@@ -282,7 +282,7 @@ export default function ProductsModerationPage({ view = 'moderation' }) {
       <div style={{ padding: 'clamp(16px, 4vw, 28px)' }} className="fade-in">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 22, gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: C.t1 }}>{published ? '📦 Опубликованные товары и услуги' : '📥 Модерация товаров и услуг'}</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 650, color: C.t1 }}>{published ? 'Опубликованные товары и услуги' : 'Модерация товаров и услуг'}</h1>
             <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{published ? 'Редактируйте действующие позиции, управляйте ключами или снимайте публикации.' : 'Проверяйте новые и повторно отправленные на модерацию позиции.'}</div>
           </div>
           {!published && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -291,11 +291,11 @@ export default function ProductsModerationPage({ view = 'moderation' }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
-          {[['all', `Все · ${counts.all}`], ['products', `Товары · ${counts.products}`], ['services', `Услуги · ${counts.services}`]].map(([v, l]) => <button key={v} onClick={() => setKind(v)} style={{ background: kind === v ? '#1A1A28' : 'transparent', border: `1px solid ${kind === v ? C.accent + '66' : C.border}`, color: kind === v ? C.t1 : C.t2, borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>)}
+          {[['all', `Все · ${counts.all}`], ['products', `Товары · ${counts.products}`], ['services', `Услуги · ${counts.services}`]].map(([v, l]) => <button key={v} onClick={() => setKind(v)} style={{ background: kind === v ? C.infoBg : 'transparent', border: `1px solid ${kind === v ? C.accent + '66' : C.border}`, color: kind === v ? C.t1 : C.t2, borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>)}
         </div>
 
         {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}><Spinner size={36} /></div>
-        : visible.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 60, textAlign: 'center', color: C.t3 }}><div style={{ fontSize: 40, marginBottom: 12 }}>✅</div><div style={{ fontSize: 15, color: C.t2 }}>Нет позиций в этом фильтре</div></div>
+        : visible.length === 0 ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 60, textAlign: 'center', color: C.t3 }}><div style={{ fontFamily:'var(--sw-serif)', color:C.accent, fontSize: 24, marginBottom: 12 }}>Catalog</div><div style={{ fontSize: 15, color: C.t2 }}>Нет позиций в этом фильтре</div></div>
         : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
             {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} published={published} />)}
           </div>}

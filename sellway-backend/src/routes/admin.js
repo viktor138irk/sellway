@@ -330,7 +330,7 @@ router.post('/products/:id/approve', async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Товар не найден' });
 
     await notify.create(product.seller_id, 'system',
-      '✅ Товар одобрен',
+      'Товар одобрен',
       `Ваш товар "${product.title}" прошёл модерацию и опубликован.`,
       `/seller/products/${product.id}`
     );
@@ -355,7 +355,7 @@ router.post('/products/:id/reject', async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Товар не найден' });
 
     await notify.create(product.seller_id, 'system',
-      '❌ Товар отклонён',
+      'Товар отклонён',
       `Товар "${product.title}" отклонён. Причина: ${reason}`,
       `/seller/products/${product.id}`
     );
@@ -468,15 +468,15 @@ router.post('/disputes/:id/resolve', requireRole('admin'), async (req, res) => {
         // Возврат покупателю
         await client.query("UPDATE orders SET status='refunded' WHERE id=$1", [dispute.order_id]);
         await client.query('UPDATE wallets SET balance=balance+$1, held=held-$1 WHERE user_id=$2', [dispute.amount, dispute.buyer_id]);
-        await notify.create(dispute.buyer_id, 'order_confirmed', '✅ Спор решён в вашу пользу', `Возврат ${dispute.amount} ₽`);
-        await notify.create(dispute.seller_id, 'system', 'ℹ️ Спор решён', 'Спор решён в пользу покупателя');
+        await notify.create(dispute.buyer_id, 'order_confirmed', 'Спор решён в вашу пользу', `Возврат ${dispute.amount} ₽`);
+        await notify.create(dispute.seller_id, 'system', 'Спор решён', 'Спор решён в пользу покупателя');
       } else {
         // Деньги продавцу
         await client.query("UPDATE orders SET status='confirmed' WHERE id=$1", [dispute.order_id]);
         await client.query('UPDATE wallets SET held=held-$1 WHERE user_id=$2', [dispute.amount, dispute.buyer_id]);
         await client.query('UPDATE wallets SET balance=balance+$1 WHERE user_id=$2', [dispute.seller_amount, dispute.seller_id]);
-        await notify.create(dispute.seller_id, 'balance_credit', '✅ Спор решён в вашу пользу', `Зачислено ${dispute.seller_amount} ₽`);
-        await notify.create(dispute.buyer_id, 'system', 'ℹ️ Спор решён', 'Спор решён в пользу продавца');
+        await notify.create(dispute.seller_id, 'balance_credit', 'Спор решён в вашу пользу', `Зачислено ${dispute.seller_amount} ₽`);
+        await notify.create(dispute.buyer_id, 'system', 'Спор решён', 'Спор решён в пользу продавца');
       }
 
       logger.info('Dispute resolved', { disputeId: req.params.id, winner, adminId: req.user.id });

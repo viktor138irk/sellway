@@ -31,7 +31,7 @@ export default function LogsPage() {
       <div style={{ padding:'24px 28px' }} className="fade-in">
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
           <div>
-            <h1 style={{ fontSize:20, fontWeight:900, color:C.t1, marginBottom:2 }}>📋 Аудит-логи</h1>
+            <h1 style={{ fontSize:28, fontWeight:650, color:C.t1, marginBottom:2 }}>Аудит-логи</h1>
             <p style={{ fontSize:13, color:C.t2 }}>История действий пользователей и системы</p>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -41,15 +41,15 @@ export default function LogsPage() {
 
         {/* Search */}
         <div style={{ position:'relative', marginBottom:18, maxWidth:360 }}>
-          <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:C.t3, fontSize:14, pointerEvents:'none' }}>🔍</span>
+          <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:C.t3, fontSize:14, pointerEvents:'none' }}>?</span>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по действию, пользователю..."
             style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`, borderRadius:9, padding:'9px 12px 9px 36px', color:C.t1, fontSize:13, outline:'none', fontFamily:'inherit' }} />
         </div>
 
         {loading
           ? <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:300 }}><Spinner size={36}/></div>
-          : <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'140px 200px 1fr 100px', gap:12, padding:'10px 18px', background:'#0A0A12', borderBottom:`1px solid ${C.border}` }}>
+          : <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'140px 200px 1fr 100px', gap:12, padding:'10px 18px', background:C.field, borderBottom:`1px solid ${C.border}` }}>
                 {['Время','Действие','Детали','Пользователь'].map((h,i) => (
                   <div key={i} style={{ fontSize:10, fontWeight:800, color:C.t3, textTransform:'uppercase', letterSpacing:1 }}>{h}</div>
                 ))}

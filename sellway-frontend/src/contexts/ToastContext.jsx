@@ -16,8 +16,8 @@ export function ToastProvider({ children }) {
   const info    = useCallback((msg) => add(msg, 'info'), [add]);
   const warn    = useCallback((msg) => add(msg, 'warn', 4000), [add]);
 
-  const C = { success: '#34D399', error: '#F87171', info: '#7C6EFF', warn: '#FBBF24' };
-  const ICON = { success: '✓', error: '✕', info: 'ℹ', warn: '⚠' };
+  const C = { success: '#4D6B55', error: '#A43E34', info: '#B65239', warn: '#B87A32' };
+  const ICON = { success: 'OK', error: '!', info: 'i', warn: '!' };
 
   return (
     <ToastContext.Provider value={{ success, error, info, warn }}>
@@ -25,14 +25,14 @@ export function ToastProvider({ children }) {
       <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {toasts.map(t => (
           <div key={t.id} style={{
-            background: '#1A1A26', border: `1px solid ${C[t.type]}44`,
-            borderRadius: 12, padding: '13px 18px', minWidth: 280, maxWidth: 400,
+            background: 'var(--sw-card, #FFFDF9)', border: `1px solid ${C[t.type]}44`,
+            borderRadius: 8, padding: '13px 18px', minWidth: 280, maxWidth: 400,
             display: 'flex', alignItems: 'center', gap: 10,
             boxShadow: `0 4px 24px ${C[t.type]}22`,
             animation: 'slideIn .2s ease',
           }}>
             <span style={{ color: C[t.type], fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{ICON[t.type]}</span>
-            <span style={{ fontSize: 13, color: '#E8E8F0', flex: 1, lineHeight: 1.4 }}>{t.msg}</span>
+            <span style={{ fontSize: 13, color: 'var(--sw-text, #2C241F)', flex: 1, lineHeight: 1.4 }}>{t.msg}</span>
           </div>
         ))}
       </div>
