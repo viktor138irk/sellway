@@ -51,9 +51,10 @@ async function buyerOrderCreated(userId, order) {
 }
 
 async function buyerOrderConfirmed(userId, order) {
+  const service = order.delivery_type === 'service';
   return create(userId, 'order_confirmed',
-    '✅ Получение подтверждено',
-    `Заказ ${order.order_number} закрыт. Спасибо за покупку!`,
+    service ? '✅ Выполнение подтверждено' : '✅ Получение подтверждено',
+    service ? `Сделка ${order.order_number} по услуге завершена.` : `Заказ ${order.order_number} закрыт. Спасибо за покупку!`,
     `/orders/${order.id}`
   );
 }
@@ -77,9 +78,10 @@ async function sellerNewOrder(userId, order, product) {
 }
 
 async function sellerOrderConfirmed(userId, order) {
+  const service = order.delivery_type === 'service';
   return create(userId, 'order_confirmed',
     '💰 Оплата получена',
-    `Покупатель подтвердил получение по заказу ${order.order_number}. Зачислено: ${order.seller_amount} ₽`,
+    `${service ? 'Заказчик подтвердил выполнение' : 'Покупатель подтвердил получение'} по заказу ${order.order_number}. Зачислено: ${order.seller_amount} ₽`,
     `/orders/${order.id}`
   );
 }

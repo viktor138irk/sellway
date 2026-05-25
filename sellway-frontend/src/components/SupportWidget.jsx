@@ -8,6 +8,7 @@ export default function SupportWidget() {
   const { user } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [thread, setThread] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -17,6 +18,7 @@ export default function SupportWidget() {
     if (!user) return;
     try {
       const { data } = await getSupportChat();
+      setThread(data.thread || null);
       setMessages(data.messages || []);
     } catch {}
   }
@@ -40,7 +42,8 @@ export default function SupportWidget() {
     setText('');
     try {
       const { data } = await sendSupportMessage(body);
-      setMessages(prev => [...prev, data.message]);
+      setThread(data.thread || null);
+      setMessages(prev => thread?.id && data.thread?.id !== thread.id ? [data.message] : [...prev, data.message]);
     } catch {
       setText(body);
     } finally {
@@ -67,6 +70,7 @@ export default function SupportWidget() {
           </div>)}
           <div ref={bottomRef} />
         </div>
+        {thread?.status === 'closed' && <div style={{ padding:'8px 12px', color:C.t3, fontSize:11, borderTop:`1px solid ${C.border}` }}>Обращение закрыто. Новое сообщение начнет новый диалог.</div>}
         <form onSubmit={send} style={{ padding:10, borderTop:`1px solid ${C.border}`, display:'flex', gap:7 }}>
           <input value={text} onChange={e => setText(e.target.value)} placeholder="Ваш вопрос..." maxLength={2000} style={{ flex:1, minWidth:0, background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:9, padding:'9px 10px', color:C.t1, outline:'none', fontFamily:'inherit' }} />
           <Btn type="submit" size="sm" loading={sending} disabled={!text.trim()}>Отпр.</Btn>

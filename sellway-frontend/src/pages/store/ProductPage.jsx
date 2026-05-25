@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { C, Spinner, Btn, Stars, Modal, Badge, Textarea, Input } from '../../components/UI';
 import useMediaQuery from '../../hooks/useMediaQuery';
+import { BUYER_CHECKOUT_RULES_SHORT } from '../../content/platformRules';
 
 const money = v => `${parseFloat(v || 0).toLocaleString('ru')} ₽`;
 const isService = p => p?.delivery_type === 'service';
@@ -27,6 +28,7 @@ export default function ProductPage() {
   const [buyLoading, setBuyLoading] = useState(false);
   const [checkoutModal, setCheckoutModal] = useState(false);
   const [checkoutEmail, setCheckoutEmail] = useState('');
+  const [purchaseRulesAccepted, setPurchaseRulesAccepted] = useState(false);
   const [serviceMessage, setServiceMessage] = useState('');
   const [quantity, setQuantity] = useState(1);
   const isMobile = useMediaQuery('(max-width: 760px)');
@@ -68,8 +70,8 @@ export default function ProductPage() {
     if (product.delivery_type === 'auto' && product.keys_count < 1) return toast.warn('Товар не в наличии');
     if (product.delivery_type === 'auto' && quantity > product.keys_count) return toast.warn(`В наличии только ${product.keys_count} шт.`);
     if (product.delivery_type === 'file' && product.files_count < 1) return toast.warn('Файл для выдачи пока не загружен');
-    if (!user) return setCheckoutModal(true);
-    return startCheckout();
+    setPurchaseRulesAccepted(false);
+    return setCheckoutModal(true);
   }
 
   async function startCheckout(email = '') {
@@ -85,8 +87,9 @@ export default function ProductPage() {
 
   async function handleGuestCheckout(e) {
     e.preventDefault();
-    if (!checkoutEmail.trim()) return toast.warn('Укажите email');
-    await startCheckout(checkoutEmail.trim());
+    if (!purchaseRulesAccepted) return toast.warn('Подтвердите условия покупки');
+    if (!user && !checkoutEmail.trim()) return toast.warn('Укажите email');
+    await startCheckout(user ? '' : checkoutEmail.trim());
   }
 
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh' }}><Spinner size={40}/></div>;
@@ -195,10 +198,14 @@ export default function ProductPage() {
         {tab === 'reviews' && <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:24 }}>{!product.reviews?.length ? <div style={{ textAlign:'center', color:C.t3, padding:32 }}>Пока нет отзывов</div> : product.reviews.map((r,i)=><div key={i} style={{ borderTop:i?`1px solid ${C.border}`:'none', paddingTop:i?16:0, marginTop:i?16:0 }}><div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}><b style={{ color:C.t1, fontSize:13 }}>{r.buyer_name}</b><span style={{ fontSize:11, color:C.t3 }}>{new Date(r.created_at).toLocaleDateString('ru')}</span></div><Stars n={r.rating} size={12}/>{r.comment && <p style={{ fontSize:13, color:C.t2, lineHeight:1.55 }}>{r.comment}</p>}</div>)}</div>}
       </div>
 
-      {checkoutModal && <Modal title="Покупка без регистрации" onClose={()=>setCheckoutModal(false)}>
+      {checkoutModal && <Modal title={user ? 'Подтверждение заказа' : 'Покупка без регистрации'} onClose={()=>setCheckoutModal(false)}>
         <form onSubmit={handleGuestCheckout} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.t2, lineHeight:1.5 }}>Укажите email. Мы автоматически создадим аккаунт покупателя, отправим пароль на почту и перенаправим на оплату.</div>
-          <Input label="Email для доступа к покупке" type="email" value={checkoutEmail} onChange={e=>setCheckoutEmail(e.target.value)} placeholder="you@example.com" required />
+          {!user && <><div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:10, padding:'12px 16px', fontSize:13, color:C.t2, lineHeight:1.5 }}>Укажите email. Мы автоматически создадим аккаунт покупателя, отправим пароль на почту и перенаправим на оплату.</div>
+          <Input label="Email для доступа к покупке" type="email" value={checkoutEmail} onChange={e=>setCheckoutEmail(e.target.value)} placeholder="you@example.com" required /></>}
+          <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:'#0A0A12', border:`1px solid ${purchaseRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:10, padding:'12px 14px', cursor:'pointer' }}>
+            <input type="checkbox" checked={purchaseRulesAccepted} onChange={e=>setPurchaseRulesAccepted(e.target.checked)} style={{ marginTop:3, accentColor:C.accent }} />
+            <span style={{ color:C.t2, fontSize:12, lineHeight:1.6 }}>{BUYER_CHECKOUT_RULES_SHORT}{' '}<Link to="/terms" target="_blank" style={{ color:C.accent }}>Правила площадки</Link></span>
+          </label>
           <Btn type="submit" full loading={buyLoading}>Перейти к оплате</Btn>
         </form>
       </Modal>}

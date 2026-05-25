@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import SellerLayout from '../../components/Layout/SellerLayout';
 import { C, Spinner, Btn, Input, Select, Textarea, Modal } from '../../components/UI';
 import { getProducts, getProduct, createProduct, updateProduct, deleteProduct, uploadImages, uploadProductFile, addKeys, getKeys, getCategories } from '../../api/products';
 import { getCommercialStatus, acceptCommercialTerms } from '../../api/seller';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { SELLER_PUBLICATION_RULES_SHORT } from '../../content/platformRules';
 
 function roleMode(role) {
   return role === 'freelancer' ? 'service' : 'product';
@@ -144,6 +145,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
   const [parentCategoryId, setParentCategoryId] = useState('');
   const [serviceSteps, setServiceSteps] = useState([]);
   const [form, setForm] = useState({ title: '', short_desc: '', description: '', price: '', old_price: '', category_id: '', delivery_type: service ? 'service' : 'auto', guarantee_days: 0, tags: '' });
+  const [publicationRulesAccepted, setPublicationRulesAccepted] = useState(false);
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
   const setFromInput = k => e => set(k)(e.target.value);
   const rootCats = cats.filter(c => !c.parent_id);
@@ -172,6 +174,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
 
   async function handleSave() {
     if (!form.title || !form.price || !form.category_id) return toast.warn('Заполните обязательные поля');
+    if (!publicationRulesAccepted) return toast.warn(service ? 'Подтвердите правила публикации услуги' : 'Подтвердите правила публикации товара');
     if (!service && form.delivery_type === 'auto' && !keysText.trim() && existingKeys.filter(k => !k.is_sold).length === 0) return toast.warn('Добавьте ключи для автовыдачи');
     if (!service && form.delivery_type === 'file' && !productFile && !existingFile) return toast.warn('Прикрепите файл для выдачи');
     setSaving(true);
@@ -250,6 +253,14 @@ function ProductForm({ productId, onSave, onCancel, user }) {
       <div style={{ background: service ? '#10101F' : '#0A1A0A', border: `1px solid ${service ? C.accent + '44' : C.green + '33'}`, borderRadius: 10, padding: '12px 16px', fontSize: 12, color: service ? C.t2 : C.green, lineHeight: 1.5 }}>
         {service ? '💼 Для услуги указанная цена показывается как “от”. Финальная стоимость и этапы утверждаются с заказчиком внутри сделки, после чего средства резервируются.' : <>💡 После сохранения товар уйдёт на модерацию. Ваш доход: <strong>{form.price ? Math.floor(+form.price * 0.93).toLocaleString('ru') : '—'} ₽</strong></>}
       </div>
+
+      <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:'#0A0A12', border:`1px solid ${publicationRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:10, padding:'12px 14px', cursor:'pointer' }}>
+        <input type="checkbox" checked={publicationRulesAccepted} onChange={e=>setPublicationRulesAccepted(e.target.checked)} style={{ marginTop:3, accentColor:C.accent }} />
+        <span style={{ fontSize:12, lineHeight:1.6, color:C.t2 }}>
+          {service ? 'Публикуя услугу, исполнитель подтверждает, что услуга законна, соответствует описанию, не нарушает права третьих лиц и не запрещена к оказанию. Исполнитель несет ответственность за результат, сроки выполнения и согласованные условия.' : SELLER_PUBLICATION_RULES_SHORT}{' '}
+          <Link to="/terms" target="_blank" style={{ color:C.accent }}>Правила площадки</Link>
+        </span>
+      </label>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         <Btn variant="ghost" onClick={onCancel}>Отмена</Btn>

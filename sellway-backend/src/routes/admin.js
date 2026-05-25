@@ -156,7 +156,7 @@ router.get('/users', async (req, res) => {
 
   try {
     const { rows } = await query(
-      `SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified,
+      `SELECT u.id, u.email, u.username, u.avatar_url, u.role, u.status, u.email_verified,
               u.created_at, u.last_login_at,
               w.balance, s.rating, s.total_sales, s.verified AS seller_verified,
               s.custom_commission_rate, s.referral_code,

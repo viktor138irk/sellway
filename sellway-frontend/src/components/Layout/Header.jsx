@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { C } from '../UI';
 import { getNotifications, readAllNotifs, readNotif } from '../../api/seller';
 import useMediaQuery from '../../hooks/useMediaQuery';
+import UserAvatar from '../UserAvatar';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -128,8 +129,7 @@ export default function Header() {
   return <header className="site-header" style={{ background: '#0F0F18', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 4000 }}>
     <div className="site-header-row" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 10px' : '0 20px', height: 58, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14 }}>
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
-        <div style={{ width: 30, height: 30, background: `linear-gradient(135deg,${C.accent},#A78BFA)`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>S</div>
-        <span className="site-brand-text" style={{ fontSize: 17, fontWeight: 900, color: C.t1 }}>SellWay</span>
+        <img className="site-brand-logo" src="/brand-logo.png" alt="SellWay" style={{ display:'block', width:isMobile ? 112 : 130, height:40, objectFit:'contain' }} />
       </Link>
 
       <form className="site-search" onSubmit={handleSearch} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
@@ -162,11 +162,14 @@ export default function Header() {
           </div>
 
           <div ref={userRef} style={{ position: 'relative' }}>
-            <button type="button" onClick={() => { setShowUser(p => !p); setShowNotifs(false); }} aria-label="Меню пользователя" style={{ width: 34, height: 34, borderRadius: 9, background: C.accent, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>{user.username?.slice(0, 2).toUpperCase()}</button>
+            <button type="button" onClick={() => { setShowUser(p => !p); setShowNotifs(false); }} aria-label="Меню пользователя" style={{ width:34, height:34, padding:0, borderRadius:9, background:'transparent', border:`1px solid ${showUser ? C.accent : 'transparent'}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontFamily:'inherit', overflow:'hidden' }}><UserAvatar user={user} size={32} radius={8} /></button>
             {showUser && <div onClick={() => setShowUser(false)} style={userPanelStyle}>
-              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{user.username}</div>
-                <div style={{ fontSize: 11, color: C.t2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+              <div style={{ padding:'14px 16px', borderBottom:`1px solid ${C.border}`, display:'flex', gap:10, alignItems:'center' }}>
+                <UserAvatar user={user} size={36} />
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{user.username}</div>
+                  <div style={{ fontSize:11, color:C.t2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.email}</div>
+                </div>
               </div>
               {[[isSellerRole ? '/seller' : '/profile/purchases', isSellerRole ? 'Кабинет продавца' : 'Личный кабинет'], ['/profile/purchases', 'Покупки'], ['/profile/settings', 'Настройки'], ...(user.role === 'admin' ? [['/admin', 'Админ-панель']] : [])].map(([to, label]) => <Link key={to} to={to} style={{ display: 'block', padding: '10px 16px', fontSize: 13, color: C.t2, textDecoration: 'none', borderBottom: `1px solid ${C.border}` }}>{label}</Link>)}
               <button type="button" onClick={handleLogout} style={{ width: '100%', background: 'transparent', border: 'none', color: C.red, fontSize: 13, padding: '10px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>Выйти</button>

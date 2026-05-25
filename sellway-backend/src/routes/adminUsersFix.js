@@ -20,7 +20,7 @@ async function ensureSellerProfile(client, user) {
 
 router.get('/stats', async (req, res) => {
   try {
-    const [revenue, orders, users, disputes, products, payouts, trends, online] = await Promise.all([
+    const [revenue, orders, users, disputes, products, payouts, trends, online, support] = await Promise.all([
       query(`SELECT COALESCE(SUM(amount),0) AS gross_total,
                     COALESCE(SUM(CASE WHEN created_at > NOW()-INTERVAL '7 days' THEN amount END),0) AS gross_week,
                     COALESCE(SUM(CASE WHEN created_at::date=CURRENT_DATE THEN amount END),0) AS gross_today,
@@ -54,6 +54,7 @@ router.get('/stats', async (req, res) => {
              LEFT JOIN transactions rt ON rt.order_id=o.id AND rt.meta->>'source'='seller_referral'
              GROUP BY d::date ORDER BY d::date`),
       query(`SELECT COUNT(*) AS online FROM users WHERE last_login_at > NOW()-INTERVAL '15 minutes'`),
+      query(`SELECT COUNT(*)::int AS open FROM support_threads WHERE status='open'`),
     ]);
 
     const r = revenue.rows[0] || {};
@@ -66,7 +67,7 @@ router.get('/stats', async (req, res) => {
     const referralToday = Number(p.referral_today || 0);
     const avgDelivery = await query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (delivered_at-created_at))/60),0) AS avg_min FROM orders WHERE delivered_at IS NOT NULL AND created_at > NOW()-INTERVAL '7 days'`);
 
-    res.json({ revenue: { gross_total: r.gross_total || 0, gross_week: r.gross_week || 0, gross_today: r.gross_today || 0, commission_total: commissionTotal, commission_week: commissionWeek, commission_today: commissionToday, referral_total: referralTotal, referral_week: referralWeek, referral_today: referralToday, profit_total: Math.max(0, commissionTotal - referralTotal), profit_week: Math.max(0, commissionWeek - referralWeek), profit_today: Math.max(0, commissionToday - referralToday) }, orders: orders.rows[0], users: users.rows[0], disputes: disputes.rows[0], products: products.rows[0], avgDeliveryMin: Math.round(avgDelivery.rows[0].avg_min), online: Number(online.rows[0]?.online || 0), trend: trends.rows.map(x => ({ day: x.day, commission: Number(x.commission || 0), referral: Number(x.referral || 0), profit: Math.max(0, Number(x.commission || 0) - Number(x.referral || 0)) })) });
+    res.json({ revenue: { gross_total: r.gross_total || 0, gross_week: r.gross_week || 0, gross_today: r.gross_today || 0, commission_total: commissionTotal, commission_week: commissionWeek, commission_today: commissionToday, referral_total: referralTotal, referral_week: referralWeek, referral_today: referralToday, profit_total: Math.max(0, commissionTotal - referralTotal), profit_week: Math.max(0, commissionWeek - referralWeek), profit_today: Math.max(0, commissionToday - referralToday) }, orders: orders.rows[0], users: users.rows[0], disputes: disputes.rows[0], products: products.rows[0], support: support.rows[0], avgDeliveryMin: Math.round(avgDelivery.rows[0].avg_min), online: Number(online.rows[0]?.online || 0), trend: trends.rows.map(x => ({ day: x.day, commission: Number(x.commission || 0), referral: Number(x.referral || 0), profit: Math.max(0, Number(x.commission || 0) - Number(x.referral || 0)) })) });
   } catch (err) { logger.error('Admin stats fix error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -178,7 +179,7 @@ router.get('/users', async (req, res) => {
   const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
   params.push(Number(limit), offset);
   try {
-    const { rows } = await query(`SELECT u.id, u.email, u.username, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
+    const { rows } = await query(`SELECT u.id, u.email, u.username, u.avatar_url, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
     res.json({ users: rows });
   } catch (err) { logger.error('Admin users list error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });

@@ -79,7 +79,7 @@ export default function AdminDashboard() {
   return <AdminLayout><div style={{ padding:'24px 28px', display:'flex', flexDirection:'column', gap:20 }} className="fade-in">
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
       <div><h1 style={{ fontSize:22, fontWeight:900, color:C.t1, marginBottom:2 }}>Дашборд администратора</h1><div style={{ fontSize:12, color:C.t2 }}>{new Date().toLocaleDateString('ru', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</div></div>
-      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>{Number(s.products?.pending || 0) > 0 && <Link to="/admin/products" style={{ background:C.amber+'20', border:`1px solid ${C.amber}44`, color:C.amber, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:700, textDecoration:'none' }}>{s.products.pending} на модерации</Link>}{Number(s.disputes?.open || 0) > 0 && <Link to="/admin/disputes" style={{ background:C.red+'20', border:`1px solid ${C.red}44`, color:C.red, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:700, textDecoration:'none' }}>{s.disputes.open} споров</Link>}</div>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>{Number(s.products?.pending || 0) > 0 && <Link to="/admin/products" style={{ background:C.amber+'20', border:`1px solid ${C.amber}44`, color:C.amber, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:700, textDecoration:'none' }}>{s.products.pending} на модерации</Link>}{Number(s.disputes?.open || 0) > 0 && <Link to="/admin/disputes" style={{ background:C.red+'20', border:`1px solid ${C.red}44`, color:C.red, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:700, textDecoration:'none' }}>{s.disputes.open} споров</Link>}{Number(s.support?.open || 0) > 0 && <Link to="/admin/support" style={{ background:C.accent+'20', border:`1px solid ${C.accent}44`, color:C.accentL, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:700, textDecoration:'none' }}>{s.support.open} обращений</Link>}</div>
     </div>
 
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))', gap:12 }}>
@@ -96,6 +96,7 @@ export default function AdminDashboard() {
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))', gap:12 }}>
       <QuickAction title="Модерация" sub={`${s.products?.pending || 0} ожидают`} to="/admin/products" />
       <QuickAction title="Споры" sub={`${s.disputes?.open || 0} открытых`} to="/admin/disputes" />
+      <QuickAction title="Поддержка" sub={`${s.support?.open || 0} открытых`} to="/admin/support" />
       <QuickAction title="Пользователи" sub="роли, комиссии, рефералы" to="/admin/users" />
       <QuickAction title="Категории товаров" sub="каталог продавцов" to="/admin/categories" />
       <QuickAction title="Услуги" sub="категории фрилансеров" to="/admin/service-categories" />

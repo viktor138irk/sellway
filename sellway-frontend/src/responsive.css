@@ -152,6 +152,25 @@ textarea {
     right: 12px !important;
     bottom: 12px !important;
   }
+
+  .admin-support-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-support-threads {
+    height: 220px !important;
+    flex-shrink: 0;
+    border-right: 0 !important;
+    border-bottom: 1px solid #1e1e2e;
+  }
+
+  .admin-support-dialog {
+    height: min(620px, calc(100vh - 180px));
+    min-height: 420px;
+  }
 }
 
 @media (max-width: 640px) {

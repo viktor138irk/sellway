@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { C, Btn, Input } from '../../components/UI';
+import { REGISTRATION_RULES_SHORT } from '../../content/platformRules';
 
 function AuthWrap({ children, title, sub }) {
   return (
@@ -152,7 +153,8 @@ export function RegisterPage() {
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#0A0A12', border: `1px solid ${errors.termsAccepted ? C.red : C.border}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
           <input type="checkbox" checked={form.termsAccepted} onChange={e => setForm(f => ({ ...f, termsAccepted: e.target.checked }))} style={{ marginTop: 2, accentColor: C.accent }} />
           <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.5 }}>
-            Я принимаю <Link to="/terms" target="_blank" style={{ color: C.accent }}>правила площадки</Link> и условия безопасной сделки.
+            {REGISTRATION_RULES_SHORT}{' '}
+            <Link to="/terms" target="_blank" style={{ color: C.accent }}>Открыть правила площадки.</Link>
             {errors.termsAccepted && <span style={{ display: 'block', color: C.red, marginTop: 4 }}>{errors.termsAccepted}</span>}
           </span>
         </label>

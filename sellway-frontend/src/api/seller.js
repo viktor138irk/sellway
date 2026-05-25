@@ -1,5 +1,6 @@
 import client from './client';
 export const getDashboard   = () => client.get('/seller/dashboard');
+export const getTransactions = (params) => client.get('/seller/transactions', { params });
 export const getReferrals   = () => client.get('/seller/referrals');
 export const applyReferrals = (data) => client.post('/seller/referrals/apply', data);
 export const requestWithdraw = (data) => client.post('/seller/withdrawal', data);

@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { C } from '../../components/UI';
+import UserAvatar from '../../components/UserAvatar';
 
 const SECTIONS = [
   {
@@ -11,6 +12,7 @@ const SECTIONS = [
       ['/admin/products',   '📦', 'Модерация'],
       ['/admin/users',      '👥', 'Пользователи'],
       ['/admin/disputes',   '⚖️', 'Споры'],
+      ['/admin/support',    '💬', 'Поддержка'],
     ],
   },
   {
@@ -51,7 +53,7 @@ export default function AdminLayout({ children }) {
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 58px)', background: C.bg }}>
       <aside style={{ width: 220, background: '#0C0C14', borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto' }}>
         <div style={{ padding: '16px', borderBottom: `1px solid ${C.border}`, display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg,${C.accent},#A78BFA)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{user?.username?.[0]?.toUpperCase()}</div>
+          <UserAvatar user={user} size={36} radius={10} initialsLength={1} background={`linear-gradient(135deg,${C.accent},#A78BFA)`} />
           <div style={{ overflow: 'hidden' }}><div style={{ fontSize: 13, fontWeight: 700, color: C.t1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}</div><div style={{ fontSize: 10, color: C.accent, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Администратор</div></div>
         </div>
         <nav style={{ flex: 1, padding: '10px 8px' }}>

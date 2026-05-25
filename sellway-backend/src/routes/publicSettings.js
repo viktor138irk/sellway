@@ -9,8 +9,8 @@ router.get('/terms', async (req, res) => {
     );
     const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
     res.json({
-      title: settings.terms_title || 'Правила SellWay',
-      version: settings.terms_version || '1.0',
+      title: settings.terms_title || 'Правила торговой площадки SellWay.pro',
+      version: settings.terms_version || '2026-05-25',
       content: settings.terms_content || '',
     });
   } catch (err) {

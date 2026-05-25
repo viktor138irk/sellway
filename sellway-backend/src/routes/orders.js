@@ -174,9 +174,19 @@ router.post('/:id/deliver', auth, async (req, res) => {
       const { rows: [order] } = await client.query("SELECT * FROM orders WHERE id=$1 AND seller_id=$2 AND status='paid' FOR UPDATE", [req.params.id, req.user.id]);
       if (!order) throw { status: 404, message: 'Сделка не найдена или не готова к передаче' };
       await client.query("UPDATE orders SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours' WHERE id=$1", [order.id]);
-      await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, req.user.id, 'Исполнитель отметил заказ как переданный. Заказчик должен подтвердить получение.']);
-      await notify.create(order.buyer_id, 'order_delivered', 'Заказ передан', `Проверьте заказ ${order.order_number} и подтвердите получение.`, `/orders/${order.id}`).catch(() => {});
-      return res.json({ message: 'Заказ отмечен как переданный' });
+      const service = order.delivery_type === 'service';
+      const systemMessage = service
+        ? 'Фрилансер отметил услугу как выполненную. Заказчик должен подтвердить результат.'
+        : 'Продавец отметил товар как переданный. Покупатель должен подтвердить получение.';
+      await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, req.user.id, systemMessage]);
+      await notify.create(
+        order.buyer_id,
+        service ? 'service_delivered' : 'order_delivered',
+        service ? 'Услуга выполнена' : 'Заказ передан',
+        service ? `Проверьте результат по сделке ${order.order_number} и подтвердите выполнение.` : `Проверьте заказ ${order.order_number} и подтвердите получение.`,
+        `/orders/${order.id}`
+      ).catch(() => {});
+      return res.json({ message: service ? 'Услуга отмечена как выполненная' : 'Заказ отмечен как переданный' });
     });
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
@@ -205,11 +215,14 @@ router.post('/:id/confirm', auth, async (req, res) => {
       const referral = await paySellerReferral(client, order);
       await client.query('UPDATE products SET sales_count=sales_count+1 WHERE id=$1', [order.product_id]);
       const referralText = referral?.paid ? ` Реферальная выплата: ${referral.amount.toLocaleString('ru')} ₽.` : '';
-      await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, order.buyer_id, `Покупатель подтвердил получение. Средства переведены продавцу.${referralText}`]);
+      const confirmationMessage = order.delivery_type === 'service'
+        ? `Заказчик подтвердил выполнение услуги. Средства переведены исполнителю.${referralText}`
+        : `Покупатель подтвердил получение. Средства переведены продавцу.${referralText}`;
+      await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, order.buyer_id, confirmationMessage]);
       await notify.sellerOrderConfirmed(order.seller_id, order).catch(() => {});
       await notify.buyerOrderConfirmed(order.buyer_id, order).catch(() => {});
       logger.info('Order confirmed', { orderId: order.id, referralPaid: referral?.amount || 0 });
-      return res.json({ message: 'Получение подтверждено. Средства переведены продавцу.', referral });
+      return res.json({ message: order.delivery_type === 'service' ? 'Выполнение подтверждено. Средства переведены исполнителю.' : 'Получение подтверждено. Средства переведены продавцу.', referral });
     });
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Confirm order error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });

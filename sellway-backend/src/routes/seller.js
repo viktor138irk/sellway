@@ -9,7 +9,7 @@ const logger = require('../config/logger');
 const { canUseReferralProgram, referralRequirements } = require('../services/referralEligibility');
 const { describeCommercialAccess } = require('../services/commercialAccess');
 
-router.use(auth, requireRole('seller', 'freelancer', 'admin'));
+router.use(auth);
 
 const avatarUpload = multer({
   storage: multer.diskStorage({
@@ -53,6 +53,8 @@ router.post('/avatar', avatarUpload.single('avatar'), async (req, res) => {
   }
 });
 
+router.use(requireRole('seller', 'freelancer', 'admin'));
+
 router.get('/dashboard', async (req, res) => {
   try {
     const [wallet, seller, recentOrders, products, referralStats] = await Promise.all([
@@ -82,6 +84,52 @@ router.get('/dashboard', async (req, res) => {
       },
     });
   } catch (err) { logger.error('Seller dashboard error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+router.get('/transactions', async (req, res) => {
+  const filter = ['all', 'income', 'expenses', 'withdrawals'].includes(req.query.filter) ? req.query.filter : 'all';
+  const params = [req.user.id];
+  const where = filter === 'income'
+    ? "WHERE h.entry_kind='income'"
+    : filter === 'expenses'
+      ? "WHERE h.entry_kind='expense'"
+      : filter === 'withdrawals'
+        ? "WHERE h.entry_kind='withdrawal'"
+        : '';
+  try {
+    const { rows } = await query(
+      `SELECT h.*
+       FROM (
+         SELECT t.id, t.type::text AS type, t.amount, t.description, t.created_at,
+                t.order_id, NULL::uuid AS withdrawal_id, NULL::text AS status, NULL::text AS method,
+                o.order_number, p.title AS product_title,
+                CASE
+                  WHEN t.type IN ('credit','refund') THEN 'income'
+                  WHEN t.type IN ('hold','debit','commission') THEN 'expense'
+                  ELSE 'operation'
+                END AS entry_kind
+         FROM transactions t
+         LEFT JOIN orders o ON o.id=t.order_id
+         LEFT JOIN products p ON p.id=o.product_id
+         WHERE t.user_id=$1
+         UNION ALL
+         SELECT w.id, 'withdrawal' AS type, w.amount,
+                'Заявка на вывод средств' AS description, w.created_at,
+                NULL::uuid AS order_id, w.id AS withdrawal_id, w.status::text AS status, w.method::text AS method,
+                NULL::text AS order_number, NULL::text AS product_title, 'withdrawal' AS entry_kind
+         FROM withdrawal_requests w
+         WHERE w.user_id=$1
+       ) h
+       ${where}
+       ORDER BY h.created_at DESC
+       LIMIT 100`,
+      params
+    );
+    res.json({ transactions: rows, filter });
+  } catch (err) {
+    logger.error('Seller transactions error', { err: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Ошибка загрузки истории транзакций' });
+  }
 });
 
 router.get('/referrals', requireApprovedCommercial, async (req, res) => {

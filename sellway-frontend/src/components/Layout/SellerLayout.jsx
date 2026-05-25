@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { C, Stars } from '../UI';
 import useMediaQuery from '../../hooks/useMediaQuery';
+import UserAvatar from '../UserAvatar';
 
 const BASE_NAV = [
   ['/seller', '📊', 'Дашборд'],
@@ -26,9 +27,7 @@ export default function SellerLayout({ children }) {
     <div className="seller-shell" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: isMobile ? 'auto' : 'calc(100vh - 90px)', width: '100%', minWidth: 0 }}>
       <aside className="seller-sidebar" style={{ width: isMobile ? '100%' : 220, background: '#0F0F18', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', flexShrink: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'column', alignItems: 'stretch', overflow: 'hidden' }}>
         <div className="seller-identity" style={{ padding: isMobile ? '12px 14px' : '20px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <div style={{ width: isMobile ? 40 : 58, height: isMobile ? 40 : 58, borderRadius: 14, background: `linear-gradient(135deg,${C.accent},#A78BFA)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 14 : 20, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
-            {user?.username?.slice(0, 2).toUpperCase()}
-          </div>
+          <UserAvatar user={user} size={isMobile ? 40 : 58} radius={14} background={`linear-gradient(135deg,${C.accent},#A78BFA)`} />
           <div style={{ textAlign: isMobile ? 'left' : 'center', minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.t1 }}>{user?.username}</div>
             <div style={{ fontSize: 11, color: C.t2, marginTop: 2 }}>{roleLabel}</div>

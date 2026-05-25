@@ -95,14 +95,21 @@ router.post('/:id/accept-proposal', auth, async (req, res) => {
 });
 
 router.post('/:id/deliver', auth, requireRole('freelancer', 'admin'), async (req, res) => {
+  const result = String(req.body?.result || '').trim().slice(0, 4000);
   try {
     await transaction(async (client) => {
       const { rows: [order] } = await client.query("SELECT * FROM orders WHERE id=$1 AND delivery_type='service' AND seller_id=$2 AND status='paid' FOR UPDATE", [req.params.id, req.user.id]);
-      if (!order) throw { status: 404, message: 'Сделка не найдена или не готова к передаче' };
-      await client.query("UPDATE orders SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours' WHERE id=$1", [order.id]);
+      if (!order) throw { status: 404, message: 'Сделка не найдена или не готова к завершению' };
+      const meta = order.meta && typeof order.meta === 'object' ? order.meta : {};
+      meta.service_delivery = { result, delivered_at: new Date().toISOString() };
+      await client.query("UPDATE orders SET status='delivered', delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=$1::jsonb WHERE id=$2", [JSON.stringify(meta), order.id]);
+      if (result) {
+        await client.query('INSERT INTO order_messages (order_id, sender_id, message) VALUES ($1,$2,$3)', [order.id, req.user.id, result]);
+      }
       await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, req.user.id, 'Фрилансер отметил услугу как выполненную. Заказчик должен подтвердить результат.']);
       await notify.create(order.buyer_id, 'service_delivered', 'Услуга выполнена', `Проверьте результат по сделке ${order.order_number}`, `/orders/${order.id}`).catch(() => {});
-      return res.json({ message: 'Услуга отмечена как выполненная' });
+      logger.info('Service marked delivered', { orderId: order.id, sellerId: req.user.id });
+      return res.json({ message: 'Результат отправлен заказчику. Услуга отмечена как выполненная.' });
     });
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); return res.status(500).json({ error: 'Ошибка сервера' }); }
 });
