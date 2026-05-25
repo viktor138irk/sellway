@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap>
-    <loc>https://sellway.pro/api/seo/sitemap.xml</loc>
-  </sitemap>
-</sitemapindex>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://sellway.pro/</loc></url>
+  <url><loc>https://sellway.pro/catalog?kind=products</loc></url>
+  <url><loc>https://sellway.pro/catalog?kind=services</loc></url>
+  <url><loc>https://sellway.pro/terms</loc></url>
+</urlset>

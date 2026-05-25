@@ -1,0 +1,40 @@
+# Индексация SellWay.pro
+
+## Публичные файлы
+
+- Robots: `https://sellway.pro/robots.txt`
+- Sitemap: `https://sellway.pro/sitemap.xml`
+
+После `bash scripts/update.sh` карта сайта создаётся заново из опубликованных
+товаров и категорий и копируется в корневую директорию сайта FastPanel.
+
+Проверка на сервере:
+
+```bash
+curl -I https://sellway.pro/robots.txt
+curl -I https://sellway.pro/sitemap.xml
+curl -s https://sellway.pro/sitemap.xml | head -30
+```
+
+Оба URL должны возвращать `HTTP/2 200` или `HTTP/1.1 200 OK`; в `sitemap.xml`
+должны быть адреса `/product/<id>` опубликованных товаров.
+
+## Яндекс Вебмастер
+
+1. Добавить сайт `https://sellway.pro` и подтвердить владение доменом.
+2. Открыть `Индексирование` -> `Файлы Sitemap`.
+3. Добавить `https://sellway.pro/sitemap.xml`.
+4. В `Проверка страницы` отправить на переобход главную страницу и несколько
+   опубликованных товаров.
+
+## Google Search Console
+
+1. Добавить ресурс домена `sellway.pro` или URL-ресурс `https://sellway.pro/`
+   и подтвердить владение.
+2. Открыть `Sitemaps`.
+3. Ввести `sitemap.xml` и отправить.
+4. Через `URL inspection` запросить индексирование главной страницы и важных
+   товарных карточек.
+
+Отправка sitemap сообщает поисковой системе об адресах, но появление в выдаче
+занимает время и зависит от качества, доступности и содержимого страниц.

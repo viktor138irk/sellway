@@ -205,6 +205,34 @@ post_update_healthcheck() {
   fail "Update finished but API is not healthy. Check .env, database and PM2 logs."
 }
 
+publish_sitemap() {
+  local api_sitemap="http://127.0.0.1:${API_PORT}/api/seo/sitemap.xml"
+  local target="${SITE_ROOT}/sitemap.xml"
+  local tmp="/tmp/sellway-sitemap.xml"
+
+  log "Publishing product sitemap in FastPanel site root"
+  if curl -fsS "$api_sitemap" -o "$tmp"; then
+    cp "$tmp" "$target"
+    printf 'Sitemap: %s\n' "${FRONTEND_URL%/}/sitemap.xml"
+  else
+    warn "Cannot generate product sitemap from ${api_sitemap}; the fallback static sitemap remains published."
+  fi
+}
+
+check_public_sitemap() {
+  local public_sitemap="${FRONTEND_URL%/}/sitemap.xml"
+
+  log "Checking public sitemap for search engines"
+  if curl -fsS "$public_sitemap" >/tmp/sellway-sitemap-public.xml 2>/tmp/sellway-sitemap.err &&
+     grep -q '<urlset' /tmp/sellway-sitemap-public.xml; then
+    printf 'Public sitemap: OK - %s\n' "$public_sitemap"
+    return
+  fi
+
+  warn "Public sitemap is unavailable or invalid: ${public_sitemap}"
+  warn "Google and Yandex will not discover all product URLs until this URL returns XML with HTTP 200."
+}
+
 finish() {
   cat <<EOF
 
@@ -227,4 +255,6 @@ run_migrations
 update_frontend
 restart_services
 post_update_healthcheck
+publish_sitemap
+check_public_sitemap
 finish

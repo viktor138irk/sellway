@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
-Allow: /api/seo/sitemap.xml
 Disallow: /admin/
 Disallow: /seller/
 Disallow: /profile
@@ -8,5 +7,5 @@ Disallow: /orders/
 Disallow: /payment/
 Disallow: /api/
 
-Sitemap: https://sellway.pro/api/seo/sitemap.xml
+Sitemap: https://sellway.pro/sitemap.xml
 Host: sellway.pro

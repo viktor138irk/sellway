@@ -462,6 +462,20 @@ install_pm2() {
   pm2 save
 }
 
+publish_sitemap() {
+  local api_sitemap="http://127.0.0.1:${API_PORT}/api/seo/sitemap.xml"
+  local target="${SITE_ROOT}/sitemap.xml"
+  local tmp="/tmp/sellway-sitemap.xml"
+
+  log "Publishing product sitemap in site root"
+  if curl -fsS "$api_sitemap" -o "$tmp"; then
+    cp "$tmp" "$target"
+    printf 'Sitemap: %s\n' "${FRONTEND_URL%/}/sitemap.xml"
+  else
+    warn "Cannot generate product sitemap. The fallback static sitemap remains published."
+  fi
+}
+
 generate_nginx_config() {
   log "Generating Nginx config"
   mkdir -p "$GENERATED_NGINX_DIR"
@@ -637,6 +651,7 @@ write_backend_env
 install_backend
 install_frontend
 install_pm2
+publish_sitemap
 generated_nginx_config="$(generate_nginx_config | tail -n 1)"
 apply_nginx_config "$generated_nginx_config"
 save_install_config
