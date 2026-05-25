@@ -46,6 +46,7 @@ router.get('/sitemap.xml', async (req, res) => {
       urlNode(`${BASE}/`, null, '1.0', 'daily'),
       urlNode(`${BASE}/catalog?kind=products`, null, '0.9', 'daily'),
       urlNode(`${BASE}/catalog?kind=services`, null, '0.9', 'daily'),
+      urlNode(`${BASE}/terms`, null, '0.5', 'monthly'),
       ...categories.rows.map(c => urlNode(`${BASE}/catalog?kind=${c.category_type === 'service' ? 'services' : 'products'}&category=${encodeURIComponent(c.slug)}`, c.updated_at || c.created_at, '0.8', 'daily')),
       ...products.rows.map(p => urlNode(`${BASE}/product/${p.id}`, p.updated_at || p.created_at, '0.8', 'daily')),
     ];

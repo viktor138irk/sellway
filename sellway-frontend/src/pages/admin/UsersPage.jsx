@@ -19,6 +19,7 @@ function UserModal({ user, onClose, onSave }) {
   const [sellerSettings, setSellerSettings] = useState({
     seller_verified: Boolean(user.seller_verified),
     custom_commission_rate: user.custom_commission_rate ?? '',
+    custom_withdrawal_commission_rate: user.custom_withdrawal_commission_rate ?? '',
     referral_commission_rate: user.referral_commission_rate ?? '0.0100',
     referred_by: user.referred_by_email || user.referred_by_username || '',
   });
@@ -33,6 +34,7 @@ function UserModal({ user, onClose, onSave }) {
       if (isCommercial) {
         payload.seller_verified = sellerSettings.seller_verified;
         payload.custom_commission_rate = sellerSettings.custom_commission_rate;
+        payload.custom_withdrawal_commission_rate = sellerSettings.custom_withdrawal_commission_rate;
         payload.referral_commission_rate = sellerSettings.referral_commission_rate;
         payload.referred_by = sellerSettings.referred_by;
       }
@@ -86,7 +88,8 @@ function UserModal({ user, onClose, onSave }) {
             <span style={{ color:C.t1, fontSize:13, fontWeight:700 }}>Аккаунт прошел модерацию и может публиковать {role === 'freelancer' ? 'услуги' : 'товары'}</span>
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            <Input label="Персональная комиссия" type="number" step="0.0001" min="0" max="0.5" value={sellerSettings.custom_commission_rate} helper="Пусто = ставка по умолчанию. 0.07 = 7%" onChange={e => setSellerSettings(s => ({ ...s, custom_commission_rate: e.target.value }))} />
+            <Input label="Индивидуальная комиссия с продаж" type="number" step="0.0001" min="0" max="0.5" value={sellerSettings.custom_commission_rate} helper="Пусто = общая ставка, 0 = без комиссии, 0.07 = 7%" onChange={e => setSellerSettings(s => ({ ...s, custom_commission_rate: e.target.value }))} />
+            <Input label="Индивидуальная комиссия вывода" type="number" step="0.0001" min="0" max="0.5" value={sellerSettings.custom_withdrawal_commission_rate} helper="Пусто = ставка метода, 0 = вывод без комиссии" onChange={e => setSellerSettings(s => ({ ...s, custom_withdrawal_commission_rate: e.target.value }))} />
             <Input label="Реферальный процент" type="number" step="0.0001" min="0" max="0.5" value={sellerSettings.referral_commission_rate} helper="0.01 = 1% с оборота" onChange={e => setSellerSettings(s => ({ ...s, referral_commission_rate: e.target.value }))} />
           </div>
           <Input label="Реферер" value={sellerSettings.referred_by} placeholder="email, username или referral code" helper="Оставьте пустым, чтобы убрать реферера" onChange={e => setSellerSettings(s => ({ ...s, referred_by: e.target.value }))} />

@@ -230,6 +230,24 @@ router.get('/verify-email/:token', async (req, res) => {
   }
 });
 
+router.post('/resend-verification', require('../middleware/auth').auth, async (req, res) => {
+  try {
+    const { rows: [user] } = await query(
+      'SELECT id, email, username, email_verified FROM users WHERE id=$1',
+      [req.user.id]
+    );
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (user.email_verified) return res.json({ message: 'Email уже подтвержден' });
+    const token = uuidv4();
+    await query('UPDATE users SET email_verify_token=$1 WHERE id=$2', [token, user.id]);
+    await sendVerifyEmail(user.email, user.username, token);
+    res.json({ message: `Письмо подтверждения отправлено на ${user.email}` });
+  } catch (err) {
+    logger.error('Resend verification email error', { userId: req.user.id, err: err.message });
+    res.status(500).json({ error: `Не удалось отправить письмо: ${err.message}` });
+  }
+});
+
 // ── POST /auth/forgot-password ───────────────────────
 
 router.post('/forgot-password', [

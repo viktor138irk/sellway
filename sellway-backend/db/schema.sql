@@ -69,6 +69,7 @@ CREATE TABLE sellers (
   total_sales       INT DEFAULT 0,
   auto_rate         DECIMAL(5,2) DEFAULT 98.00,
   custom_commission_rate DECIMAL(6,4),
+  custom_withdrawal_commission_rate DECIMAL(6,4),
   referral_code     VARCHAR(32) UNIQUE DEFAULT UPPER(SUBSTRING(REPLACE(uuid_generate_v4()::TEXT, '-', '') FROM 1 FOR 10)),
   referred_by_seller_id UUID REFERENCES users(id),
   referral_commission_rate DECIMAL(6,4) DEFAULT 0.0100,

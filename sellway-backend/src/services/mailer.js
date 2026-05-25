@@ -9,11 +9,13 @@ function smtpConfig() {
   const pass = String(process.env.SMTP_PASS || '');
   const port = parseInt(process.env.SMTP_PORT || '465', 10);
   const secure = String(process.env.SMTP_SECURE || (port === 465 ? 'true' : 'false')).toLowerCase() === 'true';
+  const family = parseInt(process.env.SMTP_FAMILY || '4', 10);
+  const connectionTimeout = parseInt(process.env.SMTP_CONNECTION_TIMEOUT || '15000', 10);
   if (!host) throw new Error('SMTP_HOST не указан');
   if (!user) throw new Error('SMTP_USER не указан');
   if (!pass) throw new Error('SMTP_PASS не указан');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SMTP_PORT указан неверно');
-  return { host, user, pass, port, secure };
+  return { host, user, pass, port, secure, family: family === 6 ? 6 : 4, connectionTimeout };
 }
 
 function createTransporter() {
@@ -22,12 +24,24 @@ function createTransporter() {
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure,
+    family: cfg.family,
     auth: { user: cfg.user, pass: cfg.pass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000,
+    connectionTimeout: cfg.connectionTimeout,
+    greetingTimeout: cfg.connectionTimeout,
+    socketTimeout: Math.max(cfg.connectionTimeout * 2, 20000),
     tls: { servername: cfg.host },
   });
+}
+
+function explainError(err, cfg) {
+  const text = String(err?.message || err || 'Неизвестная ошибка');
+  if (/timeout|ETIMEDOUT/i.test(text)) {
+    return `Таймаут подключения к ${cfg.host}:${cfg.port} по IPv${cfg.family}. Проверьте порт и TLS (465 + secure=true или 587 + secure=false), а также доступ сервера к SMTP`;
+  }
+  if (/ECONNREFUSED|ESOCKET|ECONNECTION/i.test(text)) {
+    return `SMTP ${cfg.host}:${cfg.port} отклонил соединение: ${text}`;
+  }
+  return text;
 }
 
 function mailFrom() {
@@ -63,15 +77,22 @@ async function sendGuestPasswordEmail(email, username, password) {
 }
 
 async function sendTestEmail(email) {
+  const cfg = smtpConfig();
   const transporter = createTransporter();
-  await transporter.verify();
-  await transporter.sendMail({
-    from: mailFrom(),
-    to: email,
-    subject: 'SellWay — тест SMTP',
-    html: '<h2>SellWay</h2><p>SMTP настроен корректно. Это тестовое письмо из админ-панели.</p>',
-  });
-  return { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, secure: process.env.SMTP_SECURE === 'true' };
+  try {
+    await transporter.verify();
+    await transporter.sendMail({
+      from: mailFrom(),
+      to: email,
+      subject: 'SellWay — тест SMTP',
+      html: '<h2>SellWay</h2><p>SMTP настроен корректно. Это тестовое письмо из админ-панели.</p>',
+    });
+    return { host: cfg.host, port: cfg.port, secure: cfg.secure, family: cfg.family };
+  } catch (err) {
+    throw new Error(explainError(err, cfg));
+  } finally {
+    transporter.close();
+  }
 }
 
 module.exports = { sendVerifyEmail, sendResetEmail, sendGuestPasswordEmail, sendTestEmail };

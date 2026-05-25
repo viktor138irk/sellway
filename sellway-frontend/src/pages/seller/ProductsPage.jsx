@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import SellerLayout from '../../components/Layout/SellerLayout';
 import { C, Spinner, Btn, Input, Select, Textarea, Modal } from '../../components/UI';
-import { getProducts, getProduct, createProduct, updateProduct, deleteProduct, uploadImages, uploadProductFile, addKeys, getKeys, getCategories } from '../../api/products';
+import { getProducts, getProduct, createProduct, updateProduct, deleteProduct, uploadImages, uploadProductFile, addKeys, getKeys, deleteKey, getCategories } from '../../api/products';
 import { getCommercialStatus, acceptCommercialTerms } from '../../api/seller';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -130,7 +130,7 @@ function CommercialAccessBlock({ service, status, onRefresh }) {
   );
 }
 
-function ProductForm({ productId, onSave, onCancel, user }) {
+function ProductForm({ productId, onSave, onCancel, user, commercialStatus }) {
   const toast = useToast();
   const mode = roleMode(user?.role);
   const service = isService(mode);
@@ -142,15 +142,19 @@ function ProductForm({ productId, onSave, onCancel, user }) {
   const [existingFile, setExistingFile] = useState(null);
   const [keysText, setKeysText] = useState('');
   const [existingKeys, setExistingKeys] = useState([]);
+  const [inventorySaving, setInventorySaving] = useState(false);
   const [parentCategoryId, setParentCategoryId] = useState('');
   const [serviceSteps, setServiceSteps] = useState([]);
-  const [form, setForm] = useState({ title: '', short_desc: '', description: '', price: '', old_price: '', category_id: '', delivery_type: service ? 'service' : 'auto', guarantee_days: 0, tags: '' });
+  const [form, setForm] = useState({ title: '', short_desc: '', description: '', price: '', old_price: '', category_id: '', delivery_type: service ? 'service' : 'auto', guarantee_days: 0, tags: '', auto_delivery_message: '' });
   const [publicationRulesAccepted, setPublicationRulesAccepted] = useState(false);
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
   const setFromInput = k => e => set(k)(e.target.value);
   const rootCats = cats.filter(c => !c.parent_id);
   const subCats = cats.filter(c => c.parent_id === parentCategoryId);
   const selectedCategory = cats.find(c => c.id === form.category_id) || cats.find(c => c.id === parentCategoryId);
+  const commissionRate = Number.isFinite(Number(commercialStatus?.saleCommissionRate)) ? Number(commercialStatus.saleCommissionRate) : 0.07;
+  const estimatedIncome = form.price ? (Number(form.price) * (1 - commissionRate)).toFixed(2).replace(/\.00$/, '') : '—';
+  const availableKeys = existingKeys.filter(key => !key.is_sold);
 
   useEffect(() => {
     getCategories({ type: service ? 'service' : 'product' }).then(r => setCats(r.data)).catch(() => {});
@@ -161,7 +165,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
       Promise.all(promises)
         .then(([pr, kr]) => {
           const p = pr.data;
-          setForm({ title: p.title || '', short_desc: p.short_desc || '', description: p.description || '', price: p.price || '', old_price: p.old_price || '', category_id: p.category_id || '', delivery_type: p.delivery_type || (service ? 'service' : 'auto'), guarantee_days: p.guarantee_days || 0, tags: (p.tags || []).join(', ') });
+          setForm({ title: p.title || '', short_desc: p.short_desc || '', description: p.description || '', price: p.price || '', old_price: p.old_price || '', category_id: p.category_id || '', delivery_type: p.delivery_type || (service ? 'service' : 'auto'), guarantee_days: p.guarantee_days || 0, tags: (p.tags || []).join(', '), auto_delivery_message: p.meta?.auto_delivery_message || '' });
           setParentCategoryId(p.parent_category_id || p.category_id || '');
           setImages((p.images || []).map(url => ({ preview: url })));
           setExistingFile((p.files || [])[0] || null);
@@ -171,6 +175,42 @@ function ProductForm({ productId, onSave, onCancel, user }) {
         .finally(() => setLoading(false));
     }
   }, [productId, service]);
+
+  async function reloadKeys() {
+    if (!productId) return;
+    const { data } = await getKeys(productId);
+    setExistingKeys(data || []);
+  }
+
+  async function addInventory() {
+    const keys = keysText.split('\n').map(value => value.trim()).filter(Boolean);
+    if (!keys.length) return toast.warn('Введите хотя бы один ключ');
+    setInventorySaving(true);
+    try {
+      const { data } = await addKeys(productId, keys);
+      await reloadKeys();
+      setKeysText('');
+      toast.success(`${data.added || 0} ключей добавлено в остаток без повторной модерации`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось добавить ключи');
+    } finally {
+      setInventorySaving(false);
+    }
+  }
+
+  async function removeInventoryKey(keyId) {
+    if (!window.confirm('Удалить этот не проданный ключ из остатка?')) return;
+    setInventorySaving(true);
+    try {
+      await deleteKey(productId, keyId);
+      await reloadKeys();
+      toast.success('Ключ удалён из остатка');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Проданный ключ удалить нельзя');
+    } finally {
+      setInventorySaving(false);
+    }
+  }
 
   async function handleSave() {
     if (!form.title || !form.price || !form.category_id) return toast.warn('Заполните обязательные поля');
@@ -195,7 +235,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
         await uploadProductFile(saved.id, fd).catch(() => toast.warn('Файл не загрузился'));
       }
       const keys = !service && form.delivery_type === 'auto' ? keysText.split('\n').map(s => s.trim()).filter(Boolean) : [];
-      if (keys.length > 0) await addKeys(saved.id, keys).catch(() => toast.warn('Некоторые ключи не добавились'));
+      if (keys.length > 0 && !productId) await addKeys(saved.id, keys).catch(() => toast.warn('Некоторые ключи не добавились'));
 
       toast.success(productId ? (service ? 'Услуга обновлена и отправлена на проверку' : 'Товар обновлён и отправлен на проверку') : (service ? 'Услуга создана и отправлена на модерацию' : 'Товар создан и отправлен на модерацию'));
       onSave();
@@ -241,7 +281,20 @@ function ProductForm({ productId, onSave, onCancel, user }) {
 
       {!service && form.delivery_type === 'auto' && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 12 }}>🔑 Ключи / коды</div>
-        <Textarea label="Добавить новые ключи (по одному на строку)" value={keysText} onChange={e => setKeysText(e.target.value)} rows={5} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} />
+        <Textarea label={productId ? 'Пополнить остаток (по одному ключу на строку)' : 'Ключи для первой публикации (по одному на строку)'} value={keysText} onChange={e => setKeysText(e.target.value)} rows={5} placeholder={'XXXXX-XXXXX-XXXXX\nYYYYY-YYYYY-YYYYY'} style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} />
+        {productId && <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginTop:10, flexWrap:'wrap' }}>
+          <div style={{ color:C.t3, fontSize:11 }}>Пополнение и удаление непроданных ключей не отправляет карточку на модерацию.</div>
+          <Btn size="sm" variant="green" loading={inventorySaving} onClick={addInventory}>Добавить в остаток</Btn>
+        </div>}
+        {productId && <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:12 }}>
+          <div style={{ fontSize:12, fontWeight:800, color:C.t2, marginBottom:9 }}>Доступно для продажи: {availableKeys.length}</div>
+          {availableKeys.length === 0 ? <div style={{ color:C.t3, fontSize:12 }}>Свободных ключей нет.</div> :
+            <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:210, overflowY:'auto' }}>{availableKeys.map(key => <div key={key.id} style={{ display:'flex', alignItems:'center', gap:10, background:'#111119', border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 10px' }}>
+              <code style={{ flex:1, color:C.t1, fontSize:12, overflow:'hidden', textOverflow:'ellipsis' }}>{key.key_value}</code>
+              <Btn size="sm" variant="danger" disabled={inventorySaving} onClick={() => removeInventoryKey(key.id)}>Удалить</Btn>
+            </div>)}</div>}
+        </div>}
+        <div style={{ marginTop:16 }}><Textarea label="Сообщение покупателю после получения ключа" value={form.auto_delivery_message} onChange={e => set('auto_delivery_message')(e.target.value)} rows={4} placeholder="Например: откройте Steam, выберите «Активировать продукт» и вставьте ключ..." style={{ width:'100%' }} /></div>
       </div>}
 
       {!service && form.delivery_type === 'file' && <div style={{ background: '#0A0A12', border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
@@ -251,7 +304,7 @@ function ProductForm({ productId, onSave, onCancel, user }) {
       </div>}
 
       <div style={{ background: service ? '#10101F' : '#0A1A0A', border: `1px solid ${service ? C.accent + '44' : C.green + '33'}`, borderRadius: 10, padding: '12px 16px', fontSize: 12, color: service ? C.t2 : C.green, lineHeight: 1.5 }}>
-        {service ? '💼 Для услуги указанная цена показывается как “от”. Финальная стоимость и этапы утверждаются с заказчиком внутри сделки, после чего средства резервируются.' : <>💡 После сохранения товар уйдёт на модерацию. Ваш доход: <strong>{form.price ? Math.floor(+form.price * 0.93).toLocaleString('ru') : '—'} ₽</strong></>}
+        {service ? '💼 Для услуги указанная цена показывается как “от”. Финальная стоимость и этапы утверждаются с заказчиком внутри сделки, после чего средства резервируются.' : <>💡 После сохранения карточка уйдёт на модерацию. Ваш доход: <strong>{form.price ? `${Number(estimatedIncome).toLocaleString('ru')} ₽` : '—'}</strong> <span style={{ color:C.t2 }}>(комиссия с продажи {(commissionRate * 100).toLocaleString('ru')}%)</span></>}
       </div>
 
       <label style={{ display:'flex', gap:10, alignItems:'flex-start', background:'#0A0A12', border:`1px solid ${publicationRulesAccepted ? C.accent + '55' : C.border}`, borderRadius:10, padding:'12px 14px', cursor:'pointer' }}>
@@ -323,7 +376,7 @@ export default function ProductsPage({ mode }) {
         </div>
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 'clamp(16px, 4vw, 24px)' }}>
           {canPublish
-            ? <ProductForm productId={editId} user={user} onSave={() => navigate('/seller/products')} onCancel={() => navigate('/seller/products')} />
+            ? <ProductForm productId={editId} user={user} commercialStatus={commercialStatus} onSave={() => navigate('/seller/products')} onCancel={() => navigate('/seller/products')} />
             : <CommercialAccessBlock service={service} status={commercialStatus} onRefresh={loadCommercialStatus} />}
         </div>
       </div>

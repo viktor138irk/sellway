@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [tab, setTab]   = useState('profile');
   const [saving, setSaving] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
 
   // Profile form
   const [profile, setProfile] = useState({ username: user?.username || '', phone: user?.phone || '' });
@@ -62,6 +63,18 @@ export default function SettingsPage() {
     } finally {
       setAvatarLoading(false);
       if (avatarRef.current) avatarRef.current.value = '';
+    }
+  }
+
+  async function resendEmailVerification() {
+    setEmailLoading(true);
+    try {
+      const { data } = await client.post('/auth/resend-verification');
+      toast.success(data.message || 'Письмо подтверждения отправлено');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось отправить письмо подтверждения');
+    } finally {
+      setEmailLoading(false);
     }
   }
 
@@ -162,6 +175,7 @@ export default function SettingsPage() {
                 <div style={{ fontSize: 11, color: user?.email_verified ? C.green : C.amber, marginTop: 3 }}>
                   {user?.email_verified ? '✓ Email подтверждён' : '⚠ Email не подтверждён'}
                 </div>
+                {!user?.email_verified && <div style={{ marginTop:8 }}><Btn type="button" size="sm" variant="ghost" loading={emailLoading} onClick={resendEmailVerification}>Отправить письмо повторно</Btn></div>}
               </div>
               <div>
                 <input ref={avatarRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleAvatar(e.target.files?.[0])} />

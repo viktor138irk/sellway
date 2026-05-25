@@ -29,6 +29,8 @@ const ENV_SETTINGS = {
   SMTP_USER: 'SMTP-пользователь',
   SMTP_PASS: 'SMTP-пароль',
   SMTP_FROM: 'Email отправителя писем',
+  SMTP_FAMILY: 'IP-протокол для SMTP: 4 или 6',
+  SMTP_CONNECTION_TIMEOUT: 'Таймаут подключения SMTP в миллисекундах',
   SMSPILOT_ENABLED: 'Включить SMSPilot',
   SMSPILOT_API_KEY: 'API-ключ SMSPilot',
   SMSPILOT_SENDER: 'Имя отправителя SMSPilot',
@@ -562,6 +564,9 @@ router.put('/settings', requireRole('admin'), async (req, res) => {
     const normalized = normalizeSettingValue(value);
     if (key in ENV_SETTINGS) envUpdates[key] = normalized;
     else dbUpdates[key] = normalized;
+  }
+  if (dbUpdates.default_seller_commission_rate !== undefined) {
+    dbUpdates.platform_commission = dbUpdates.default_seller_commission_rate;
   }
 
   try {

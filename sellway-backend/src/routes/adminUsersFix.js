@@ -192,13 +192,13 @@ router.get('/users', async (req, res) => {
   const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
   params.push(Number(limit), offset);
   try {
-    const { rows } = await query(`SELECT u.id, u.email, u.username, u.avatar_url, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online, seller_delivery.avg_delivery_time_min AS seller_delivery_time_min, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=u.id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
+    const { rows } = await query(`SELECT u.id, u.email, u.username, u.avatar_url, u.role, u.status, u.email_verified, u.phone_verified, u.telegram_verified, u.created_at, u.last_login_at, w.balance, w.held, s.rating, s.total_sales, s.verified AS seller_verified, s.commercial_application_status, s.commercial_terms_accepted_at, s.commercial_reject_reason, s.custom_commission_rate, s.custom_withdrawal_commission_rate, s.referral_code, s.referred_by_seller_id, ref_user.email AS referred_by_email, ref_user.username AS referred_by_username, s.referral_commission_rate, s.referral_earnings, s.referred_sellers_count, (s.last_seen_at > NOW()-INTERVAL '5 minutes') AS seller_online, seller_delivery.avg_delivery_time_min AS seller_delivery_time_min, COALESCE(ref_orders.orders_count, 0) AS referral_orders_count, COALESCE(ref_orders.turnover, 0) AS referral_turnover FROM users u LEFT JOIN wallets w ON w.user_id=u.id LEFT JOIN sellers s ON s.user_id=u.id LEFT JOIN users ref_user ON ref_user.id=s.referred_by_seller_id LEFT JOIN LATERAL (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (delivery.delivered_at - COALESCE(delivery.paid_at, delivery.created_at))) / 60))::int AS avg_delivery_time_min FROM orders delivery WHERE delivery.seller_id=u.id AND delivery.delivered_at IS NOT NULL AND delivery.delivered_at >= COALESCE(delivery.paid_at, delivery.created_at)) seller_delivery ON TRUE LEFT JOIN (SELECT child.referred_by_seller_id AS user_id, COUNT(o.id)::int AS orders_count, COALESCE(SUM(o.amount),0) AS turnover FROM sellers child LEFT JOIN orders o ON o.seller_id=child.user_id AND o.status='confirmed' WHERE child.referred_by_seller_id IS NOT NULL GROUP BY child.referred_by_seller_id) ref_orders ON ref_orders.user_id=u.id ${whereStr} ORDER BY u.created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`, params);
     res.json({ users: rows });
   } catch (err) { logger.error('Admin users list error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 router.put('/users/:id', requireRole('admin'), async (req, res) => {
-  const { role, status, seller_verified, custom_commission_rate, referral_commission_rate, referred_by } = req.body;
+  const { role, status, seller_verified, custom_commission_rate, custom_withdrawal_commission_rate, referral_commission_rate, referred_by } = req.body;
   const allowedRoles = ['buyer', 'seller', 'freelancer', 'moderator', 'admin'];
   if (role && !allowedRoles.includes(role)) return res.status(400).json({ error: 'Некорректная роль' });
   try {
@@ -218,12 +218,15 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
           } else referrerId = null;
         }
         const commissionRate = custom_commission_rate === '' || custom_commission_rate === undefined ? null : Number(custom_commission_rate);
+        const withdrawalRate = custom_withdrawal_commission_rate === '' || custom_withdrawal_commission_rate === undefined ? null : Number(custom_withdrawal_commission_rate);
         const referralRate = referral_commission_rate === '' || referral_commission_rate === undefined ? undefined : Number(referral_commission_rate);
         if (commissionRate !== null && (Number.isNaN(commissionRate) || commissionRate < 0 || commissionRate > 0.5)) throw { status: 400, message: 'Комиссия должна быть от 0 до 0.5' };
+        if (withdrawalRate !== null && (Number.isNaN(withdrawalRate) || withdrawalRate < 0 || withdrawalRate > 0.5)) throw { status: 400, message: 'Комиссия вывода должна быть от 0 до 0.5' };
         if (referralRate !== undefined && (Number.isNaN(referralRate) || referralRate < 0 || referralRate > 0.5)) throw { status: 400, message: 'Реферальный процент должен быть от 0 до 0.5' };
         const updates = [];
         const values = [];
         if (custom_commission_rate !== undefined) { values.push(commissionRate); updates.push(`custom_commission_rate=$${values.length}`); }
+        if (custom_withdrawal_commission_rate !== undefined) { values.push(withdrawalRate); updates.push(`custom_withdrawal_commission_rate=$${values.length}`); }
         if (referralRate !== undefined) { values.push(referralRate); updates.push(`referral_commission_rate=$${values.length}`); }
         if (referrerId !== undefined) { values.push(referrerId); updates.push(`referred_by_seller_id=$${values.length}`); }
         if (seller_verified !== undefined) {

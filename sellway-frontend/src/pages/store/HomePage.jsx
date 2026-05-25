@@ -55,7 +55,6 @@ export default function HomePage() {
   const [popular, setPopular] = useState([]);
   const [newest, setNewest] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [openCatId, setOpenCatId] = useState(null);
   const isMobile = useMediaQuery('(max-width: 760px)');
   const navigate = useNavigate();
@@ -65,8 +64,6 @@ export default function HomePage() {
       .then(([c,p,n]) => { setCats((c.data || []).filter(x=>x.is_active)); setPopular(p.data.products || []); setNewest(n.data.products || []); })
       .catch(console.error).finally(()=>setLoading(false));
   }, []);
-
-  function handleSearch(e) { e.preventDefault(); if (search.trim()) navigate(`/catalog?kind=products&search=${encodeURIComponent(search)}`); }
 
   const rootCats = cats.filter(c => !c.parent_id);
   const selectedRoot = rootCats.find(c => c.id === openCatId) || null;
@@ -80,16 +77,6 @@ export default function HomePage() {
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh' }}><Spinner size={40}/></div>;
 
   return <div style={{ maxWidth:1200, margin:'0 auto', padding:'28px 20px', display:'flex', flexDirection:'column', gap:48, width:'100%', boxSizing:'border-box' }} className="fade-in">
-    <div style={{ background:'linear-gradient(135deg,#0D0D1E,#121028)', border:`1px solid ${C.border}`, borderRadius:22, padding:'clamp(28px,6vw,48px) clamp(18px,5vw,44px)', position:'relative', overflow:'hidden' }}>
-      <div style={{ position:'absolute', top:-80, right:-80, width:320, height:320, background:`radial-gradient(circle,${C.accent}18,transparent 70%)`, pointerEvents:'none' }} />
-      <div style={{ position:'relative', maxWidth:580 }}>
-        <div style={{ display:'inline-flex', alignItems:'center', gap:7, background:C.accent+'20', border:`1px solid ${C.accent}30`, borderRadius:20, padding:'5px 14px', marginBottom:18 }}><span style={{ width:7, height:7, borderRadius:'50%', background:C.green, display:'inline-block' }} /><span style={{ fontSize:12, color:C.green, fontWeight:700 }}>Мгновенная доставка · Защита покупателя</span></div>
-        <h1 style={{ fontSize:'clamp(28px,8vw,38px)', fontWeight:900, color:C.t1, lineHeight:1.15, marginBottom:16, letterSpacing:-1 }}>Маркетплейс<br/><span style={{ background:`linear-gradient(90deg,${C.accent},#C084FC)`, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>цифровых товаров и услуг</span></h1>
-        <p style={{ fontSize:15, color:C.t2, lineHeight:1.7, marginBottom:28, maxWidth:460 }}>Покупайте и продавайте цифровые товары, аккаунты, подписки и услуги. Каждая сделка защищена системой Escrow.</p>
-        <form onSubmit={handleSearch} style={{ display:'flex', gap:10, maxWidth:480, marginBottom:28, flexWrap:'wrap' }}><div style={{ flex:'1 1 230px', position:'relative' }}><span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:C.t3, fontSize:16, pointerEvents:'none' }}>🔍</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Steam, сайт, дизайн, Minecraft..." style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.06)', border:`1px solid ${C.border}`, borderRadius:11, padding:'13px 14px 13px 42px', color:C.t1, fontSize:14, outline:'none', fontFamily:'inherit' }} /></div><button type="submit" style={{ background:C.accent, border:'none', color:'#fff', borderRadius:11, padding:'13px 24px', fontSize:14, fontWeight:800, cursor:'pointer', fontFamily:'inherit', flex:'0 0 auto' }}>Найти</button></form>
-        <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>{[['18 420+','Активных позиций'],['99.4%','Довольных покупателей'],['< 2 мин','Среднее время сделки']].map(([v,l])=><div key={l}><div style={{ fontSize:20, fontWeight:900, color:C.accent }}>{v}</div><div style={{ fontSize:12, color:C.t3, marginTop:2 }}>{l}</div></div>)}</div>
-      </div>
-    </div>
 
     {rootCats.length > 0 && <section>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}><h2 style={{ fontSize:20, fontWeight:900, color:C.t1 }}>Категории</h2><Link to="/catalog?kind=products" style={{ fontSize:13, color:C.accent, textDecoration:'none' }}>Все →</Link></div>

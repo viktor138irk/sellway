@@ -21,6 +21,15 @@ canvas {
   max-width: 100%;
 }
 
+.admin-support-dialog,
+.admin-support-messages {
+  min-height: 0;
+}
+
+.admin-support-messages {
+  overscroll-behavior: contain;
+}
+
 button,
 input,
 select,

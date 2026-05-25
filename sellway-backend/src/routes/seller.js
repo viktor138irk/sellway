@@ -87,7 +87,7 @@ router.get('/dashboard', async (req, res) => {
         referred30d: parseInt(referralStats.rows[0]?.referred_30d || 0),
         earnings: s.referral_earnings || '0.00',
         referralRate: s.referral_commission_rate || '0.0100',
-        commissionRate: s.custom_commission_rate || null,
+        commissionRate: s.custom_commission_rate ?? null,
         role: roleForLink(req.user.role),
         enabled: canUseReferral,
         applicationStatus: s.referral_application_status || 'not_requested',
@@ -197,7 +197,7 @@ async function getUsdtRateRub(settings = {}) {
 async function getWithdrawConfig(client = { query }, userId = null) {
   const { rows } = await client.query(
     `SELECT key, value FROM settings WHERE key IN (
-      'min_withdrawal','max_withdrawal_daily','usdt_rub_rate_fallback',
+      'min_withdrawal','max_withdrawal_daily','usdt_rub_rate_fallback','withdrawal_commission',
       'withdraw_method_card_enabled','withdraw_method_card_commission',
       'withdraw_method_sbp_enabled','withdraw_method_sbp_commission',
       'withdraw_method_paypal_enabled','withdraw_method_paypal_commission',
@@ -206,11 +206,29 @@ async function getWithdrawConfig(client = { query }, userId = null) {
     )`
   );
   const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  let personalWithdrawalRate = null;
+  let seller = null;
+  if (userId) {
+    const result = await client.query(
+      `SELECT auto_payout_enabled, auto_payout_method, auto_payout_threshold, auto_payout_requisites,
+              custom_withdrawal_commission_rate
+       FROM sellers WHERE user_id=$1`,
+      [userId]
+    );
+    seller = result.rows[0];
+    personalWithdrawalRate = seller?.custom_withdrawal_commission_rate != null
+      ? Number(seller.custom_withdrawal_commission_rate)
+      : null;
+  }
+  const defaultWithdrawalRate = Number(settings.withdrawal_commission ?? 0.02);
   const methods = Object.entries(WITHDRAW_METHODS).map(([id, meta]) => ({
     id,
     ...meta,
     enabled: settings[`withdraw_method_${id}_enabled`] !== 'false',
-    commission: id === 'crypto' ? 0 : parseFloat(settings[`withdraw_method_${id}_commission`] || (id === 'sbp' ? 0.01 : 0.02)),
+    commission: id === 'crypto'
+      ? 0
+      : (personalWithdrawalRate ?? Number(settings[`withdraw_method_${id}_commission`] ?? defaultWithdrawalRate)),
+    commissionSource: id === 'crypto' ? 'crypto_free' : personalWithdrawalRate != null ? 'personal' : 'method',
   }));
   const config = {
     minAmount: parseFloat(settings.min_withdrawal || 500),
@@ -222,17 +240,13 @@ async function getWithdrawConfig(client = { query }, userId = null) {
     methods,
   };
   if (userId) {
-    const { rows: [seller] } = await client.query(
-      `SELECT auto_payout_enabled, auto_payout_method, auto_payout_threshold, auto_payout_requisites
-       FROM sellers WHERE user_id=$1`,
-      [userId]
-    );
     config.autoPayout = {
       enabled: Boolean(seller?.auto_payout_enabled),
       method: seller?.auto_payout_method || 'card',
       threshold: parseFloat(seller?.auto_payout_threshold || config.autoPayoutMinBalance),
       requisites: seller?.auto_payout_requisites || {},
     };
+    config.personalWithdrawalCommissionRate = personalWithdrawalRate;
   }
   return config;
 }
@@ -249,11 +263,17 @@ router.get('/withdrawal/config', requireApprovedCommercial, async (req, res) => 
 router.get('/commercial-status', async (req, res) => {
   try {
     const { rows: [seller] } = await query('SELECT * FROM sellers WHERE user_id=$1', [req.user.id]);
+    const { rows: [defaultCommission] } = await query("SELECT value FROM settings WHERE key='default_seller_commission_rate' LIMIT 1");
+    const saleCommissionRate = seller?.custom_commission_rate != null
+      ? Number(seller.custom_commission_rate)
+      : Number(defaultCommission?.value ?? process.env.PLATFORM_COMMISSION ?? 0.07);
     const access = describeCommercialAccess(req.user, seller);
     res.json({
       access,
       seller: seller || null,
       role: req.user.role,
+      saleCommissionRate,
+      saleCommissionSource: seller?.custom_commission_rate != null ? 'personal' : 'default',
       requirements: {
         terms: Boolean(seller?.commercial_terms_accepted_at),
         approved: Boolean(seller?.verified && seller?.commercial_application_status === 'approved'),
@@ -324,7 +344,7 @@ router.put('/withdrawal/auto-payout', requireApprovedCommercial, async (req, res
   }
 });
 
-router.post('/withdrawal', async (req, res) => { const { amount, method, requisites } = req.body; const amt = parseFloat(amount); if (!requisites?.account?.trim()) return res.status(400).json({ error: 'Укажите реквизиты' }); try { const w = await transaction(async (client) => { const config = await getWithdrawConfig(client); const methodConfig = config.methods.find(m => m.id === method && m.enabled); if (!methodConfig) throw { status: 400, message: 'Неверный или отключенный метод вывода' }; if (!amt || amt < config.minAmount) throw { status: 400, message: `Минимальная сумма ${config.minAmount.toLocaleString('ru')} ₽` }; const { rows: [wallet] } = await client.query('SELECT balance FROM wallets WHERE user_id=$1 FOR UPDATE', [req.user.id]); if (!wallet || parseFloat(wallet.balance) < amt) throw { status: 402, message: 'Недостаточно средств' }; const commission = method === 'crypto' ? 0 : parseFloat((amt * methodConfig.commission).toFixed(2)); const netAmount = parseFloat((amt - commission).toFixed(2)); const { rows: [w] } = await client.query(`INSERT INTO withdrawal_requests (user_id, amount, commission, net_amount, method, requisites) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`, [req.user.id, amt, commission, netAmount, method, JSON.stringify(requisites)]); await client.query('UPDATE wallets SET balance=balance-$1 WHERE user_id=$2', [amt, req.user.id]); return w; }); notify.notifyAdmins('system', 'Новая заявка на вывод', `${req.user.username}: ${amt.toLocaleString('ru')} ₽ через ${method}`, '/admin/withdrawals').catch(() => {}); logger.info('Withdrawal requested', { userId: req.user.id, amount: amt, method }); res.status(201).json({ withdrawal: w }); } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Withdrawal error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); } });
+router.post('/withdrawal', async (req, res) => { const { amount, method, requisites } = req.body; const amt = parseFloat(amount); if (!requisites?.account?.trim()) return res.status(400).json({ error: 'Укажите реквизиты' }); try { const w = await transaction(async (client) => { const config = await getWithdrawConfig(client, req.user.id); const methodConfig = config.methods.find(m => m.id === method && m.enabled); if (!methodConfig) throw { status: 400, message: 'Неверный или отключенный метод вывода' }; if (!amt || amt < config.minAmount) throw { status: 400, message: `Минимальная сумма ${config.minAmount.toLocaleString('ru')} ₽` }; const { rows: [wallet] } = await client.query('SELECT balance FROM wallets WHERE user_id=$1 FOR UPDATE', [req.user.id]); if (!wallet || parseFloat(wallet.balance) < amt) throw { status: 402, message: 'Недостаточно средств' }; const commission = parseFloat((amt * methodConfig.commission).toFixed(2)); const netAmount = parseFloat((amt - commission).toFixed(2)); const { rows: [w] } = await client.query(`INSERT INTO withdrawal_requests (user_id, amount, commission, net_amount, method, requisites) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`, [req.user.id, amt, commission, netAmount, method, JSON.stringify(requisites)]); await client.query('UPDATE wallets SET balance=balance-$1 WHERE user_id=$2', [amt, req.user.id]); return w; }); notify.notifyAdmins('system', 'Новая заявка на вывод', `${req.user.username}: ${amt.toLocaleString('ru')} ₽ через ${method}`, '/admin/withdrawals').catch(() => {}); logger.info('Withdrawal requested', { userId: req.user.id, amount: amt, method }); res.status(201).json({ withdrawal: w }); } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Withdrawal error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); } });
 router.post('/telegram-link', async (req, res) => { try { const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || '').trim().replace(/^@+/, ''); if (!botUsername || /^your_/i.test(botUsername) || botUsername === 'SellWayBot') return res.status(400).json({ error: 'Сначала укажите реальный TELEGRAM_BOT_USERNAME в админке' }); const token = crypto.randomBytes(24).toString('hex'); const expires = new Date(Date.now() + 10 * 60 * 1000); await query('UPDATE users SET telegram_link_token=$1, telegram_link_expires=$2 WHERE id=$3', [token, expires, req.user.id]); res.json({ link: `https://t.me/${botUsername}?start=${token}`, appLink: `tg://resolve?domain=${botUsername}&start=${token}`, botUsername, token, expiresAt: expires }); } catch (err) { logger.error('Telegram link error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); } });
 
 module.exports = router;

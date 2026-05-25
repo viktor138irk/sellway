@@ -19,6 +19,7 @@ export default function SupportPage() {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
+  const messagesRef = useRef(null);
 
   const loadThreads = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -67,7 +68,8 @@ export default function SupportPage() {
   }, [selectedId, loadDialog, loadThreads]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const panel = messagesRef.current;
+    if (panel) panel.scrollTo({ top: panel.scrollHeight, behavior: 'smooth' });
   }, [dialog?.messages?.length]);
 
   async function sendReply(e) {
@@ -110,7 +112,7 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="admin-support-layout" style={{ display:'grid', gridTemplateColumns:'300px minmax(0,1fr)', height:'calc(100vh - 150px)', minHeight:520, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden', background:C.card }}>
+      <div className="admin-support-layout" style={{ display:'grid', gridTemplateColumns:'300px minmax(0,1fr)', height:'calc(100vh - 150px)', minHeight:520, minWidth:0, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden', background:C.card }}>
         <aside className="admin-support-threads" style={{ borderRight:`1px solid ${C.border}`, overflowY:'auto', background:'#0B0B13' }}>
           {loading ? <div style={{ padding:36, display:'flex', justifyContent:'center' }}><Spinner size={26}/></div> :
             threads.length === 0 ? <div style={{ padding:28, color:C.t3, fontSize:13, textAlign:'center' }}>Обращений нет</div> :
@@ -126,7 +128,7 @@ export default function SupportPage() {
           }
         </aside>
 
-        <section className="admin-support-dialog" style={{ minWidth:0, display:'flex', flexDirection:'column' }}>
+        <section className="admin-support-dialog" style={{ minWidth:0, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
           {!selectedId ? <div style={{ margin:'auto', color:C.t3, fontSize:13 }}>Выберите обращение</div> :
             dialogLoading && !dialog ? <div style={{ margin:'auto' }}><Spinner size={30}/></div> :
               dialog && <>
@@ -137,7 +139,7 @@ export default function SupportPage() {
                   </div>
                   {dialog.thread.status === 'open' && <Btn size="sm" variant="ghost" onClick={closeThread}>Закрыть обращение</Btn>}
                 </div>
-                <div style={{ flex:1, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, background:'#0D0D15' }}>
+                <div ref={messagesRef} className="admin-support-messages" style={{ flex:1, minHeight:0, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, background:'#0D0D15' }}>
                   {(dialog.messages || []).map(message => <div key={message.id} style={{ display:'flex', justifyContent:message.sender_type === 'admin' ? 'flex-end' : 'flex-start' }}>
                     <div style={{ maxWidth:'76%' }}>
                       <div style={{ fontSize:10, color:C.t3, marginBottom:3, textAlign:message.sender_type === 'admin' ? 'right' : 'left' }}>{message.sender_type === 'admin' ? 'Поддержка' : dialog.thread.username}</div>

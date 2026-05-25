@@ -63,6 +63,46 @@ export default function ProductPage() {
       document.head.appendChild(canonical);
     }
     canonical.setAttribute('href', `${window.location.origin}/product/${product.id}`);
+    const setPropertyMeta = (property, content) => {
+      let element = document.querySelector(`meta[property="${property}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute('property', property);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', content);
+    };
+    const canonicalUrl = `${window.location.origin}/product/${product.id}`;
+    setPropertyMeta('og:type', 'product');
+    setPropertyMeta('og:title', title);
+    setPropertyMeta('og:description', description);
+    setPropertyMeta('og:url', canonicalUrl);
+    if (product.images?.[0]) setPropertyMeta('og:image', new URL(product.images[0], window.location.origin).toString());
+    let schema = document.querySelector('#sellway-product-schema');
+    if (!schema) {
+      schema = document.createElement('script');
+      schema.id = 'sellway-product-schema';
+      schema.type = 'application/ld+json';
+      document.head.appendChild(schema);
+    }
+    schema.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': product.delivery_type === 'service' ? 'Service' : 'Product',
+      name: product.title,
+      description,
+      image: product.images || [],
+      provider: { '@type': 'Organization', name: product.seller_name || 'SellWay' },
+      offers: {
+        '@type': 'Offer',
+        url: canonicalUrl,
+        priceCurrency: 'RUB',
+        price: String(product.price),
+        availability: product.delivery_type !== 'auto' || Number(product.keys_count) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      },
+    });
+    return () => {
+      document.querySelector('#sellway-product-schema')?.remove();
+    };
   }, [product]);
 
   async function handleBuy() {

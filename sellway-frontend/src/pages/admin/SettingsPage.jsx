@@ -11,10 +11,9 @@ const PAGES = {
     subtitle: 'Комиссии, системы вывода средств и правила сделок',
     groups: [
       { title: 'Финансы', keys: [
-        ['platform_commission','Комиссия платформы (доля)','number','0.07','Например: 0.07 = 7%'],
-        ['default_seller_commission_rate','Комиссия продавца по умолчанию','number','0.07','Используется, если у продавца нет персональной ставки'],
+        ['default_seller_commission_rate','Комиссия с продаж по умолчанию','number','0.07','Удерживается с продажи, если у продавца нет индивидуальной ставки. 0.07 = 7%'],
         ['default_referral_commission_rate','Реферальный процент по умолчанию','number','0.01','Например: 0.01 = 1%'],
-        ['withdrawal_commission','Комиссия при выводе (доля)','number','0.02',''],
+        ['withdrawal_commission','Резервная комиссия вывода','number','0.02','Используется только если у способа вывода не задана своя ставка'],
         ['min_withdrawal','Мин. сумма вывода (₽)','number','500',''],
         ['max_withdrawal_daily','Макс. вывод в день (₽)','number','100000',''],
         ['auto_payouts_enabled','Автовыплаты включены','toggle','true','Глобально разрешить продавцам автовыплаты'],
@@ -24,13 +23,13 @@ const PAGES = {
       ]},
       { title: 'Системы вывода средств', keys: [
         ['withdraw_method_card_enabled','Карты включены','toggle','true','Показывать вывод на банковские карты'],
-        ['withdraw_method_card_commission','Комиссия карты (доля)','number','0.02','0.02 = 2%'],
+        ['withdraw_method_card_commission','Комиссия вывода на карту','number','0.02','Для всех без индивидуальной ставки вывода. 0 = без комиссии'],
         ['withdraw_method_sbp_enabled','СБП включен','toggle','true','Показывать вывод через СБП'],
-        ['withdraw_method_sbp_commission','Комиссия СБП (доля)','number','0.01','0.01 = 1%'],
+        ['withdraw_method_sbp_commission','Комиссия вывода через СБП','number','0.01','Для всех без индивидуальной ставки вывода. 0 = без комиссии'],
         ['withdraw_method_paypal_enabled','PayPal включен','toggle','true','Показывать вывод PayPal'],
-        ['withdraw_method_paypal_commission','Комиссия PayPal (доля)','number','0.02','0.02 = 2%'],
+        ['withdraw_method_paypal_commission','Комиссия вывода PayPal','number','0.02','Для всех без индивидуальной ставки вывода. 0 = без комиссии'],
         ['withdraw_method_crypto_enabled','Криптовалюта включена','toggle','true','Показывать вывод криптовалютой'],
-        ['withdraw_method_crypto_commission','Комиссия crypto (доля)','number','0.01','0.01 = 1%'],
+        ['withdraw_method_crypto_commission','Комиссия вывода USDT','number','0','Вывод USDT выполняется без комиссии'],
       ]},
       { title: 'Сделки', keys: [
         ['escrow_auto_confirm_hours','Авто-подтверждение (часов)','number','48','Через сколько часов после выдачи сделка считается завершенной'],
@@ -70,6 +69,8 @@ const PAGES = {
         ['SMTP_USER','SMTP пользователь','text','noreply@sellway.pro','Email отправителя'],
         ['SMTP_PASS','SMTP пароль','password','','Пароль приложения или почтового ящика'],
         ['SMTP_FROM','Email отправителя','text','noreply@sellway.pro','Должен быть разрешен SMTP-провайдером'],
+        ['SMTP_FAMILY','IP-протокол подключения','number','4','Оставьте 4, если IPv6 на сервере не настроен'],
+        ['SMTP_CONNECTION_TIMEOUT','Таймаут подключения (мс)','number','15000','Увеличьте только для медленных SMTP-серверов'],
       ]},
       { title: 'SMSPilot', keys: [
         ['SMSPILOT_ENABLED','Включить SMSPilot','toggle','false','Отправка SMS-кодов подтверждения'],
@@ -98,6 +99,7 @@ const RESTART_KEYS = new Set([
   'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_ADMIN_BOT_TOKEN', 'TELEGRAM_ADMIN_BOT_USERNAME', 'TELEGRAM_ADMIN_CHAT_ID',
   'PROXY_ENABLED', 'PROXY_SCHEME', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_USERNAME', 'PROXY_PASSWORD',
   'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM',
+  'SMTP_FAMILY', 'SMTP_CONNECTION_TIMEOUT',
   'SMSPILOT_ENABLED', 'SMSPILOT_API_KEY', 'SMSPILOT_SENDER', 'SMS_CODE_TEMPLATE',
 ]);
 
@@ -253,6 +255,12 @@ export default function SettingsPage({ page = 'finance' }) {
             </div>
           ))}
 
+          {page === 'finance' && (
+            <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:12, padding:'14px 18px', color:C.t2, fontSize:12, lineHeight:1.65 }}>
+              <b style={{ color:C.t1 }}>Как считаются комиссии:</b> ставка с продаж применяется к доходу от заказа. У каждого продавца можно задать индивидуальную ставку, включая <b style={{ color:C.green }}>0%</b>. Для вывода сначала проверяется индивидуальная ставка вывода, затем ставка выбранного способа; вывод USDT остается без комиссии.
+            </div>
+          )}
+
           {page === 'telegram' && (
             <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22 }}>
               <div style={{ fontSize:14, fontWeight:800, color:C.t1, marginBottom:12 }}>Тест Telegram</div>
@@ -273,6 +281,7 @@ export default function SettingsPage({ page = 'finance' }) {
                 <Input label="Email для теста" value={testEmail || user?.email || ''} onChange={e => setTestEmail(e.target.value)} placeholder="admin@example.com" />
                 <Btn loading={actionLoading === 'test-smtp'} onClick={() => handleAction('test-smtp', { email: testEmail || user?.email }, false)}>Отправить тест</Btn>
               </div>
+              <div style={{ color:C.t3, fontSize:11, lineHeight:1.55, marginTop:12 }}>Для сервера обычно подходят: порт 465 с защищенным соединением или порт 587 без него. Подключение выполняется по IPv4, чтобы не упираться в нерабочий IPv6 хостинга.</div>
             </div>
           )}
 

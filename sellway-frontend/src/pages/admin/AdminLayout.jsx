@@ -9,7 +9,7 @@ const SECTIONS = [
     items: [
       ['/admin',            '📊', 'Дашборд'],
       ['/admin/orders',     '🛒', 'Заказы'],
-      ['/admin/products',   '📦', 'Модерация'],
+      ['/admin/products',   '📦', 'Товары и услуги'],
       ['/admin/users',      '👥', 'Пользователи'],
       ['/admin/disputes',   '⚖️', 'Споры'],
       ['/admin/support',    '💬', 'Поддержка'],

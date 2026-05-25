@@ -250,7 +250,7 @@ async function completeDirectPurchase(payment, source) {
       if (soldKeys.length !== quantity) throw new Error('Could not reserve keys');
       keys = soldKeys;
       finalStatus = 'delivered';
-      await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=COALESCE(meta,'{}'::jsonb) || $2::jsonb WHERE id=$3", [keys[0].id, JSON.stringify({ keys: keys.map(k => k.key_value) }), order.id]);
+      await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=COALESCE(meta,'{}'::jsonb) || $2::jsonb WHERE id=$3", [keys[0].id, JSON.stringify({ keys: keys.map(k => k.key_value), auto_delivery_message: product.meta?.auto_delivery_message || '' }), order.id]);
       await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, `Ключи переданы автоматически: ${keys.length} шт.`]);
     } else if (product.delivery_type === 'file') {
       finalStatus = 'delivered';

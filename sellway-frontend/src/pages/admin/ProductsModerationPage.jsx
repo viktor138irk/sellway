@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
-import { C, Spinner, Btn, Modal } from '../../components/UI';
+import { C, Spinner, Btn, Modal, Input, Textarea } from '../../components/UI';
 import { getPendingProducts, approveProduct, rejectProduct } from '../../api/admin';
+import { updateProduct, deleteProduct, addKeys, getKeys, deleteKey } from '../../api/products';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 import SellerMeta from '../../components/SellerMeta';
 
 const STATUS_STYLE = {
@@ -26,16 +28,84 @@ function CategoryIcon({ product, size = 20 }) {
   </span>;
 }
 
-function ProductDetail({ product, onClose, onAction }) {
+function ProductDetail({ product, onClose, onAction, onChanged, canManage }) {
+  const toast = useToast();
   const [reason, setReason] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [loading, setLoading] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [keys, setKeys] = useState([]);
+  const [keysText, setKeysText] = useState('');
+  const [draft, setDraft] = useState({
+    title: product.title || '', short_desc: product.short_desc || '', description: product.description || '',
+    price: product.price || '', old_price: product.old_price || '', guarantee_days: product.guarantee_days || 0,
+    auto_delivery_message: product.meta?.auto_delivery_message || '',
+  });
   const images = product.images?.filter(Boolean) || (product.main_image ? [product.main_image] : []);
   const [, deliveryLabel] = DELIVERY[product.delivery_type] || ['Товар', product.delivery_type || '—'];
   const steps = product.meta?.service_steps || [];
 
+  useEffect(() => {
+    if (canManage && product.delivery_type === 'auto') getKeys(product.id).then(r => setKeys(r.data || [])).catch(() => {});
+  }, [canManage, product.id, product.delivery_type]);
+
   async function handleApprove() { setLoading('approve'); await onAction('approve', product.id); setLoading(''); onClose(); }
   async function handleReject() { if (!reason.trim()) return; setLoading('reject'); await onAction('reject', product.id, reason); setLoading(''); onClose(); }
+  async function saveEdit() {
+    setLoading('save');
+    try {
+      const { data } = await updateProduct(product.id, {
+        ...draft,
+        price: Number(draft.price),
+        old_price: draft.old_price ? Number(draft.old_price) : null,
+        category_id: product.category_id,
+        delivery_type: product.delivery_type,
+        tags: product.tags || [],
+        service_steps: steps,
+      });
+      toast.success('Позиция обновлена без снятия с публикации');
+      setEditing(false);
+      onChanged(data);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось изменить позицию');
+    } finally {
+      setLoading('');
+    }
+  }
+  async function archiveItem() {
+    if (!window.confirm('Скрыть позицию из каталога? Текущие сделки сохранятся.')) return;
+    try {
+      await deleteProduct(product.id);
+      toast.success('Позиция перенесена в архив');
+      onChanged(null);
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось архивировать позицию');
+    }
+  }
+  async function addInventory() {
+    const values = keysText.split('\n').map(key => key.trim()).filter(Boolean);
+    if (!values.length) return;
+    setLoading('keys');
+    try {
+      await addKeys(product.id, values);
+      const { data } = await getKeys(product.id);
+      setKeys(data || []);
+      setKeysText('');
+      toast.success('Ключи добавлены в остаток');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Не удалось добавить ключи');
+    } finally { setLoading(''); }
+  }
+  async function removeKey(id) {
+    try {
+      await deleteKey(product.id, id);
+      setKeys(current => current.filter(key => key.id !== id));
+      toast.success('Ключ удален');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Проданный ключ удалить нельзя');
+    }
+  }
 
   return (
     <Modal title={isService(product) ? 'Модерация услуги' : 'Модерация товара'} onClose={onClose} width={760}>
@@ -82,6 +152,28 @@ function ProductDetail({ product, onClose, onAction }) {
           {product.tags.map(t => <span key={t} style={{ fontSize: 11, background: '#1A1A28', color: C.t2, padding: '4px 10px', borderRadius: 8 }}>#{t}</span>)}
         </div>}
 
+        {canManage && editing && <div style={{ background:'#10101F', border:`1px solid ${C.accent}33`, borderRadius:14, padding:14, display:'grid', gap:12 }}>
+          <div style={{ fontWeight:900, color:C.t1, fontSize:13 }}>Редактирование опубликованной позиции</div>
+          <Input label="Название" value={draft.title} onChange={e => setDraft(d => ({ ...d, title:e.target.value }))} />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <Input label="Цена (₽)" type="number" value={draft.price} onChange={e => setDraft(d => ({ ...d, price:e.target.value }))} />
+            <Input label="Старая цена (₽)" type="number" value={draft.old_price} onChange={e => setDraft(d => ({ ...d, old_price:e.target.value }))} />
+          </div>
+          <Input label="Краткое описание" value={draft.short_desc} onChange={e => setDraft(d => ({ ...d, short_desc:e.target.value }))} />
+          <Textarea label="Описание" rows={5} value={draft.description} onChange={e => setDraft(d => ({ ...d, description:e.target.value }))} />
+          {product.delivery_type === 'auto' && <Textarea label="Инструкция покупателю после получения ключа" rows={3} value={draft.auto_delivery_message} onChange={e => setDraft(d => ({ ...d, auto_delivery_message:e.target.value }))} />}
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}><Btn variant="ghost" onClick={() => setEditing(false)}>Отмена</Btn><Btn loading={loading === 'save'} onClick={saveEdit}>Сохранить</Btn></div>
+        </div>}
+
+        {canManage && product.delivery_type === 'auto' && <div style={{ background:'#0A0A12', border:`1px solid ${C.border}`, borderRadius:14, padding:14 }}>
+          <div style={{ fontSize:12, fontWeight:900, color:C.t1, marginBottom:10 }}>Остаток ключей: {keys.filter(key => !key.is_sold).length}</div>
+          <Textarea rows={3} value={keysText} onChange={e => setKeysText(e.target.value)} placeholder="Новые ключи, по одному на строку" />
+          <div style={{ display:'flex', justifyContent:'flex-end', marginTop:8 }}><Btn size="sm" variant="green" loading={loading === 'keys'} onClick={addInventory}>Добавить ключи</Btn></div>
+          <div style={{ maxHeight:170, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginTop:10 }}>
+            {keys.filter(key => !key.is_sold).map(key => <div key={key.id} style={{ display:'flex', gap:8, alignItems:'center', background:'#111119', borderRadius:8, padding:'7px 9px' }}><code style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', color:C.t2, fontSize:11 }}>{key.key_value}</code><Btn size="sm" variant="danger" onClick={() => removeKey(key.id)}>Удалить</Btn></div>)}
+          </div>
+        </div>}
+
         {showReject && <div>
           <label style={{ fontSize: 12, fontWeight: 800, color: C.t2, display: 'block', marginBottom: 8 }}>Причина отклонения</label>
           <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Напишите причину для автора..." style={{ width: '100%', background: '#0A0A12', border: `1px solid ${C.red}44`, borderRadius: 10, padding: '11px 13px', color: C.t1, fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'vertical' }} />
@@ -89,9 +181,11 @@ function ProductDetail({ product, onClose, onAction }) {
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Btn full variant="ghost" onClick={onClose}>Закрыть</Btn>
+          {canManage && product.status !== 'archived' && <Btn full variant="ghost" onClick={() => setEditing(value => !value)}>{editing ? 'Скрыть редактор' : 'Редактировать'}</Btn>}
+          {canManage && product.status === 'active' && <Btn full variant="danger" onClick={archiveItem}>Архивировать</Btn>}
           {!showReject ? <>
-            <Btn full variant="danger" onClick={() => setShowReject(true)}>Отклонить</Btn>
-            <Btn full variant="green" loading={loading === 'approve'} onClick={handleApprove}>Одобрить</Btn>
+            {product.status === 'pending' && <><Btn full variant="danger" onClick={() => setShowReject(true)}>Отклонить</Btn>
+            <Btn full variant="green" loading={loading === 'approve'} onClick={handleApprove}>Одобрить</Btn></>}
           </> : <>
             <Btn full variant="ghost" onClick={() => setShowReject(false)}>Назад</Btn>
             <Btn full variant="danger" loading={loading === 'reject'} disabled={!reason.trim()} onClick={handleReject}>Отклонить с причиной</Btn>
@@ -138,18 +232,23 @@ function ModerationCard({ product, filter, onSelect, onAction }) {
 
 export default function ProductsModerationPage() {
   const toast = useToast();
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
   const [kind, setKind] = useState('all');
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
+  function loadProducts() {
     setLoading(true);
     getPendingProducts({ status: filter, limit: 80 })
       .then(r => setProducts(r.data.products || []))
       .catch(() => toast.error('Ошибка загрузки'))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadProducts();
   }, [filter]);
 
   async function handleAction(type, id, reason) {
@@ -159,6 +258,15 @@ export default function ProductsModerationPage() {
       toast.success(type === 'approve' ? 'Одобрено' : 'Отклонено');
       setProducts(prev => prev.filter(p => p.id !== id));
     } catch (err) { toast.error(err.response?.data?.error || 'Ошибка'); }
+  }
+
+  function handleChanged(product) {
+    if (!product) {
+      loadProducts();
+      return;
+    }
+    setProducts(current => current.map(item => item.id === product.id ? { ...item, ...product } : item));
+    setSelected(current => current?.id === product.id ? { ...current, ...product } : current);
   }
 
   const visible = products.filter(p => kind === 'all' ? true : kind === 'services' ? p.delivery_type === 'service' : p.delivery_type !== 'service');
@@ -187,7 +295,7 @@ export default function ProductsModerationPage() {
             {visible.map(p => <ModerationCard key={p.id} product={p} filter={filter} onSelect={setSelected} onAction={handleAction} />)}
           </div>}
       </div>
-      {selected && <ProductDetail product={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
+      {selected && <ProductDetail product={selected} onClose={() => setSelected(null)} onAction={handleAction} onChanged={handleChanged} canManage={user?.role === 'admin'} />}
     </AdminLayout>
   );
 }

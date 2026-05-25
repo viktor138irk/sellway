@@ -27,7 +27,7 @@ function normalizeServiceSteps(input) {
   })).filter(step => step.title);
 }
 
-function buildMeta(deliveryType, serviceSteps, previous = {}) {
+function buildMeta(deliveryType, serviceSteps, autoDeliveryMessage, previous = {}) {
   const meta = previous && typeof previous === 'object' && !Array.isArray(previous) ? { ...previous } : {};
   if (deliveryType === 'service') {
     meta.service = true;
@@ -37,6 +37,11 @@ function buildMeta(deliveryType, serviceSteps, previous = {}) {
     delete meta.service;
     delete meta.service_price_mode;
     delete meta.service_steps;
+  }
+  if (deliveryType === 'auto' && String(autoDeliveryMessage || '').trim()) {
+    meta.auto_delivery_message = String(autoDeliveryMessage).trim().slice(0, 4000);
+  } else {
+    delete meta.auto_delivery_message;
   }
   return meta;
 }
@@ -183,7 +188,11 @@ router.get('/:id', optionalAuth, async (req, res) => {
        FROM reviews r JOIN users u ON u.id = r.buyer_id WHERE r.product_id = $1 ORDER BY r.created_at DESC LIMIT 10`,
       [req.params.id]
     );
-    res.json({ ...rows[0], reviews });
+    const product = { ...rows[0], meta: { ...(rows[0].meta || {}) } };
+    if ((!req.user || req.user.id !== product.seller_id) && req.user?.role !== 'admin') {
+      delete product.meta.auto_delivery_message;
+    }
+    res.json({ ...product, reviews });
   } catch (err) {
     logger.error('Get product error', { err: err.message });
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -199,12 +208,12 @@ router.post('/', auth, requireRole('seller', 'freelancer', 'admin'), [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
 
-  const { title, description, short_desc, price, old_price, category_id, delivery_type, guarantee_days, service_steps } = req.body;
+  const { title, description, short_desc, price, old_price, category_id, delivery_type, guarantee_days, service_steps, auto_delivery_message } = req.body;
   const roleError = assertRoleCanUseDelivery(req.user, delivery_type);
   if (roleError) return res.status(403).json({ error: roleError });
 
   const tags = normalizeTags(req.body.tags);
-  const meta = buildMeta(delivery_type, service_steps);
+  const meta = buildMeta(delivery_type, service_steps, auto_delivery_message);
 
   try {
     const categoryError = await assertCategoryMatchesDelivery(category_id, delivery_type);
@@ -228,11 +237,11 @@ router.post('/', auth, requireRole('seller', 'freelancer', 'admin'), [
 
 router.put('/:id', auth, requireRole('seller', 'freelancer', 'admin'), async (req, res) => {
   try {
-    const { rows: [existing] } = await query('SELECT seller_id, category_id, delivery_type, meta FROM products WHERE id=$1', [req.params.id]);
+    const { rows: [existing] } = await query('SELECT seller_id, category_id, delivery_type, status, meta FROM products WHERE id=$1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     if (existing.seller_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Нет доступа' });
 
-    const { title, description, short_desc, price, old_price, category_id, delivery_type, guarantee_days, service_steps } = req.body;
+    const { title, description, short_desc, price, old_price, category_id, delivery_type, guarantee_days, service_steps, auto_delivery_message } = req.body;
     const finalDeliveryType = delivery_type || existing.delivery_type;
     const roleError = assertRoleCanUseDelivery(req.user, finalDeliveryType);
     if (roleError) return res.status(403).json({ error: roleError });
@@ -243,16 +252,18 @@ router.put('/:id', auth, requireRole('seller', 'freelancer', 'admin'), async (re
     if (!commercial.ok) return res.status(commercial.status || 403).json({ error: commercial.error, code: commercial.code });
 
     const tags = normalizeTags(req.body.tags);
-    const meta = buildMeta(finalDeliveryType, service_steps, existing.meta);
+    const meta = buildMeta(finalDeliveryType, service_steps, auto_delivery_message, existing.meta);
+    const isAdminEdit = req.user.role === 'admin';
     const { rows: [product] } = await query(
       `UPDATE products SET
          title=COALESCE($1,title), description=$2, short_desc=$3,
          price=COALESCE($4,price), old_price=$5, category_id=COALESCE($6,category_id),
          delivery_type=COALESCE($7,delivery_type), guarantee_days=$8, tags=$9, meta=$10::jsonb,
-         status = CASE WHEN status='active' THEN 'pending' ELSE status END
-       WHERE id=$11 RETURNING *`,
-      [title, description, short_desc, price, old_price || null, category_id, delivery_type, guarantee_days || 0, tags, JSON.stringify(meta), req.params.id]
+         status = CASE WHEN $11::boolean THEN status ELSE 'pending' END
+       WHERE id=$12 RETURNING *`,
+      [title, description, short_desc, price, old_price || null, category_id, delivery_type, guarantee_days || 0, tags, JSON.stringify(meta), isAdminEdit, req.params.id]
     );
+    if (!isAdminEdit) notify.adminNewProduct(product).catch(() => {});
     res.json(product);
   } catch (err) {
     logger.error('Update product error', { err: err.message });

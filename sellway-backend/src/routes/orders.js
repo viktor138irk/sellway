@@ -76,7 +76,7 @@ router.post('/', auth, async (req, res) => {
         if (soldKeys.length !== quantity) throw { status: 400, message: 'Не удалось зарезервировать нужное количество ключей' };
         keys = soldKeys;
         if (keys.length) {
-          await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=COALESCE(meta,'{}'::jsonb) || $2::jsonb WHERE id=$3", [keys[0].id, JSON.stringify({ keys: keys.map(k => k.key_value) }), order.id]);
+          await client.query("UPDATE orders SET status='delivered', key_id=$1, delivered_at=NOW(), auto_confirm_at=NOW()+INTERVAL '48 hours', meta=COALESCE(meta,'{}'::jsonb) || $2::jsonb WHERE id=$3", [keys[0].id, JSON.stringify({ keys: keys.map(k => k.key_value), auto_delivery_message: product.meta?.auto_delivery_message || '' }), order.id]);
           await client.query(`INSERT INTO order_messages (order_id, sender_id, message, is_system) VALUES ($1,$2,$3,TRUE)`, [order.id, product.seller_user_id, `Ключи переданы автоматически: ${keys.length} шт.`]);
         }
       } else if (product.delivery_type === 'file') {
@@ -140,7 +140,7 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const { rows: [order] } = await query(
       `SELECT o.*, p.title AS product_title, p.description AS product_desc, p.delivery_type,
-              o.meta->'file' AS file, o.meta->'keys' AS key_values, pk.key_value,
+              o.meta->'file' AS file, o.meta->'keys' AS key_values, o.meta->>'auto_delivery_message' AS auto_delivery_message, pk.key_value,
               buyer.username AS buyer_name, buyer.avatar_url AS buyer_avatar,
               buyer.buyer_rating, buyer.buyer_reviews_count,
               seller.username AS seller_name, seller.avatar_url AS seller_avatar,
