@@ -29,6 +29,30 @@ const bot = new TelegramBot(telegramToken, {
 
 let pollingRetryTimer = null;
 const adminChatId = String(process.env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
+const pendingSupportReplies = new Map();
+
+function adminKeyboard() {
+  return {
+    reply_markup: {
+      keyboard: [
+        [{ text: 'Товары на модерации' }, { text: 'Аккаунты на модерации' }],
+        [{ text: 'Обращения поддержки' }, { text: 'Статус' }],
+      ],
+      resize_keyboard: true,
+    },
+  };
+}
+
+function supportActions(threadId) {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: 'Ответить', callback_data: `support:reply:${threadId}` },
+        { text: 'Закрыть', callback_data: `support:close:${threadId}` },
+      ]],
+    },
+  };
+}
 
 function chatIdOf(msgOrQuery) {
   return msgOrQuery?.message?.chat?.id || msgOrQuery?.chat?.id;
@@ -77,7 +101,8 @@ bot.onText(/\/start|\/help/, async (msg) => {
   if (await rejectIfNotAdmin(msg)) return;
   await bot.sendMessage(
     msg.chat.id,
-    `SellWay Admin Bot\n\nChat ID: ${msg.chat.id}\n\nКоманды:\n/pending_products - товары и услуги на модерации\n/pending_users - продавцы и фрилансеры на модерации\n/status - статус бота`
+    `SellWay Admin Bot\n\nChat ID: ${msg.chat.id}\n\nВыберите действие кнопкой ниже.`,
+    adminKeyboard()
   );
 });
 
@@ -85,12 +110,12 @@ bot.onText(/\/id/, async (msg) => {
   await bot.sendMessage(msg.chat.id, String(msg.chat.id));
 });
 
-bot.onText(/\/status/, async (msg) => {
+bot.onText(/\/status|^Статус$/, async (msg) => {
   if (await rejectIfNotAdmin(msg)) return;
   await bot.sendMessage(msg.chat.id, 'SellWay Admin Bot работает.');
 });
 
-bot.onText(/\/pending_products/, async (msg) => {
+bot.onText(/\/pending_products|^Товары на модерации$/, async (msg) => {
   if (await rejectIfNotAdmin(msg)) return;
   try {
     const { rows } = await query(
@@ -118,7 +143,7 @@ bot.onText(/\/pending_products/, async (msg) => {
   }
 });
 
-bot.onText(/\/pending_users/, async (msg) => {
+bot.onText(/\/pending_users|^Аккаунты на модерации$/, async (msg) => {
   if (await rejectIfNotAdmin(msg)) return;
   try {
     const { rows } = await query(
@@ -149,6 +174,50 @@ bot.onText(/\/pending_users/, async (msg) => {
   }
 });
 
+bot.onText(/\/support|^Обращения поддержки$/, async (msg) => {
+  if (await rejectIfNotAdmin(msg)) return;
+  try {
+    const { rows } = await query(
+      `SELECT st.id, st.updated_at, u.username, u.email,
+              (SELECT sm.message FROM support_messages sm
+               WHERE sm.thread_id=st.id ORDER BY sm.created_at DESC LIMIT 1) AS last_message
+       FROM support_threads st
+       JOIN users u ON u.id=st.user_id
+       WHERE st.status='open'
+       ORDER BY st.updated_at DESC
+       LIMIT 10`
+    );
+    if (!rows.length) return bot.sendMessage(msg.chat.id, 'Открытых обращений нет.');
+    for (const thread of rows) {
+      const body = String(thread.last_message || '').slice(0, 500);
+      await bot.sendMessage(
+        msg.chat.id,
+        `Обращение [${String(thread.id).slice(0, 8)}]\nОт: ${thread.username} (${thread.email})\n\n${body}`,
+        supportActions(thread.id)
+      );
+    }
+  } catch (err) {
+    logger.error('Admin bot support list error', { err: err.message });
+    bot.sendMessage(msg.chat.id, 'Не удалось загрузить обращения.');
+  }
+});
+
+async function saveSupportReply(threadId, message) {
+  const { rows: [thread] } = await query(
+    "SELECT id, user_id FROM support_threads WHERE id=$1 AND status='open'",
+    [threadId]
+  );
+  if (!thread) throw new Error('Support thread is closed or not found');
+  await query(
+    `INSERT INTO support_messages (thread_id, sender_type, message)
+     VALUES ($1,'admin',$2)`,
+    [thread.id, message]
+  );
+  await query('UPDATE support_threads SET updated_at=NOW() WHERE id=$1', [thread.id]);
+  await notify.create(thread.user_id, 'system', 'Ответ поддержки', message, null).catch(() => {});
+  return thread;
+}
+
 bot.onText(/\/reply\s+([0-9a-f-]{8,36})\s+([\s\S]+)/i, async (msg, match) => {
   if (await rejectIfNotAdmin(msg)) return;
   const reference = String(match?.[1] || '').trim();
@@ -163,14 +232,7 @@ bot.onText(/\/reply\s+([0-9a-f-]{8,36})\s+([\s\S]+)/i, async (msg, match) => {
       [`${reference}%`]
     );
     if (rows.length !== 1) return bot.sendMessage(msg.chat.id, rows.length ? 'Уточните ID диалога полностью.' : 'Диалог не найден.');
-    const thread = rows[0];
-    await query(
-      `INSERT INTO support_messages (thread_id, sender_type, message)
-       VALUES ($1,'admin',$2)`,
-      [thread.id, message]
-    );
-    await query('UPDATE support_threads SET updated_at=NOW() WHERE id=$1', [thread.id]);
-    await notify.create(thread.user_id, 'system', 'Ответ поддержки', message, null).catch(() => {});
+    const thread = await saveSupportReply(rows[0].id, message);
     await bot.sendMessage(msg.chat.id, `Ответ отправлен в диалог ${String(thread.id).slice(0, 8)}.`);
   } catch (err) {
     logger.error('Admin bot support reply error', { err: err.message, reference });
@@ -181,8 +243,38 @@ bot.onText(/\/reply\s+([0-9a-f-]{8,36})\s+([\s\S]+)/i, async (msg, match) => {
 bot.on('callback_query', async (cq) => {
   if (await rejectIfNotAdmin(cq)) return bot.answerCallbackQuery(cq.id).catch(() => {});
   const [entity, action, id] = String(cq.data || '').split(':');
-  if (!['product', 'user'].includes(entity) || !['approve', 'reject'].includes(action) || !id) return;
+  if (!id) return;
   try {
+    if (entity === 'support' && action === 'reply') {
+      pendingSupportReplies.set(String(cq.message.chat.id), { threadId: id });
+      await bot.answerCallbackQuery(cq.id, { text: 'Введите ответ' });
+      return bot.sendMessage(
+        cq.message.chat.id,
+        `Напишите ответ пользователю по обращению ${String(id).slice(0, 8)}:`,
+        { reply_markup: { inline_keyboard: [[{ text: 'Отменить ответ', callback_data: 'support:cancel:reply' }]] } }
+      );
+    }
+
+    if (entity === 'support' && action === 'cancel') {
+      pendingSupportReplies.delete(String(cq.message.chat.id));
+      await bot.answerCallbackQuery(cq.id, { text: 'Отменено' });
+      return bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: cq.message.chat.id, message_id: cq.message.message_id }).catch(() => {});
+    }
+
+    if (entity === 'support' && action === 'close') {
+      const { rows: [thread] } = await query(
+        "UPDATE support_threads SET status='closed', updated_at=NOW() WHERE id=$1 AND status='open' RETURNING id, user_id",
+        [id]
+      );
+      if (!thread) throw new Error('Support thread is closed or not found');
+      pendingSupportReplies.delete(String(cq.message.chat.id));
+      await notify.create(thread.user_id, 'system', 'Обращение закрыто', 'Поддержка завершила обращение. Если вопрос остался, напишите новое сообщение.', null).catch(() => {});
+      await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: cq.message.chat.id, message_id: cq.message.message_id }).catch(() => {});
+      await bot.answerCallbackQuery(cq.id, { text: 'Обращение закрыто' });
+      return bot.sendMessage(cq.message.chat.id, `Обращение ${String(id).slice(0, 8)} закрыто.`);
+    }
+
+    if (!['product', 'user'].includes(entity) || !['approve', 'reject'].includes(action)) return;
     if (entity === 'product') {
       const status = action === 'approve' ? 'active' : 'rejected';
       const reason = action === 'reject' ? 'Отклонено администратором в Telegram' : null;
@@ -240,6 +332,27 @@ bot.on('callback_query', async (cq) => {
   }
 });
 
+bot.on('message', async msg => {
+  if (!isAdminChat(msg)) return;
+  const text = String(msg.text || '').trim();
+  if (!text || text.startsWith('/') || ['Товары на модерации', 'Аккаунты на модерации', 'Обращения поддержки', 'Статус'].includes(text)) return;
+  const pending = pendingSupportReplies.get(String(msg.chat.id));
+  if (!pending) return;
+  try {
+    const thread = await saveSupportReply(pending.threadId, text.slice(0, 2000));
+    pendingSupportReplies.delete(String(msg.chat.id));
+    await bot.sendMessage(
+      msg.chat.id,
+      `Ответ отправлен в обращение ${String(thread.id).slice(0, 8)}.`,
+      supportActions(thread.id)
+    );
+  } catch (err) {
+    pendingSupportReplies.delete(String(msg.chat.id));
+    logger.error('Admin bot button support reply error', { err: err.message, threadId: pending.threadId });
+    await bot.sendMessage(msg.chat.id, 'Не удалось отправить ответ. Возможно, обращение уже закрыто.');
+  }
+});
+
 async function sendToChat(chatId, text, options = {}) {
   try {
     await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...options });
@@ -255,7 +368,8 @@ async function sendSupportMessage(threadId, user, message) {
   const body = String(message).slice(0, 1500);
   await bot.sendMessage(
     adminChatId,
-    `Новое сообщение поддержки [${shortId}]\nОт: ${user.username} (${user.email})\n\n${body}\n\nОтвет: /reply ${shortId} текст`
+    `Новое сообщение поддержки [${shortId}]\nОт: ${user.username} (${user.email})\n\n${body}`,
+    supportActions(threadId)
   );
 }
 
