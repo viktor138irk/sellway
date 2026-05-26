@@ -48,6 +48,15 @@ function mailFrom() {
   return `"SellWay" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`;
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendVerifyEmail(email, username, token) {
   const link = `${BASE}/verify-email/${token}`;
   await createTransporter().sendMail({
@@ -76,6 +85,29 @@ async function sendGuestPasswordEmail(email, username, password) {
   });
 }
 
+async function sendCommercialApprovedEmail(email, username, role) {
+  const freelancer = role === 'freelancer';
+  const accountType = freelancer ? 'фрилансера' : 'продавца';
+  const action = freelancer ? 'публиковать услуги и принимать заказы' : 'публиковать товары и принимать заказы';
+  const link = `${BASE}/seller`;
+  await createTransporter().sendMail({
+    from: mailFrom(),
+    to: email,
+    subject: `SellWay — аккаунт ${accountType} одобрен`,
+    html: `<h2>Здравствуйте, ${escapeHtml(username)}!</h2><p>Ваша заявка на аккаунт ${accountType} успешно прошла модерацию.</p><p>Теперь вы можете ${action} на SellWay.</p><p><a href="${link}">Перейти в кабинет</a></p>`,
+  });
+}
+
+async function sendReferralApprovedEmail(email, username) {
+  const link = `${BASE}/seller/referrals`;
+  await createTransporter().sendMail({
+    from: mailFrom(),
+    to: email,
+    subject: 'SellWay — участие в реферальной программе одобрено',
+    html: `<h2>Здравствуйте, ${escapeHtml(username)}!</h2><p>Ваша заявка на участие в реферальной программе успешно одобрена.</p><p>Реферальная ссылка и статистика доступны в кабинете.</p><p><a href="${link}">Открыть реферальный кабинет</a></p>`,
+  });
+}
+
 async function sendTestEmail(email) {
   const cfg = smtpConfig();
   const transporter = createTransporter();
@@ -95,4 +127,11 @@ async function sendTestEmail(email) {
   }
 }
 
-module.exports = { sendVerifyEmail, sendResetEmail, sendGuestPasswordEmail, sendTestEmail };
+module.exports = {
+  sendVerifyEmail,
+  sendResetEmail,
+  sendGuestPasswordEmail,
+  sendCommercialApprovedEmail,
+  sendReferralApprovedEmail,
+  sendTestEmail,
+};

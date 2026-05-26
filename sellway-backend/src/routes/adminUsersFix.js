@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { query, transaction } = require('../config/db');
 const { auth, requireRole } = require('../middleware/auth');
 const logger = require('../config/logger');
+const { sendCommercialApprovedEmail } = require('../services/mailer');
 
 const COMMERCIAL_ROLES = ['seller', 'freelancer', 'admin'];
 
@@ -203,6 +204,7 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
   const allowedRoles = ['buyer', 'seller', 'freelancer', 'moderator', 'admin'];
   if (role && !allowedRoles.includes(role)) return res.status(400).json({ error: 'Некорректная роль' });
   try {
+    let newlyApprovedCommercial = false;
     const result = await transaction(async (client) => {
       const { rows: [user] } = await client.query('UPDATE users SET role=COALESCE($1,role), status=COALESCE($2,status) WHERE id=$3 RETURNING id, email, username, role, status', [role || null, status || null, req.params.id]);
       if (!user) throw { status: 404, message: 'Пользователь не найден' };
@@ -234,12 +236,13 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
           const approved = seller_verified === true || seller_verified === 'true';
           if (approved) {
             const { rows: [profile] } = await client.query(
-              'SELECT commercial_terms_accepted_at FROM sellers WHERE user_id=$1',
+              'SELECT commercial_terms_accepted_at, verified, commercial_application_status FROM sellers WHERE user_id=$1 FOR UPDATE',
               [user.id]
             );
             if (!profile?.commercial_terms_accepted_at) {
               throw { status: 400, message: 'Пользователь еще не принял дополнительные условия' };
             }
+            newlyApprovedCommercial = !(profile.verified && profile.commercial_application_status === 'approved');
           }
           values.push(approved); updates.push(`verified=$${values.length}`);
           updates.push(`verified_at=CASE WHEN ${approved ? 'TRUE' : 'FALSE'} THEN NOW() ELSE NULL END`);
@@ -253,17 +256,30 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
       return user;
     });
     logger.info('User updated by admin users fix', { targetId: req.params.id, adminId: req.user.id, role, status });
+    if (newlyApprovedCommercial) {
+      await sendCommercialApprovedEmail(result.email, result.username, result.role).catch(err => {
+        logger.error('Commercial approval email error', { err: err.message, userId: result.id });
+      });
+    }
     res.json(result);
   } catch (err) { if (err.status) return res.status(err.status).json({ error: err.message }); logger.error('Admin users update error', { err: err.message }); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 router.post('/users/:id/approve-commercial', requireRole('admin'), async (req, res) => {
   try {
-    const { rows: [user] } = await transaction(async (client) => {
+    const { user, newlyApproved } = await transaction(async (client) => {
       const { rows: [target] } = await client.query('SELECT id, username, email, role FROM users WHERE id=$1', [req.params.id]);
       if (!target) throw { status: 404, message: 'Пользователь не найден' };
       if (!COMMERCIAL_ROLES.includes(target.role)) throw { status: 400, message: 'Это не коммерческая роль' };
       await ensureSellerProfile(client, target);
+      const { rows: [profile] } = await client.query(
+        'SELECT commercial_terms_accepted_at, verified, commercial_application_status FROM sellers WHERE user_id=$1 FOR UPDATE',
+        [target.id]
+      );
+      if (!profile?.commercial_terms_accepted_at) throw { status: 400, message: 'Пользователь еще не принял дополнительные условия' };
+      if (profile.verified && profile.commercial_application_status === 'approved') {
+        return { user: target, newlyApproved: false };
+      }
       const { rows } = await client.query(
         `UPDATE sellers
          SET verified=TRUE,
@@ -278,10 +294,15 @@ router.post('/users/:id/approve-commercial', requireRole('admin'), async (req, r
         [req.user.id, target.id]
       );
       if (!rows.length) throw { status: 400, message: 'Пользователь еще не принял дополнительные условия' };
-      return { rows: [target] };
+      return { user: target, newlyApproved: true };
     });
     if (!user) return res.status(404).json({ error: 'Профиль не найден' });
-    res.json({ message: 'Коммерческий аккаунт одобрен', user });
+    if (newlyApproved) {
+      await sendCommercialApprovedEmail(user.email, user.username, user.role).catch(err => {
+        logger.error('Commercial approval email error', { err: err.message, userId: user.id });
+      });
+    }
+    res.json({ message: 'Коммерческий аккаунт одобрен', user, alreadyApproved: !newlyApproved });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     logger.error('Approve commercial user error', { err: err.message, targetId: req.params.id });

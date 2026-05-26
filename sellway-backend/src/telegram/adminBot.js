@@ -8,6 +8,7 @@ const { query, transaction } = require('../config/db');
 const notify = require('../services/notify');
 const { paySellerReferral } = require('../services/referrals');
 const { canUseReferralProgram } = require('../services/referralEligibility');
+const { sendCommercialApprovedEmail, sendReferralApprovedEmail } = require('../services/mailer');
 const { createTelegramRequestOptions } = require('./proxy');
 
 const telegramToken = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
@@ -548,18 +549,28 @@ async function rejectProduct(id, reason) {
 
 async function decideCommercial(id, approved, reason = '') {
   const admin = await actingAdmin();
-  const { rows: [user] } = await query('SELECT id, username, role FROM users WHERE id=$1', [id]);
+  const { rows: [user] } = await query(
+    `SELECT u.id, u.username, u.email, u.role, s.verified, s.commercial_application_status
+     FROM users u JOIN sellers s ON s.user_id=u.id WHERE u.id=$1`,
+    [id]
+  );
   if (!user) throw new Error('Пользователь не найден');
+  if (approved && user.verified && user.commercial_application_status === 'approved') return;
   const { rows: [seller] } = await query(
     `UPDATE sellers SET verified=$1, verified_at=CASE WHEN $1 THEN NOW() ELSE NULL END,
        commercial_application_status=CASE WHEN $1 THEN 'approved' ELSE 'rejected' END,
        commercial_reviewed_at=NOW(), commercial_reviewed_by=$2, commercial_reject_reason=$3, updated_at=NOW()
-     WHERE user_id=$4 AND (NOT $1 OR commercial_terms_accepted_at IS NOT NULL) RETURNING user_id`,
+     WHERE user_id=$4 AND (NOT $1 OR (commercial_terms_accepted_at IS NOT NULL AND commercial_application_status='pending')) RETURNING user_id`,
     [approved, admin.id, approved ? null : reason, id]
   );
   if (!seller) throw new Error('Пользователь не принял дополнительные условия или заявка отсутствует');
   await notify.create(id, 'system', approved ? 'Коммерческий аккаунт одобрен' : 'Коммерческий аккаунт отклонен',
     approved ? 'Теперь можно публиковать товары или услуги.' : reason, '/seller/products').catch(() => {});
+  if (approved) {
+    await sendCommercialApprovedEmail(user.email, user.username, user.role).catch(err => {
+      logger.error('Telegram commercial approval email error', { err: err.message, userId: user.id });
+    });
+  }
   await audit(admin.id, approved ? 'commercial_approved' : 'commercial_rejected', 'seller', id, { reason });
 }
 
@@ -635,18 +646,29 @@ async function rejectWithdrawal(id, reason) {
 async function decideReferral(userId, approved, reason = '') {
   const admin = await actingAdmin();
   const { rows: [user] } = await query(
-    `SELECT u.id, u.email_verified, u.phone_verified, u.telegram_verified FROM users u JOIN sellers s ON s.user_id=u.id WHERE u.id=$1`,
+    `SELECT u.id, u.username, u.email, u.email_verified, u.phone_verified, u.telegram_verified,
+            s.referral_application_status, s.referral_enabled
+     FROM users u JOIN sellers s ON s.user_id=u.id WHERE u.id=$1`,
     [userId]
   );
   if (!user) throw new Error('Пользователь не найден');
+  if (approved && user.referral_application_status === 'approved' && user.referral_enabled) return;
+  if (user.referral_application_status !== 'pending') throw new Error('Заявка уже обработана');
   if (approved && !canUseReferralProgram(user)) throw new Error('Нужно подтвердить email, телефон и Telegram');
-  await query(
+  const { rows: [seller] } = await query(
     `UPDATE sellers SET referral_enabled=$1, referral_application_status=$2, referral_reviewed_at=NOW(),
-       referral_reviewed_by=$3, referral_reject_reason=$4 WHERE user_id=$5`,
+       referral_reviewed_by=$3, referral_reject_reason=$4, updated_at=NOW()
+     WHERE user_id=$5 AND referral_application_status='pending' RETURNING user_id`,
     [approved, approved ? 'approved' : 'rejected', admin.id, approved ? null : reason, userId]
   );
+  if (!seller) throw new Error('Заявка уже обработана');
   await notify.create(userId, 'system', approved ? 'Реферальная программа одобрена' : 'Заявка на реферальную программу отклонена',
     approved ? 'Администратор одобрил ваше участие в реферальной программе.' : reason, '/seller/referrals').catch(() => {});
+  if (approved) {
+    await sendReferralApprovedEmail(user.email, user.username).catch(err => {
+      logger.error('Telegram referral approval email error', { err: err.message, userId: user.id });
+    });
+  }
   await audit(admin.id, approved ? 'referral_approved' : 'referral_rejected', 'seller', userId, { reason });
 }
 

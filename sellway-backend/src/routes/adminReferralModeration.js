@@ -4,6 +4,7 @@ const { auth, requireRole } = require('../middleware/auth');
 const notify = require('../services/notify');
 const logger = require('../config/logger');
 const { canUseReferralProgram, referralRequirements } = require('../services/referralEligibility');
+const { sendReferralApprovedEmail } = require('../services/mailer');
 
 router.use(auth, requireRole('admin'));
 
@@ -59,6 +60,9 @@ router.post('/referrals/:userId/approve', async (req, res) => {
     });
     if (!result.alreadyApproved) {
       await notify.create(result.user.id, 'system', 'Реферальная программа одобрена', 'Администратор одобрил ваше участие в реферальной программе.', '/seller/referrals').catch(() => {});
+      await sendReferralApprovedEmail(result.user.email, result.user.username).catch(err => {
+        logger.error('Referral approval email error', { err: err.message, userId: result.user.id });
+      });
       logger.info('Referral application approved', { userId: result.user.id, adminId: req.user.id });
     }
     res.set('Cache-Control', 'no-store').json({ message: 'Участие в реферальной программе одобрено', seller: result.seller, alreadyApproved: Boolean(result.alreadyApproved) });
