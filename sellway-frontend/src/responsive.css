@@ -514,8 +514,18 @@ textarea {
     padding: 0 4px !important;
   }
 
-  .site-nav a {
-    padding-left: 11px !important;
-    padding-right: 11px !important;
+  .site-nav {
+    overflow-x: hidden !important;
+  }
+
+  .site-nav > a,
+  .site-nav > button {
+    padding-left: 7px !important;
+    padding-right: 7px !important;
+    font-size: 11px !important;
+  }
+
+  .site-nav > button {
+    gap: 3px !important;
   }
 }
