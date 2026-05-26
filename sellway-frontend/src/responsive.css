@@ -257,11 +257,6 @@ textarea {
     width: 100%;
   }
 
-  [style*="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))"],
-  [style*="grid-template-columns: repeat(auto-fill,minmax(280px,1fr))"] {
-    grid-template-columns: 1fr !important;
-  }
-
   [style*="grid-template-columns: minmax(280px, 390px) 1fr"] {
     grid-template-columns: 1fr !important;
   }
@@ -359,6 +354,26 @@ textarea {
 
   .profile-sms-actions button {
     width: 100%;
+  }
+
+  .market-product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100%;
+  }
+
+  .market-product-grid > * {
+    min-width: 0 !important;
+    width: auto !important;
+  }
+
+  .seller-products-grid > div > div:first-child {
+    height: 104px !important;
+  }
+
+  .seller-products-grid > div > div:last-child {
+    padding: 10px !important;
   }
 
   .admin-users-list-head {

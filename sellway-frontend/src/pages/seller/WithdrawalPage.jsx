@@ -6,6 +6,13 @@ import { useToast } from '../../contexts/ToastContext';
 import useMediaQuery from '../../hooks/useMediaQuery';
 
 const METHOD_ICON = { card: '💳', sbp: '📱', paypal: '🌐', crypto: '₮' };
+const USDT_NETWORKS = [
+  ['TRC20', 'TRC-20 (TRON)'],
+  ['BEP20', 'BEP-20 (BNB Smart Chain)'],
+  ['ERC20', 'ERC-20 (Ethereum)'],
+  ['TON', 'TON'],
+  ['POLYGON', 'Polygon'],
+];
 
 export default function WithdrawalPage() {
   const toast = useToast();
@@ -19,6 +26,7 @@ export default function WithdrawalPage() {
   const [autoPayout, setAutoPayout] = useState({ enabled: false, threshold: 500 });
   const [amount, setAmount] = useState('');
   const [account, setAccount] = useState('');
+  const [network, setNetwork] = useState('TRC20');
   const [loading, setLoading] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
 
@@ -29,6 +37,7 @@ export default function WithdrawalPage() {
       const available = (config.methods || []).filter(item => item.enabled);
       const savedMethod = available.some(item => item.id === config.autoPayout?.method) ? config.autoPayout.method : available[0]?.id || 'card';
       const savedAccount = config.autoPayout?.requisites?.account || '';
+      const savedNetwork = config.autoPayout?.requisites?.network || 'TRC20';
       setMethods(available);
       setLimits({ minAmount: config.minAmount || 500, maxDaily: config.maxDaily || 100000 });
       setUsdtRate(Number(config.usdtRate || 0));
@@ -39,6 +48,7 @@ export default function WithdrawalPage() {
       });
       setMethod(savedMethod);
       setAccount(savedAccount);
+      setNetwork(savedNetwork);
     }).catch(() => toast.error('Не удалось загрузить способы вывода'));
   }, []);
 
@@ -48,12 +58,14 @@ export default function WithdrawalPage() {
   const receive = amount ? Number(amount) - fee : 0;
   const toUsdt = rub => usdtRate > 0 ? Number(rub || 0) / usdtRate : 0;
   const payoutPreview = method === 'crypto' ? `${toUsdt(receive).toLocaleString('ru', { maximumFractionDigits: 2 })} USDT` : `${receive.toLocaleString('ru')} ₽`;
+  const requisites = () => ({ account: account.trim(), ...(method === 'crypto' ? { network } : {}) });
 
   async function saveAutomaticPreference() {
     if (autoPayout.enabled && !account.trim()) return toast.warn('Укажите реквизиты для автовыплаты');
+    if (autoPayout.enabled && method === 'crypto' && !network) return toast.warn('Выберите сеть USDT');
     setAutoSaving(true);
     try {
-      await saveAutoPayout({ enabled: autoPayout.enabled, method, threshold: autoPayout.threshold, requisites: { account: account.trim() } });
+      await saveAutoPayout({ enabled: autoPayout.enabled, method, threshold: autoPayout.threshold, requisites: requisites() });
       toast.success(autoPayout.enabled ? 'Автовыплата сохранена' : 'Автовыплата отключена');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Ошибка сохранения автовыплаты');
@@ -67,11 +79,12 @@ export default function WithdrawalPage() {
     if (!amount || Number(amount) < limits.minAmount) return toast.warn(`Минимальная сумма: ${limits.minAmount.toLocaleString('ru')} ₽`);
     if (Number(amount) > balance) return toast.warn('Недостаточно средств');
     if (!account.trim()) return toast.warn('Укажите реквизиты');
+    if (method === 'crypto' && !network) return toast.warn('Выберите сеть USDT');
     setLoading(true);
     try {
-      await requestWithdraw({ amount: Number(amount), method, requisites: { account: account.trim() } });
+      await requestWithdraw({ amount: Number(amount), method, requisites: requisites() });
       if (autoAllowed) {
-        await saveAutoPayout({ enabled: autoPayout.enabled, method, threshold: autoPayout.threshold, requisites: { account: account.trim() } });
+        await saveAutoPayout({ enabled: autoPayout.enabled, method, threshold: autoPayout.threshold, requisites: requisites() });
       }
       toast.success(autoPayout.enabled ? 'Заявка подана, реквизиты автовыплаты сохранены' : 'Заявка на вывод подана');
       setBalance(current => Math.max(0, current - Number(amount)));
@@ -101,6 +114,12 @@ export default function WithdrawalPage() {
                 {methods.map(item => <option key={item.id} value={item.id}>{METHOD_ICON[item.id] || ''} {item.label} · комиссия {(Number(item.commission) * 100).toFixed(2).replace(/\.?0+$/, '')}%</option>)}
               </select>
             </label>
+            {method === 'crypto' && <label style={{ display:'grid', gap:7 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:C.t2 }}>Сеть USDT</span>
+              <select value={network} onChange={event => setNetwork(event.target.value)} style={{ width:'100%', background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:'11px 12px', color:C.t1, fontSize:13, fontFamily:'inherit' }}>
+                {USDT_NETWORKS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </select>
+            </label>}
             <div>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7 }}>
                 <label style={{ fontSize:12, fontWeight:700, color:C.t2 }}>Сумма (₽)</label>
@@ -108,7 +127,7 @@ export default function WithdrawalPage() {
               </div>
               <input type="number" min={limits.minAmount} value={amount} onChange={event => setAmount(event.target.value)} placeholder="0" style={{ width:'100%', boxSizing:'border-box', background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:'11px 13px', color:C.t1, fontSize:16, fontWeight:700, outline:'none', fontFamily:'inherit' }} />
             </div>
-            <Input label="Реквизиты" value={account} onChange={event => setAccount(event.target.value)} placeholder={selectedMethod?.placeholder || 'Укажите реквизиты'} />
+            <Input label={method === 'crypto' ? 'Адрес кошелька USDT' : 'Реквизиты'} value={account} onChange={event => setAccount(event.target.value)} placeholder={selectedMethod?.placeholder || 'Укажите реквизиты'} />
             {autoAllowed && <div style={{ background:C.field, border:`1px solid ${C.border}`, borderRadius:8, padding:14, display:'grid', gap:12 }}>
               <label style={{ display:'flex', alignItems:'center', gap:10, color:C.t1, fontWeight:700, fontSize:13, cursor:'pointer' }}>
                 <input type="checkbox" checked={autoPayout.enabled} onChange={event => setAutoPayout(current => ({ ...current, enabled:event.target.checked }))} style={{ accentColor:C.accent, width:17, height:17 }} />

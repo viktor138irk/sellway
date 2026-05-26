@@ -28,7 +28,7 @@ const PAGES = {
         ['withdraw_method_sbp_commission','Комиссия вывода через СБП','number','0.01','Для всех без индивидуальной ставки вывода. 0 = без комиссии'],
         ['withdraw_method_paypal_enabled','PayPal включен','toggle','true','Показывать вывод PayPal'],
         ['withdraw_method_paypal_commission','Комиссия вывода PayPal','number','0.02','Для всех без индивидуальной ставки вывода. 0 = без комиссии'],
-        ['withdraw_method_crypto_enabled','Криптовалюта включена','toggle','true','Показывать вывод криптовалютой'],
+        ['withdraw_method_crypto_enabled','USDT включён','toggle','true','Показывать вывод в USDT с выбором сети'],
         ['withdraw_method_crypto_commission','Комиссия вывода USDT','number','0','Вывод USDT выполняется без комиссии'],
       ]},
       { title: 'Сделки', keys: [

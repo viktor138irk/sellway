@@ -457,7 +457,7 @@ export default function ProductsPage({ mode }) {
             <div style={{ fontSize: 13, color: C.t3, marginBottom: 24 }}>{service ? 'Добавьте первую услугу, чтобы получать заказы' : 'Добавьте первый товар, чтобы начать продавать'}</div>
             <Btn onClick={() => navigate('/seller/products/new')} icon="+">{service ? 'Добавить услугу' : 'Добавить товар'}</Btn>
           </div>
-        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+        : <div className="market-product-grid seller-products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
             {products.map(p => (
               <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
                 <div style={{ height: 150, background: C.media, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

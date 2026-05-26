@@ -280,7 +280,7 @@ export default function Header() {
         <Link to="/catalog?kind=products&sort=newest" onClick={() => setMenuKind('')} style={{ padding:'9px 16px', fontSize:13, color:C.t2, textDecoration:'none', fontWeight:600, borderBottom:'2px solid transparent', whiteSpace:'nowrap' }}>✨ Новинки</Link>
         {isSellerRole && <Link to="/seller/products/new" style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: 13, color: C.accent, textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>{user.role === 'freelancer' ? '+ Услуга' : '+ Продать'}</Link>}
       </div>
-      {menuKind && <div style={{ position:'absolute', left:isMobile ? 10 : 20, right:isMobile ? 10 : 20, top:'100%', maxWidth:1160, margin:'0 auto', zIndex:5000 }}>
+      {menuKind && <div style={{ position:'absolute', left:isMobile ? 10 : 20, right:isMobile ? 10 : undefined, top:'100%', width:isMobile ? undefined : 'min(1160px, calc(100vw - 40px))', zIndex:5000 }}>
         <CatalogMenu kind={menuKind} categories={menuCategories[menuKind]} mobile={isMobile} onClose={() => setMenuKind('')} />
       </div>}
     </div>

@@ -4,7 +4,7 @@ import { C, Spinner, Btn, Modal } from '../../components/UI';
 import { getWithdrawals, approveWithdraw, rejectWithdraw } from '../../api/admin';
 import { useToast } from '../../contexts/ToastContext';
 
-const METHOD_LABEL = { card:'Карта', sbp:'СБП', paypal:'PayPal', crypto:'Крипто' };
+const METHOD_LABEL = { card:'Карта', sbp:'СБП', paypal:'PayPal', crypto:'USDT' };
 const STATUS_STYLE = { pending:{ bg:C.amber+'22', color:C.amber }, processing:{ bg:C.infoBg, color:C.accent }, completed:{ bg:C.green+'22', color:C.green }, rejected:{ bg:C.red+'22', color:C.red } };
 
 export default function WithdrawalsPage() {
@@ -62,8 +62,8 @@ export default function WithdrawalsPage() {
               return (
                 <div key={w.id} style={{ display:'grid', gridTemplateColumns:'180px 1fr 120px 120px 100px 100px', gap:12, padding:'13px 18px', borderBottom:`1px solid ${C.border}`, alignItems:'center', transition:'background .15s' }}
                   onMouseEnter={e=>e.currentTarget.style.background=C.cardHov} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <div><div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{w.username}</div><div style={{ fontSize:11, color:C.t2 }}>{METHOD_LABEL[w.method]||w.method}</div><div style={{ fontSize:10, color:C.t3 }}>{new Date(w.created_at).toLocaleString('ru')}</div></div>
-                  <div style={{ fontSize:12, color:C.t2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{req?.account || '—'}</div>
+                  <div><div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>{w.username}</div><div style={{ fontSize:11, color:C.t2 }}>{METHOD_LABEL[w.method]||w.method}{w.method === 'crypto' && req?.network ? ` · ${req.network}` : ''}</div><div style={{ fontSize:10, color:C.t3 }}>{new Date(w.created_at).toLocaleString('ru')}</div></div>
+                  <div style={{ fontSize:12, color:C.t2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{req?.account || '—'}{w.method === 'crypto' && req?.network ? ` (${req.network})` : ''}</div>
                   <div style={{ fontSize:14, fontWeight:800, color:C.t1 }}>{parseFloat(w.amount).toLocaleString('ru')} ₽</div>
                   <div><div style={{ fontSize:14, fontWeight:800, color:C.green }}>{parseFloat(w.net_amount).toLocaleString('ru')} ₽</div><div style={{ fontSize:10, color:C.t3 }}>ком. {parseFloat(w.commission).toLocaleString('ru')} ₽</div></div>
                   <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20, background:st.bg, color:st.color }}>{w.status}</span>

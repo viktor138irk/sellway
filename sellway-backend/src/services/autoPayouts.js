@@ -3,6 +3,7 @@ const logger = require('../config/logger');
 const notify = require('./notify');
 
 const METHODS = new Set(['card', 'sbp', 'paypal', 'crypto']);
+const USDT_NETWORKS = new Set(['TRC20', 'BEP20', 'ERC20', 'TON', 'POLYGON']);
 
 async function getSettings() {
   const { rows } = await query(
@@ -41,6 +42,7 @@ async function createAutomaticPayout(candidate, settings) {
     const threshold = Number(seller.auto_payout_threshold || settings.min_withdrawal || 500);
     const minAmount = Number(settings.min_withdrawal || 500);
     if (!METHODS.has(method) || settings[`withdraw_method_${method}_enabled`] === 'false' || !String(requisites.account || '').trim()) return null;
+    if (method === 'crypto' && !USDT_NETWORKS.has(String(requisites.network || ''))) return null;
     if (balance < threshold || balance < minAmount) return null;
 
     const { rows: [pending] } = await client.query(
@@ -96,7 +98,7 @@ async function runAutoPayouts() {
       notify.notifyAdmins(
         'system',
         'Автовыплата: новая заявка',
-        `${candidate.username}: ${Number(withdrawal.amount).toLocaleString('ru')} ₽ через ${withdrawal.method}`,
+        `${candidate.username}: ${Number(withdrawal.amount).toLocaleString('ru')} ₽ через ${withdrawal.method === 'crypto' ? `USDT (${withdrawal.requisites?.network})` : withdrawal.method}`,
         '/admin/withdrawals'
       ).catch(() => {});
       logger.info('Automatic withdrawal requested', { userId: candidate.user_id, amount: withdrawal.amount, method: withdrawal.method });

@@ -41,7 +41,7 @@ export default function FavoritesPage() {
         <div style={{ color:C.t2, fontSize:13, marginBottom:20 }}>Нажимайте на сердце в каталоге, чтобы вернуться к позиции позже.</div>
         <Link to="/catalog?kind=products"><Btn>Открыть каталог</Btn></Link>
       </div>
-    : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(225px,1fr))', gap:12 }}>
+    : <div className="market-product-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(225px,1fr))', gap:12 }}>
         {products.map(product => <div key={product.id} role="button" tabIndex={0} onClick={() => navigate(`/product/${product.id}`)} onKeyDown={event => event.key === 'Enter' && navigate(`/product/${product.id}`)} style={{ cursor:'pointer', background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden', minWidth:0 }}>
           <div style={{ position:'relative', height:132, background:C.media }}>
             {product.images?.[0] ? <img src={product.images[0]} alt={product.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--sw-serif)', fontSize:36, color:C.accent }}>{String(product.title || 'S').slice(0, 1)}</div>}
