@@ -37,14 +37,22 @@ export default function AdminReferralsPage() {
   }
 
   async function approve(userId) {
-    try { await approveReferral(userId, {}); toast.success('Заявка одобрена'); load(); }
+    try {
+      await approveReferral(userId, {});
+      setData(current => current ? { ...current, applications: (current.applications || []).filter(item => item.user_id !== userId) } : current);
+      toast.success('Заявка одобрена');
+    }
     catch (err) { toast.error(err.response?.data?.error || 'Ошибка одобрения'); }
   }
 
   async function reject(userId) {
     const reason = window.prompt('Причина отказа');
     if (!reason?.trim()) return;
-    try { await rejectReferral(userId, reason.trim()); toast.success('Заявка отклонена'); load(); }
+    try {
+      await rejectReferral(userId, reason.trim());
+      setData(current => current ? { ...current, applications: (current.applications || []).filter(item => item.user_id !== userId) } : current);
+      toast.success('Заявка отклонена');
+    }
     catch (err) { toast.error(err.response?.data?.error || 'Ошибка отказа'); }
   }
 

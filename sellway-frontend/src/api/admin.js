@@ -18,7 +18,7 @@ export const runSettingsAction = (action, data = {}) => client.post(
   data,
   { timeout: ['test-smtp', 'test-telegram-connection'].includes(action) ? 60000 : 15000 }
 );
-export const getAdminReferrals = ()         => client.get('/admin/referrals');
+export const getAdminReferrals = ()         => client.get('/admin/referrals', { params: { _fresh: Date.now() } });
 export const saveReferralSettings = (data)  => client.put('/admin/referrals/settings', data);
 export const approveReferral = (userId, data) => client.post(`/admin/referrals/${userId}/approve`, data);
 export const rejectReferral  = (userId, reason) => client.post(`/admin/referrals/${userId}/reject`, { reason });

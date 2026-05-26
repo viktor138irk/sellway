@@ -73,6 +73,7 @@ router.get('/stats', async (req, res) => {
 
 router.get('/referrals', requireRole('admin'), async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const [settings, summary, topReferrers, recentPayments, invited, applications] = await Promise.all([
       query(`SELECT key, value FROM settings WHERE key IN ('referral_enabled','default_referral_commission_rate','max_referral_commission_rate','referral_payout_basis')`),
       query(`SELECT COALESCE(SUM(t.amount),0) AS paid_total,
